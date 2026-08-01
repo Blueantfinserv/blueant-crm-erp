@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: blueant-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: blueant_crm_erp
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - blueant-network
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: blueant-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - blueant-network
+
+  app:
+    build: .
+    container_name: blueant-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/blueant_crm_erp?useSSL=false&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME:-blueant-documents}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-mock-key}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-mock-secret}
+      - JWT_SECRET=5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+      - JWT_EXPIRATION=86400000
+    depends_on:
+      - db
+      - redis
+    networks:
+      - blueant-network
+
+networks:
+  blueant-network:
+    driver: bridge
+
+volumes:
+  db_data:

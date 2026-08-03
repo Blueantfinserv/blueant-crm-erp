@@ -1,6 +1,8 @@
 package com.blueant_crm_erp.config;
 
 import com.zaxxer.hikari.HikariDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -8,9 +10,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 @Configuration
 public class DatabaseConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
 
     /**
      * Binds spring.datasource.* from application.yml into DataSourceProperties
@@ -30,9 +36,58 @@ public class DatabaseConfig {
     @Primary
     @ConfigurationProperties("spring.datasource.hikari")
     public DataSource dataSource(DataSourceProperties properties) {
+        String url = properties.getUrl();
+        if (url != null && url.startsWith("mysql://")) {
+            try {
+                URI uri = new URI(url);
+                String userInfo = uri.getUserInfo();
+                if (userInfo != null) {
+                    int colonIndex = userInfo.indexOf(':');
+                    if (colonIndex != -1) {
+                        properties.setUsername(userInfo.substring(0, colonIndex));
+                        properties.setPassword(userInfo.substring(colonIndex + 1));
+                    } else {
+                        properties.setUsername(userInfo);
+                    }
+                }
+
+                String host = uri.getHost();
+                int port = uri.getPort();
+                String path = uri.getPath();
+                String query = uri.getQuery();
+
+                StringBuilder jdbcUrl = new StringBuilder("jdbc:mysql://").append(host);
+                if (port != -1) {
+                    jdbcUrl.append(":").append(port);
+                }
+                if (path != null) {
+                    jdbcUrl.append(path);
+                }
+                if (query != null) {
+                    jdbcUrl.append("?").append(query);
+                }
+
+                String fixedUrl = jdbcUrl.toString();
+                logger.info("Parsed mysql:// URL. Clean JDBC URL: {}", sanitizeUrl(fixedUrl));
+                properties.setUrl(fixedUrl);
+            } catch (URISyntaxException e) {
+                logger.error("Failed to parse mysql:// database URL: {}", url, e);
+                // Fallback
+                properties.setUrl("jdbc:" + url);
+            }
+        } else {
+            logger.info("Using database URL: {}", sanitizeUrl(url));
+        }
         return properties
                 .initializeDataSourceBuilder()
                 .type(HikariDataSource.class)
                 .build();
+    }
+
+    private String sanitizeUrl(String url) {
+        if (url == null) {
+            return "null";
+        }
+        return url.replaceAll(":[^:@/]+@", ":****@");
     }
 }

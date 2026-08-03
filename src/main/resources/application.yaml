@@ -1,7 +1,7 @@
 # ==============================================================================
 # BlueAnt CRM ERP Platform
 # ==============================================================================
-# Environment : Development
+# Environment : Development / Production (Railway)
 # Framework   : Spring Boot 3.3.x
 # Java        : 21
 # Version     : 1.0.0
@@ -13,7 +13,7 @@
 
 server:
 
-  port: 8080
+  port: ${PORT:8080}
 
   servlet:
     context-path: /api
@@ -51,11 +51,11 @@ spring:
 
     driver-class-name: com.mysql.cj.jdbc.Driver
 
-    url: ${DB_URL:jdbc:mysql://localhost:3306/blueant_crm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata&nullCatalogMeansCurrent=true}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/blueant_crm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata&nullCatalogMeansCurrent=true}
 
-    username: ${DB_USERNAME:root}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
 
-    password: ${DB_PASSWORD:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
 
     hikari:
 
@@ -141,9 +141,9 @@ spring:
       repositories:
         enabled: false
 
-      host: localhost
-      port: 6379
-      password:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
 
       timeout: 2s
 
@@ -172,13 +172,13 @@ spring:
 
   mail:
 
-    host: smtp.gmail.com
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
 
-    port: 587
+    port: ${SPRING_MAIL_PORT:587}
 
-    username: noreply@blueant.in
+    username: ${MAIL_USERNAME:noreply@blueant.in}
 
-    password: ${MAIL_PASSWORD:your-app-password}
+    password: ${MAIL_PASSWORD:}
 
     properties:
 
@@ -238,13 +238,13 @@ app:
 
   support-email: support@blueant.in
 
-  frontend-url: http://localhost:3000
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
 
   cors:
 
     allowed-origins:
 
-      - http://localhost:3000
+      - ${FRONTEND_URL:http://localhost:3000}
       - http://localhost:5173
       - https://crm.blueant.in
 
@@ -254,11 +254,11 @@ app:
 
 jwt:
 
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  secret: ${JWT_SECRET:change-this-in-production}
 
-  expiration-ms: 86400000
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
-  refresh-expiration-ms: 604800000
+  refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
 
 # ==============================================================================
 # Lead Module
@@ -298,6 +298,14 @@ logging:
     org.springframework.http.converter.json: DEBUG
     com.fasterxml.jackson: DEBUG
 
+  pattern:
+
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId}] %-5level %logger{40} - %msg%n"
+
+  file:
+
+    name: logs/blueant-crm-erp.log
+
 # ==============================================================================
 # Actuator Configuration
 # ==============================================================================
@@ -319,11 +327,3 @@ aws:
   s3:
     bucket:
       name: ${AWS_S3_BUCKET_NAME:blueant-documents}
-
-  pattern:
-
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId}] %-5level %logger{40} - %msg%n"
-
-  file:
-
-    name: logs/blueant-crm-erp.log

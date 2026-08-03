@@ -51,11 +51,11 @@ spring:
 
     driver-class-name: com.mysql.cj.jdbc.Driver
 
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/blueant_crm?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata&nullCatalogMeansCurrent=true}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQLHOST:localhost}:${MYSQLPORT:3306}/${MYSQLDATABASE:blueant_crm}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata&nullCatalogMeansCurrent=true}
 
-    username: ${SPRING_DATASOURCE_USERNAME:root}
+    username: ${SPRING_DATASOURCE_USERNAME:${MYSQLUSER:root}}
 
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQLPASSWORD:root}}
 
     hikari:
 
@@ -141,9 +141,9 @@ spring:
       repositories:
         enabled: false
 
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
-      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      host: ${SPRING_DATA_REDIS_HOST:${REDISHOST:localhost}}
+      port: ${SPRING_DATA_REDIS_PORT:${REDISPORT:6379}}
+      password: ${SPRING_DATA_REDIS_PASSWORD:${REDISPASSWORD:}}
 
       timeout: 2s
 

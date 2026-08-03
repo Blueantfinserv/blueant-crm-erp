@@ -1,29 +1,31 @@
-FROM eclipse-temurin:21-jdk-alpine as builder
+FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 
-# Copy Maven wrapper and pom.xml
+# Copy Maven wrapper and configuration
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
-# Make Maven wrapper executable inside the container
+# Ensure execute permissions (both chmod and running via sh as fallback/double-guarantee)
 RUN chmod +x mvnw
 
 # Download dependencies offline (cache layer)
-RUN ./mvnw dependency:go-offline
+RUN sh ./mvnw dependency:go-offline
 
-# Copy source code and build the package
+# Copy source code
 COPY src ./src
-RUN ./mvnw clean package -DskipTests
+
+# Build the production jar package
+RUN sh ./mvnw clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Copy jar from builder stage
+# Copy the exact compiled jar from builder stage
 COPY --from=builder /app/target/blueant-crm-erp-0.0.1-SNAPSHOT.jar app.jar
 
-# Expose server port
+# Expose port 8080
 EXPOSE 8080
 
-# Run the jar file
+# Execute the application
 ENTRYPOINT ["java", "-jar", "app.jar"]

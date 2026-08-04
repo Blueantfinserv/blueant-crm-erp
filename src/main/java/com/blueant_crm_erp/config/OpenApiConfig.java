@@ -8,6 +8,7 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,10 +17,31 @@ import java.util.List;
 @Configuration
 public class OpenApiConfig {
 
+    @Value("${openapi.dev-url:http://localhost:8080/api}")
+    private String devUrl;
+
+    @Value("${openapi.prod-url:https://blueant-crm-erp.up.railway.app/api}")
+    private String prodUrl;
+
     @Bean
     public OpenAPI blueAntOpenAPI() {
 
         final String securitySchemeName = "Bearer Authentication";
+
+        Server devServer = new Server()
+                .url(devUrl)
+                .description("Local Development");
+
+        Server prodServer = new Server()
+                .url(prodUrl)
+                .description("Production Server");
+
+        List<Server> servers;
+        if (System.getenv("RAILWAY_ENVIRONMENT") != null || System.getenv("RAILWAY_STATIC_URL") != null) {
+            servers = List.of(prodServer, devServer);
+        } else {
+            servers = List.of(devServer, prodServer);
+        }
 
         return new OpenAPI()
 
@@ -53,16 +75,7 @@ public class OpenApiConfig {
                         .license(new License()
                                 .name("BlueAnt Proprietary License")))
 
-                .servers(List.of(
-
-                        new Server()
-                                .url("http://localhost:8080/api")
-                                .description("Local Development"),
-
-                        new Server()
-                                .url("https://crm.blueant.in/api")
-                                .description("Production Server")
-                ))
+                .servers(servers)
 
                 .addSecurityItem(
                         new SecurityRequirement()

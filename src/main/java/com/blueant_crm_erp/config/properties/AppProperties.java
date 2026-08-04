@@ -15,5 +15,14 @@ public class AppProperties {
     private String version;
     private String supportEmail;
     private String frontendUrl;
-    private List<String> corsAllowedOrigins;
+    private Cors cors = new Cors();
+
+    @Data
+    public static class Cors {
+        private List<String> allowedOrigins;
+    }
+
+    public List<String> getCorsAllowedOrigins() {
+        return cors != null ? cors.getAllowedOrigins() : java.util.Collections.emptyList();
+    }
 }

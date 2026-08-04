@@ -226,6 +226,10 @@ springdoc:
     enabled: true
     path: /swagger-ui.html
 
+openapi:
+  dev-url: ${OPENAPI_DEV_URL:http://localhost:8080/api}
+  prod-url: ${OPENAPI_PROD_URL:https://blueant-crm-erp.up.railway.app/api}
+
 # ==============================================================================
 # Application
 # ==============================================================================

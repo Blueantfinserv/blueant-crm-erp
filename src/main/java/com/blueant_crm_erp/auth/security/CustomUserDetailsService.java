@@ -2,6 +2,8 @@ package com.blueant_crm_erp.auth.security;
 
 import com.blueant_crm_erp.common.enums.Status;
 import com.blueant_crm_erp.role.entity.Role;
+import com.blueant_crm_erp.role.repository.RolePermissionRepository;
+import com.blueant_crm_erp.permission.entity.Permission;
 import com.blueant_crm_erp.user.entity.User;
 import com.blueant_crm_erp.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ import java.util.Set;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final RolePermissionRepository rolePermissionRepository;
 
     /**
      * Loads authenticated user.
@@ -85,6 +88,13 @@ public class CustomUserDetailsService implements UserDetailsService {
                             "ROLE_" + role.getCode()
                     )
             );
+
+            rolePermissionRepository.findAllByRole(role).forEach(rolePermission -> {
+                Permission permission = rolePermission.getPermission();
+                if (permission != null && Status.ACTIVE.equals(permission.getStatus())) {
+                    authorities.add(new SimpleGrantedAuthority(permission.getCode()));
+                }
+            });
 
         }
 

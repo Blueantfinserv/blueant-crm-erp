@@ -2,6 +2,7 @@ package com.blueant_crm_erp.user.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import com.blueant_crm_erp.common.enums.Gender;
 import com.blueant_crm_erp.common.enums.Status;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -152,6 +153,12 @@ public class CreateUserRequest implements Serializable {
      */
     @Schema(description = "Reporting Manager Id", example = "Example Reporting Manager Id", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long reportingManagerId;
+
+    /**
+     * Gender.
+     */
+    @Schema(description = "Gender", example = "MALE", requiredMode = Schema.RequiredMode.REQUIRED)
+    private Gender gender;
 
     /**
      * User Status.

@@ -2,6 +2,7 @@ package com.blueant_crm_erp.user.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import com.blueant_crm_erp.common.enums.Gender;
 import com.blueant_crm_erp.common.enums.Status;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -96,6 +97,12 @@ public class UserResponse implements Serializable {
      */
     @Schema(description = "Mobile Number", example = "Example Mobile Number")
     private String mobileNumber;
+
+    /**
+     * Gender.
+     */
+    @Schema(description = "Gender", example = "MALE")
+    private Gender gender;
 
     /**
      * Profile Image URL.

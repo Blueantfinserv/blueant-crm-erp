@@ -46,7 +46,7 @@ public class MeetingWorkflowVerificationTest {
         // 1. Create a brand-new lead
         CreateLeadRequest leadRequest = new CreateLeadRequest();
         leadRequest.setClientName("Test Verification Client");
-        leadRequest.setMobileNumber("9998887776");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
         leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
         LeadResponse leadResponse = leadService.createLead(leadRequest, currentUserEmail);
         

@@ -17,21 +17,21 @@ import lombok.NoArgsConstructor;
  * ============================================================================
  *
  * Project : BlueAnt CRM ERP
+ * System  : CRM and Sales Management System
  * Module  : Lead Management
  *
  * Description:
  * Request DTO used by a Sales Person to create a new Lead.
  *
- * This DTO captures only the initial lead information.
- * Business-managed fields such as Lead Code, Unique Lead ID,
- * Lead Date, Lead Time, Assigned Sales Person, Assigned Leader,
- * Lead Status, Lead Stage, Priority, Audit Fields, and Duplicate Status
- * are generated automatically by the backend.
+ * This DTO captures only the initial lead information entered by the user.
+ * System-managed fields such as Lead Code, Unique Lead ID, Lead Status,
+ * Lead Stage, Priority, Duplicate Status, Assignment, Audit Information,
+ * and other workflow-related fields are generated automatically by the backend.
  *
- * NOTE: Meeting information (Meeting Date, Meeting Time, Meeting Mode,
- * Meeting With, etc.) does NOT belong to Lead creation.
- * A meeting happens only after the salesperson contacts the client.
- * Meeting data will be managed by the future Meeting module.
+ * Note:
+ * Meeting details are intentionally excluded because a meeting is scheduled
+ * only after the initial client interaction. Meeting information will be
+ * managed by the Meeting module.
  *
  * ============================================================================
  */
@@ -45,7 +45,8 @@ public class CreateLeadRequest {
      * Client Name
      */
     @NotBlank(message = "Client name is required.")
-    @Size(min = 2, max = 100, message = "Client name must be between 2 and 100 characters.")
+    @Size(min = 2, max = 150,
+            message = "Client name must be between 2 and 150 characters.")
     private String clientName;
 
     /**
@@ -71,15 +72,24 @@ public class CreateLeadRequest {
      * Email Address (Optional)
      */
     @Email(message = "Please enter a valid email address.")
-    @Size(max = 100, message = "Email cannot exceed 100 characters.")
+    @Size(max = 150,
+            message = "Email cannot exceed 150 characters.")
     private String email;
 
     /**
      * Client Location
      */
     @NotBlank(message = "Location is required.")
-    @Size(max = 100, message = "Location cannot exceed 100 characters.")
+    @Size(max = 255,
+            message = "Location cannot exceed 255 characters.")
     private String location;
+
+    /**
+     * Lead Remarks (Optional)
+     */
+    @Size(max = 1000,
+            message = "Remarks cannot exceed 1000 characters.")
+    private String remarks;
 
     /**
      * Lead Source

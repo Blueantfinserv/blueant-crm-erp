@@ -44,7 +44,7 @@ public final class PermissionConstants {
     // API Base Path
     // =========================================================================
 
-    public static final String API_BASE = "/api/v1/permissions";
+    public static final String API_BASE = "/v1/permissions";
 
     // =========================================================================
     // Path Variables

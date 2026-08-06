@@ -47,7 +47,7 @@ public class UserController {
     // Create
     // =========================================================================
 
-    @PostMapping
+    @PostMapping("/create")
     @Operation(
             summary     = "Create New User",
             description = "Creates a new user and validates uniqueness constraints."

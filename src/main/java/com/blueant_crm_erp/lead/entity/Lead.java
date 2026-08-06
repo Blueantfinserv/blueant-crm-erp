@@ -8,7 +8,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 
-import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -77,8 +77,24 @@ public class Lead extends BaseVersionEntity {
     @Column(name = "email", length = 150)
     private String email;
 
-    @Column(name = "location", length = 150)
+    // ========================================================================
+// Lead Location Information
+// ========================================================================
+
+    /**
+     * Human-readable address selected or resolved from GPS.
+     * Example:
+     * Connaught Place, New Delhi, India
+     */
+    @Column(name = "location", length = 255)
     private String location;
+
+    /**
+     * GPS Latitude
+     */
+    @Column(name = "latitude", precision = 10, scale = 7)
+    private BigDecimal latitude;
+
 
     @Enumerated(EnumType.STRING)
     @Column(name = "profession", length = 50)

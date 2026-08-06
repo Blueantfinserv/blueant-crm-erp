@@ -66,6 +66,7 @@ public class LeadServiceImpl implements LeadService {
                 .email(request.getEmail())
                 .location(request.getLocation())
                 .leadSource(request.getLeadSource())
+                .remarks(request.getRemarks())
                 // --- System-managed defaults ---
                 .leadType(LeadType.MUTUAL_FUND)
                 .leadStatus(LeadStatus.NEW)

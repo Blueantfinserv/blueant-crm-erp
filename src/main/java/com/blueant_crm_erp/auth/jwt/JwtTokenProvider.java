@@ -143,7 +143,14 @@ public class JwtTokenProvider {
     public String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader(jwtProperties.getHeader());
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(jwtProperties.getPrefix() + " ")) {
-            return bearerToken.substring(jwtProperties.getPrefix().length() + 1);
+            String token = bearerToken.substring(jwtProperties.getPrefix().length() + 1).trim();
+            if (token.startsWith("\"") && token.endsWith("\"")) {
+                token = token.substring(1, token.length() - 1);
+            }
+            if (token.startsWith("'") && token.endsWith("'")) {
+                token = token.substring(1, token.length() - 1);
+            }
+            return token;
         }
         return null;
     }

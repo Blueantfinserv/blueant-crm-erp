@@ -1,6 +1,7 @@
 package com.blueant_crm_erp.user.service.impl;
 
 import com.blueant_crm_erp.common.dto.response.PageResponse;
+import com.blueant_crm_erp.common.enums.Gender;
 import com.blueant_crm_erp.common.enums.Status;
 import com.blueant_crm_erp.exception.common.BadRequestException;
 import com.blueant_crm_erp.exception.common.ResourceNotFoundException;
@@ -70,6 +71,9 @@ public class UserServiceImpl implements UserService {
         user.setPasswordChangedAt(LocalDateTime.now());
         user.setFailedLoginAttempts(0);
         user.setCredentialsNonExpired(true);
+        if (user.getGender() == null) {
+            user.setGender(Gender.MALE);
+        }
 
         if (request.getRoleId() != null) {
             userValidator.validateRole(request.getRoleId());

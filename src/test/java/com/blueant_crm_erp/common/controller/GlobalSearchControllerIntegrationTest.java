@@ -21,7 +21,7 @@ public class GlobalSearchControllerIntegrationTest {
     @Test
     @WithMockUser(username = "EMP001", roles = {"SALES"})
     public void testGlobalSearch_Authenticated() throws Exception {
-        mockMvc.perform(get("/api/v1/search")
+        mockMvc.perform(get("/v1/search")
                 .param("query", "test"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.query").value("test"));
@@ -29,7 +29,7 @@ public class GlobalSearchControllerIntegrationTest {
 
     @Test
     public void testGlobalSearch_Unauthenticated() throws Exception {
-        mockMvc.perform(get("/api/v1/search")
+        mockMvc.perform(get("/v1/search")
                 .param("query", "test"))
                 .andExpect(status().isUnauthorized());
     }

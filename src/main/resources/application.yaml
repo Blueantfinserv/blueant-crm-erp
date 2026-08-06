@@ -231,6 +231,7 @@ openapi:
   prod-url: ${OPENAPI_PROD_URL:https://blueant-crm-erp.up.railway.app/api}
 
 # ==============================================================================
+# ==============================================================================
 # Application
 # ==============================================================================
 
@@ -242,13 +243,14 @@ app:
 
   support-email: support@blueant.in
 
-  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  frontend-url: ${FRONTEND_URL:http://localhost:8081}
 
   cors:
 
     allowed-origins:
 
-      - ${FRONTEND_URL:http://localhost:3000}
+      - ${FRONTEND_URL:http://localhost:8081}
+      - http://localhost:3000
       - http://localhost:5173
       - http://localhost:8081
       - https://crm.blueant.in

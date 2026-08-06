@@ -55,7 +55,7 @@ public final class UserConstants {
 
     public static final String RESTORE = "/{userId}/restore";
 
-    public static final String API_BASE = "/api/v1/users";
+    public static final String API_BASE = "/v1/users";
 
     public static final String USER_ID = "/{userId}";
 

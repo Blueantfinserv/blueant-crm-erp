@@ -43,7 +43,7 @@ public final class RoleConstants {
     // API Base Path
     // =========================================================================
 
-    public static final String API_BASE = "/api/v1/roles";
+    public static final String API_BASE = "/v1/roles";
 
     // =========================================================================
     // Path Variables

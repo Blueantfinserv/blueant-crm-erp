@@ -89,11 +89,6 @@ public class Lead extends BaseVersionEntity {
     @Column(name = "location", length = 255)
     private String location;
 
-    /**
-     * GPS Latitude
-     */
-    @Column(name = "latitude", precision = 10, scale = 7)
-    private BigDecimal latitude;
 
 
     @Enumerated(EnumType.STRING)

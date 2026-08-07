@@ -10,9 +10,9 @@ import com.blueant_crm_erp.meeting.dto.request.MeetingWorkflowRequest;
 import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.entity.MeetingUpdate;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
+import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
-import com.blueant_crm_erp.meeting.enums.WorkflowDecision;
 import com.blueant_crm_erp.meeting.event.FollowUpCreatedEvent;
 import com.blueant_crm_erp.meeting.event.LeadConvertedEvent;
 import com.blueant_crm_erp.meeting.event.LeadWorkflowTerminatedEvent;
@@ -21,7 +21,6 @@ import com.blueant_crm_erp.meeting.event.MeetingUpdatedEvent;
 import com.blueant_crm_erp.meeting.mapper.MeetingMapper;
 import com.blueant_crm_erp.meeting.repository.MeetingRepository;
 import com.blueant_crm_erp.meeting.service.FollowUpService;
-import com.blueant_crm_erp.meeting.service.MeetingDecisionEngine;
 import com.blueant_crm_erp.meeting.service.MeetingUpdateService;
 import com.blueant_crm_erp.meeting.service.MeetingWorkflowService;
 import com.blueant_crm_erp.meeting.validator.MeetingWorkflowValidator;
@@ -32,24 +31,10 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Set;
-
 /**
  * ============================================================================
- * Meeting Workflow Service Implementation (Orchestrator)
+ * Meeting Workflow Service Implementation (Redesigned & Cleaned)
  * ============================================================================
- *
- * Orchestrates the full meeting update workflow.
- *
- * This class is a pure orchestrator — it delegates every business decision
- * to specialized components:
- *
- * MeetingWorkflowValidator → Guard conditions
- * MeetingUpdateService     → Persist immutable audit record
- * MeetingDecisionEngine    → Evaluate outcome → WorkflowDecision (Strategy)
- * FollowUpService          → Auto-create next sequential meeting
- * LeadService              → Update lead status
- * ApplicationEventPublisher → Publish typed domain events
  */
 @Service
 @RequiredArgsConstructor
@@ -61,22 +46,9 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
     private final MeetingMapper meetingMapper;
     private final MeetingWorkflowValidator workflowValidator;
     private final MeetingUpdateService meetingUpdateService;
-    private final MeetingDecisionEngine decisionEngine;
     private final FollowUpService followUpService;
     private final @Lazy LeadService leadService;
     private final ApplicationEventPublisher eventPublisher;
-
-    /** Terminal outcomes that end the workflow and require no follow-up date */
-    private static final Set<MeetingOutcome> TERMINAL_OUTCOMES = Set.of(
-            MeetingOutcome.CONVERTED,
-            MeetingOutcome.SUCCESS,
-            MeetingOutcome.NOT_INTERESTED,
-            MeetingOutcome.ALREADY_CLIENT,
-            MeetingOutcome.REMOVED,
-            MeetingOutcome.REJECTED,
-            MeetingOutcome.DOCUMENT_PENDING,
-            MeetingOutcome.NO_RESPONSE
-    );
 
     @Override
     public MeetingResponse processWorkflow(String meetingCode, MeetingWorkflowRequest request, String currentUserEmail) {
@@ -87,13 +59,6 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
                 
         String previousStatus = meeting.getMeetingStatus().name();
 
-        if (request.getMeetingOutcome() == null) {
-            log.info("[WorkflowOrchestrator] No outcome provided for meeting: {}. Saving updates only.", meetingCode);
-            MeetingUpdate savedUpdate = meetingUpdateService.persistUpdate(meeting, request, currentUserEmail);
-            eventPublisher.publishEvent(new MeetingUpdatedEvent(this, meeting, savedUpdate, currentUserEmail));
-            return meetingMapper.toResponse(meeting);
-        }
-
         // ── Step 1: Guard Conditions ─────────────────────────────────────────
         workflowValidator.validate(request);
         workflowValidator.validateMeetingState(meeting);
@@ -102,71 +67,86 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
         MeetingUpdate savedUpdate = meetingUpdateService.persistUpdate(meeting, request, currentUserEmail);
 
         // ── Step 3: Publish MeetingCompleted + MeetingUpdated Events ────────
-        eventPublisher.publishEvent(new MeetingCompletedEvent(this, meeting, previousStatus,
-                "Meeting completed via workflow", currentUserEmail));
-        eventPublisher.publishEvent(new MeetingUpdatedEvent(this, meeting, savedUpdate, currentUserEmail));
+        if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
+            eventPublisher.publishEvent(new MeetingUpdatedEvent(this, meeting, savedUpdate, currentUserEmail));
+        } else {
+            eventPublisher.publishEvent(new MeetingCompletedEvent(this, meeting, previousStatus,
+                    "Meeting completed via workflow", currentUserEmail));
+            eventPublisher.publishEvent(new MeetingUpdatedEvent(this, meeting, savedUpdate, currentUserEmail));
+        }
 
-        // ── Step 4: Evaluate Decision ────────────────────────────────────────
-        WorkflowDecision decision = decisionEngine.evaluate(request.getMeetingOutcome());
-        log.info("[WorkflowOrchestrator] Decision for outcome {}: {}", request.getMeetingOutcome(), decision);
-
-        // ── Step 5: Act on Decision (Status Changes Only) ────────────────────
-        switch (decision) {
-            case CONVERT_LEAD -> {
-                changeLeadStatus(meeting, LeadStatus.CONVERTED, LeadStage.INVESTMENT_CONFIRMED,
-                        "Converted from meeting: " + meeting.getMeetingCode(), currentUserEmail);
-                eventPublisher.publishEvent(new LeadConvertedEvent(this, meeting, previousStatus, currentUserEmail));
-                log.info("[WorkflowOrchestrator] Lead {} converted.", meeting.getLead().getLeadCode());
-            }
-            case TERMINATE_WORKFLOW -> {
-                LeadStatus targetStatus = resolveTerminalLeadStatus(request.getMeetingOutcome());
-                changeLeadStatus(meeting, targetStatus, meeting.getLead().getLeadStage(),
-                        "Workflow terminated. Outcome: " + request.getMeetingOutcome().getDisplayName(), currentUserEmail);
-                eventPublisher.publishEvent(new LeadWorkflowTerminatedEvent(this, meeting,
-                        request.getMeetingOutcome(), previousStatus, currentUserEmail));
-                log.info("[WorkflowOrchestrator] Workflow terminated for lead {}. Status → {}",
-                        meeting.getLead().getLeadCode(), targetStatus);
-            }
-            case HOLD_LEAD -> {
-                changeLeadStatus(meeting, LeadStatus.ON_HOLD, meeting.getLead().getLeadStage(),
-                        "No response / on hold from meeting: " + meeting.getMeetingCode(), currentUserEmail);
-                log.info("[WorkflowOrchestrator] Lead {} put on hold.", meeting.getLead().getLeadCode());
-            }
-            case DOCUMENT_PENDING -> {
-                changeLeadStatus(meeting, LeadStatus.DOCUMENT_PENDING, LeadStage.DOCUMENT_COLLECTION,
-                        "Documents pending from meeting: " + meeting.getMeetingCode(), currentUserEmail);
-                log.info("[WorkflowOrchestrator] Lead {} marked document pending.", meeting.getLead().getLeadCode());
-            }
-            case SCHEDULE_FOLLOW_UP -> {
-                // No special lead status changes
+        // ── Step 4: Act on Workflow Transitions ──────────────────────────────
+        if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
+            // CASE 1: Not Conducted
+            changeLeadStatus(meeting, LeadStatus.FOLLOW_UP_PENDING, meeting.getLead().getLeadStage(),
+                    "Meeting not conducted. Lead status updated to Follow-Up Pending.", currentUserEmail);
+            log.info("[WorkflowOrchestrator] Meeting not conducted. Lead {} status set to FOLLOW_UP_PENDING.",
+                    meeting.getLead().getLeadCode());
+        } else {
+            // CASE 2: Conducted
+            switch (request.getLeadStatus()) {
+                case ALREADY_CLIENT -> {
+                    changeLeadStatus(meeting, LeadStatus.ALREADY_CLIENT, meeting.getLead().getLeadStage(),
+                            request.getMeetingRemarks(), currentUserEmail);
+                    eventPublisher.publishEvent(new LeadWorkflowTerminatedEvent(this, meeting,
+                            MeetingLeadStatus.ALREADY_CLIENT, previousStatus, currentUserEmail));
+                    log.info("[WorkflowOrchestrator] Lead {} marked ALREADY_CLIENT.", meeting.getLead().getLeadCode());
+                }
+                case CONVERTED_CLIENT -> {
+                    changeLeadStatus(meeting, LeadStatus.CONVERTED, LeadStage.INVESTMENT_CONFIRMED,
+                            "Converted client from meeting: " + meeting.getMeetingCode(), currentUserEmail);
+                    eventPublisher.publishEvent(new LeadConvertedEvent(this, meeting, previousStatus, currentUserEmail));
+                    log.info("[WorkflowOrchestrator] Lead {} converted.", meeting.getLead().getLeadCode());
+                }
+                case REMOVE_CLIENT -> {
+                    changeLeadStatus(meeting, LeadStatus.REMOVED, meeting.getLead().getLeadStage(),
+                            "Lead removed. Reason: " + request.getReason(), currentUserEmail);
+                    eventPublisher.publishEvent(new LeadWorkflowTerminatedEvent(this, meeting,
+                            MeetingLeadStatus.REMOVE_CLIENT, previousStatus, currentUserEmail));
+                    log.info("[WorkflowOrchestrator] Lead {} removed.", meeting.getLead().getLeadCode());
+                }
+                case CLIENT_NOT_INTERESTED -> {
+                    changeLeadStatus(meeting, LeadStatus.NOT_INTERESTED, meeting.getLead().getLeadStage(),
+                            "Lead not interested. Reason: " + request.getReason(), currentUserEmail);
+                    eventPublisher.publishEvent(new LeadWorkflowTerminatedEvent(this, meeting,
+                            MeetingLeadStatus.CLIENT_NOT_INTERESTED, previousStatus, currentUserEmail));
+                    log.info("[WorkflowOrchestrator] Lead {} marked NOT_INTERESTED.", meeting.getLead().getLeadCode());
+                }
+                case WORK_IN_PROGRESS -> {
+                    changeLeadStatus(meeting, LeadStatus.WORK_IN_PROGRESS, meeting.getLead().getLeadStage(),
+                            "Meeting conducted. Status updated to Work In Progress.", currentUserEmail);
+                    log.info("[WorkflowOrchestrator] Lead {} marked WORK_IN_PROGRESS.", meeting.getLead().getLeadCode());
+                }
             }
         }
 
-        // ── Step 6: Create Next Sequential Meeting (Idempotency-Guarded) ────
-        int nextSequence = meeting.getMeetingNumber() + 1;
-        boolean wasAlreadyCompleted = MeetingStatus.COMPLETED.name().equals(previousStatus);
-        boolean nextSequenceExists = meetingRepository.existsByLeadIdAndMeetingNumber(
-                meeting.getLead().getId(), nextSequence);
+        // ── Step 5: Create Next Sequential Meeting (If applicable) ───────────
+        boolean shouldScheduleFollowUp = (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED)
+                || (request.getMeetingConducted() == MeetingConductStatus.CONDUCTED && request.getLeadStatus() == MeetingLeadStatus.WORK_IN_PROGRESS);
 
-        if (wasAlreadyCompleted || nextSequenceExists) {
-            log.info("[WorkflowOrchestrator] Skipping next meeting creation. " +
-                     "wasAlreadyCompleted={}, nextSequenceExists={} (sequence {})",
-                     wasAlreadyCompleted, nextSequenceExists, nextSequence);
-            return meetingMapper.toResponse(meeting);
+        if (shouldScheduleFollowUp) {
+            int nextSequence = meeting.getMeetingNumber() + 1;
+            boolean wasAlreadyCompleted = MeetingStatus.COMPLETED.name().equals(previousStatus) || MeetingStatus.NOT_CONDUCTED.name().equals(previousStatus);
+            boolean nextSequenceExists = meetingRepository.existsByLeadIdAndMeetingNumber(
+                    meeting.getLead().getId(), nextSequence);
+
+            if (!wasAlreadyCompleted && !nextSequenceExists) {
+                java.time.LocalDate nextDate = request.getNextPlanDate() != null
+                        ? request.getNextPlanDate() : java.time.LocalDate.now().plusDays(1);
+                java.time.LocalTime nextTime = request.getNextPlanTime() != null
+                        ? request.getNextPlanTime() : java.time.LocalTime.of(10, 0);
+
+                Meeting nextMeeting = followUpService.createFollowUp(
+                        meeting, nextDate, nextTime, currentUserEmail);
+                eventPublisher.publishEvent(new FollowUpCreatedEvent(this, meeting, nextMeeting, currentUserEmail));
+                log.info("[WorkflowOrchestrator] Next sequential meeting #{} created: {}",
+                         nextMeeting.getMeetingNumber(), nextMeeting.getMeetingCode());
+
+                return meetingMapper.toResponse(nextMeeting);
+            }
         }
 
-        java.time.LocalDate nextDate = request.getNextMeetingDate() != null
-                ? request.getNextMeetingDate() : java.time.LocalDate.now().plusDays(1);
-        java.time.LocalTime nextTime = request.getNextMeetingTime() != null
-                ? request.getNextMeetingTime() : java.time.LocalTime.of(10, 0);
-
-        Meeting nextMeeting = followUpService.createFollowUp(
-                meeting, nextDate, nextTime, currentUserEmail);
-        eventPublisher.publishEvent(new FollowUpCreatedEvent(this, meeting, nextMeeting, currentUserEmail));
-        log.info("[WorkflowOrchestrator] Next sequential meeting #{} created: {}",
-                 nextMeeting.getMeetingNumber(), nextMeeting.getMeetingCode());
-
-        return meetingMapper.toResponse(nextMeeting);
+        return meetingMapper.toResponse(meeting);
     }
 
     // ── Private Helpers ────────────────────────────────────────────────────
@@ -180,15 +160,5 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
                 .remarks(remarks)
                 .build();
         leadService.changeStatus(req, currentUserEmail);
-    }
-
-    private LeadStatus resolveTerminalLeadStatus(MeetingOutcome outcome) {
-        return switch (outcome) {
-            case NOT_INTERESTED -> LeadStatus.NOT_INTERESTED;
-            case ALREADY_CLIENT -> LeadStatus.ALREADY_CLIENT;
-            case REMOVED        -> LeadStatus.REMOVED;
-            case REJECTED       -> LeadStatus.LOST;
-            default             -> LeadStatus.LOST;
-        };
     }
 }

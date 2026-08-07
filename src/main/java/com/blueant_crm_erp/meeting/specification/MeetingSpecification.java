@@ -3,7 +3,6 @@ package com.blueant_crm_erp.meeting.specification;
 import com.blueant_crm_erp.common.enums.Status;
 import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.enums.MeetingMode;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -26,13 +25,6 @@ public final class MeetingSpecification {
                 meetingStatus == null
                         ? null
                         : cb.equal(root.get("meetingStatus"), meetingStatus);
-    }
-
-    public static Specification<Meeting> hasMeetingOutcome(MeetingOutcome meetingOutcome) {
-        return (root, query, cb) ->
-                meetingOutcome == null
-                        ? null
-                        : cb.equal(root.get("meetingOutcome"), meetingOutcome);
     }
 
     public static Specification<Meeting> hasMeetingMode(MeetingMode meetingMode) {

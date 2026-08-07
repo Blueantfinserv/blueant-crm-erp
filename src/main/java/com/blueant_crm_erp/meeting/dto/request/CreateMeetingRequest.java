@@ -50,8 +50,6 @@ public class CreateMeetingRequest {
     @Size(max = 2000)
     private String discussion;
 
-    private com.blueant_crm_erp.meeting.enums.MeetingOutcome meetingOutcome;
-
     @Size(max = 500)
     private String attachment;
 

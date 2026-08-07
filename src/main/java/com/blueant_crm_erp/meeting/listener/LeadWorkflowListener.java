@@ -52,9 +52,9 @@ public class LeadWorkflowListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onWorkflowTerminated(LeadWorkflowTerminatedEvent event) {
-        log.info("[LeadWorkflow] Lead {} workflow terminated. Terminal outcome: {}. Archiving lead.",
+        log.info("[LeadWorkflow] Lead {} workflow terminated. Terminal status: {}. Archiving lead.",
                 event.getMeeting().getLead().getLeadCode(),
-                event.getTerminalOutcome());
+                event.getTerminalStatus());
     }
 
     @Async

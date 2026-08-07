@@ -71,31 +71,4 @@ public class MeetingValidator {
         }
     }
 
-    /**
-     * Validates the sales-friendly workflow request.
-     *
-     * Business rules enforced:
-     * - When scheduleNextMeeting = true, both nextMeetingDate and nextMeetingTime are mandatory.
-     * - nextMeetingDate cannot be in the past.
-     */
-    public void validateWorkflow(MeetingWorkflowRequest request) {
-
-        if (request == null) {
-            throw new IllegalArgumentException("Workflow request cannot be null.");
-        }
-
-        boolean isTerminal = request.getMeetingOutcome() == com.blueant_crm_erp.meeting.enums.MeetingOutcome.CONVERTED ||
-                             request.getMeetingOutcome() == com.blueant_crm_erp.meeting.enums.MeetingOutcome.REJECTED ||
-                             request.getMeetingOutcome() == com.blueant_crm_erp.meeting.enums.MeetingOutcome.DOCUMENT_PENDING;
-
-        if (!isTerminal) {
-            if (request.getNextMeetingDate() == null || request.getNextMeetingTime() == null) {
-                throw new IllegalArgumentException("Next meeting date and time are required for continuous follow-up (unless outcome is Converted, Rejected, or Document Pending).");
-            }
-
-            if (request.getNextMeetingDate().isBefore(LocalDate.now())) {
-                throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
-            }
-        }
-    }
 }

@@ -17,6 +17,8 @@ import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.meeting.dto.response.MeetingSummaryResponse;
 import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.meeting.mapper.MeetingMapper;
 import com.blueant_crm_erp.meeting.repository.MeetingRepository;
 import com.blueant_crm_erp.meeting.service.MeetingService;
@@ -361,7 +363,8 @@ public class MeetingServiceImpl implements MeetingService {
             Meeting activeMeeting = activeMeetingOpt.get();
             String previousStatus = activeMeeting.getMeetingStatus().name();
             activeMeeting.setMeetingStatus(MeetingStatus.COMPLETED);
-            activeMeeting.setMeetingOutcome(com.blueant_crm_erp.meeting.enums.MeetingOutcome.CONVERTED);
+            activeMeeting.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+            activeMeeting.setLeadStatus(MeetingLeadStatus.CONVERTED_CLIENT);
             Meeting savedMeeting = meetingRepository.save(activeMeeting);
             
             eventPublisher.publishEvent(new MeetingWorkflowEvent(this, savedMeeting, "CONVERTED", previousStatus, "Lead explicitly converted.", currentUserEmail));

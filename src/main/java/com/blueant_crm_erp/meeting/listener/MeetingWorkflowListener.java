@@ -38,9 +38,10 @@ public class MeetingWorkflowListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMeetingCompleted(MeetingCompletedEvent event) {
-        log.info("[MeetingWorkflow] Meeting {} completed. Outcome: {}",
+        log.info("[MeetingWorkflow] Meeting {} completed. Conducted: {} | Lead Status: {}",
                 event.getMeeting().getMeetingCode(),
-                event.getMeeting().getMeetingOutcome());
+                event.getMeeting().getMeetingConducted(),
+                event.getMeeting().getLeadStatus());
         // TODO: Remove from today's pending meetings queue
     }
 

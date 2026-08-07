@@ -4,8 +4,9 @@ import com.blueant_crm_erp.common.base.BaseVersionEntity;
 import com.blueant_crm_erp.common.enums.Status;
 import com.blueant_crm_erp.lead.entity.Lead;
 import com.blueant_crm_erp.meeting.enums.MeetingMode;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -98,10 +99,6 @@ public class Meeting extends BaseVersionEntity {
     @Column(name = "meeting_status", nullable = false, length = 30)
     private MeetingStatus meetingStatus;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "meeting_outcome", length = 30)
-    private MeetingOutcome meetingOutcome;
-
     @Column(name = "client_interest_level", length = 50)
     private String clientInterestLevel;
 
@@ -157,6 +154,55 @@ public class Meeting extends BaseVersionEntity {
 
     @Column(name = "verified_by", length = 100)
     private String verifiedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "meeting_conducted", nullable = false, length = 30)
+    @Builder.Default
+    private MeetingConductStatus meetingConducted = MeetingConductStatus.NOT_CONDUCTED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lead_status", length = 50)
+    private MeetingLeadStatus leadStatus;
+
+    @Column(name = "reason", length = 255)
+    private String reason;
+
+    @Column(name = "current_investment_company", length = 150)
+    private String currentInvestmentCompany;
+
+    @Column(name = "current_advisor", length = 150)
+    private String currentAdvisor;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "investment_type", length = 50)
+    private com.blueant_crm_erp.meeting.enums.InvestmentType investmentType;
+
+    @Column(name = "investment_company", length = 150)
+    private String investmentCompany;
+
+    @Column(name = "current_stage", length = 100)
+    private String currentStage;
+
+    @Column(name = "pan_number", length = 20)
+    private String panNumber;
+
+    @Column(name = "investment_amount", precision = 15, scale = 2)
+    private java.math.BigDecimal investmentAmount;
+
+    @Column(name = "latitude", precision = 10, scale = 7)
+    private java.math.BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 7)
+    private java.math.BigDecimal longitude;
+
+    @Column(name = "location_captured_at")
+    private java.time.LocalDateTime locationCapturedAt;
+
+    @Column(name = "location_accuracy")
+    private Double locationAccuracy;
+
+    @Column(name = "google_maps_url", length = 512)
+    private String googleMapsUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

@@ -110,7 +110,7 @@ public class MeetingController {
 
     @PostMapping("/{meetingCode}/workflow-update")
     @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "Update meeting outcome and optionally schedule a follow-up (sales workflow)")
+    @Operation(summary = "Submit meeting workflow update (conducted/not conducted, lead status, GPS location)")
     public ApiResponse<MeetingResponse> processMeetingWorkflow(@PathVariable String meetingCode,
                                                                @Valid @RequestBody MeetingWorkflowRequest request,
                                                                Principal principal) {

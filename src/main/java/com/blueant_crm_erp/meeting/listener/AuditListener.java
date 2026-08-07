@@ -38,10 +38,11 @@ public class AuditListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMeetingUpdated(MeetingUpdatedEvent event) {
-        log.info("[Audit] MEETING_UPDATED | Meeting: {} | UpdateNumber: {} | Outcome: {} | By: {}",
+        log.info("[Audit] MEETING_UPDATED | Meeting: {} | UpdateNumber: {} | Conducted: {} | LeadStatus: {} | By: {}",
                 event.getMeeting().getMeetingCode(),
                 event.getMeetingUpdate().getUpdateNumber(),
-                event.getMeetingUpdate().getMeetingOutcome(),
+                event.getMeetingUpdate().getMeetingConducted(),
+                event.getMeetingUpdate().getLeadStatus(),
                 event.getTriggeredBy());
     }
 
@@ -66,9 +67,9 @@ public class AuditListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onWorkflowTerminated(LeadWorkflowTerminatedEvent event) {
-        log.info("[Audit] WORKFLOW_TERMINATED | Lead: {} | TerminalOutcome: {} | By: {}",
+        log.info("[Audit] WORKFLOW_TERMINATED | Lead: {} | TerminalStatus: {} | By: {}",
                 event.getMeeting().getLead().getLeadCode(),
-                event.getTerminalOutcome(),
+                event.getTerminalStatus(),
                 event.getTriggeredBy());
     }
 

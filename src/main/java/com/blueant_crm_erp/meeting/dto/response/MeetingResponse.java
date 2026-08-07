@@ -2,8 +2,9 @@ package com.blueant_crm_erp.meeting.dto.response;
 
 import com.blueant_crm_erp.common.enums.Status;
 import com.blueant_crm_erp.meeting.enums.MeetingMode;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -41,8 +42,6 @@ public class MeetingResponse {
 
     private MeetingStatus meetingStatus;
 
-    private MeetingOutcome meetingOutcome;
-
     private MeetingMode meetingMode;
 
     private LocalDate meetingDate;
@@ -69,4 +68,21 @@ public class MeetingResponse {
     private LocalDate nextMeetingDate;
     private LocalTime nextMeetingTime;
 
+    private MeetingConductStatus meetingConducted;
+    private MeetingLeadStatus leadStatus;
+    private String reason;
+    private String currentInvestmentCompany;
+    private String currentAdvisor;
+    private com.blueant_crm_erp.meeting.enums.InvestmentType investmentType;
+    private String investmentCompany;
+    private String currentStage;
+    private String panNumber;
+    private java.math.BigDecimal investmentAmount;
+
+    // GPS fields
+    private java.math.BigDecimal latitude;
+    private java.math.BigDecimal longitude;
+    private java.time.LocalDateTime locationCapturedAt;
+    private Double locationAccuracy;
+    private String googleMapsUrl;
 }

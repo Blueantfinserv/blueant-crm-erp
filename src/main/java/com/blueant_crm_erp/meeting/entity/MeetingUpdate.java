@@ -2,7 +2,8 @@ package com.blueant_crm_erp.meeting.entity;
 
 import com.blueant_crm_erp.common.base.BaseAuditEntity;
 import com.blueant_crm_erp.meeting.enums.MeetingMode;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
+import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -69,17 +70,19 @@ public class MeetingUpdate extends BaseAuditEntity {
     @Column(name = "meeting_mode", length = 30)
     private MeetingMode meetingMode;
 
-    @Column(name = "meeting_conducted", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "meeting_conducted", nullable = false, length = 30)
     @Builder.Default
-    private Boolean meetingConducted = Boolean.FALSE;
+    private MeetingConductStatus meetingConducted = MeetingConductStatus.NOT_CONDUCTED;
 
     // ── Sales Workflow Fields ──────────────────────────────────────────────────
 
     @Column(name = "completed_stage", length = 50)
     private String completedStage;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "lead_status", length = 50)
-    private String leadStatus;
+    private MeetingLeadStatus leadStatus;
 
     @Column(name = "client_status", length = 50)
     private String clientStatus;
@@ -107,11 +110,45 @@ public class MeetingUpdate extends BaseAuditEntity {
     @Column(name = "product_type", length = 100)
     private String productType;
 
-    // ── Outcome ───────────────────────────────────────────────────────────────
+    @Column(name = "reason", length = 255)
+    private String reason;
+
+    @Column(name = "next_plan_time")
+    private LocalTime nextPlanTime;
+
+    @Column(name = "current_investment_company", length = 150)
+    private String currentInvestmentCompany;
+
+    @Column(name = "current_advisor", length = 150)
+    private String currentAdvisor;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "meeting_outcome", length = 30)
-    private MeetingOutcome meetingOutcome;
+    @Column(name = "investment_type", length = 50)
+    private com.blueant_crm_erp.meeting.enums.InvestmentType investmentType;
+
+    @Column(name = "investment_company", length = 150)
+    private String investmentCompany;
+
+    @Column(name = "current_stage", length = 100)
+    private String currentStage;
+
+    @Column(name = "address", length = 500)
+    private String address;
+
+    @Column(name = "latitude", precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 7)
+    private BigDecimal longitude;
+
+    @Column(name = "location_captured_at")
+    private LocalDateTime locationCapturedAt;
+
+    @Column(name = "location_accuracy")
+    private Double locationAccuracy;
+
+    @Column(name = "google_maps_url", length = 512)
+    private String googleMapsUrl;
 
     @Column(name = "discussion", columnDefinition = "TEXT")
     private String discussion;

@@ -1,6 +1,5 @@
 package com.blueant_crm_erp.meeting.dto.response;
 
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingType;
 
@@ -47,11 +46,6 @@ public class MeetingSummaryResponse {
     private MeetingStatus meetingStatus;
 
     /**
-     * Meeting Outcome
-     */
-    private MeetingOutcome meetingOutcome;
-
-    /**
      * Meeting Date
      */
     private LocalDate meetingDate;
@@ -79,12 +73,5 @@ public class MeetingSummaryResponse {
     
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime updatedAt;
-
-    /**
-     * Frontend compatibility aliases
-     */
-    public MeetingOutcome getOutcome() {
-        return this.meetingOutcome;
-    }
 
 }

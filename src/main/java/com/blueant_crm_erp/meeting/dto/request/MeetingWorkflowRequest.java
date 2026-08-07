@@ -1,7 +1,9 @@
 package com.blueant_crm_erp.meeting.dto.request;
 
 import com.blueant_crm_erp.meeting.enums.MeetingMode;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
+import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
+import com.blueant_crm_erp.meeting.enums.InvestmentType;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -38,14 +40,11 @@ public class MeetingWorkflowRequest {
     private MeetingMode meetingMode;
 
     /** Whether the meeting was physically conducted */
-    private Boolean meetingConducted;
+    private MeetingConductStatus meetingConducted;
 
     /** What was discussed in the meeting (max 2000 chars) */
     @Size(max = 2000, message = "Discussion cannot exceed 2000 characters.")
     private String discussion;
-
-    /** Outcome of this meeting */
-    private MeetingOutcome meetingOutcome;
 
     /** Any additional remarks (max 1000 chars) */
     @Size(max = 1000, message = "Remarks cannot exceed 1000 characters.")
@@ -58,8 +57,7 @@ public class MeetingWorkflowRequest {
     private String completedStage;
 
     /** Current lead status as observed by sales rep */
-    @Size(max = 50, message = "Lead status cannot exceed 50 characters.")
-    private String leadStatus;
+    private MeetingLeadStatus leadStatus;
 
     /** Client engagement status (e.g. Interested, Thinking, Not Interested) */
     @Size(max = 50, message = "Client status cannot exceed 50 characters.")
@@ -101,19 +99,19 @@ public class MeetingWorkflowRequest {
     @Size(max = 100, message = "Product type cannot exceed 100 characters.")
     private String productType;
 
-    // ─── Next Follow-up Scheduling ─────────────────────────────────────────
 
-    /**
-     * Set to true to schedule a follow-up meeting.
-     * When true, nextMeetingDate and nextMeetingTime become required.
-     * The follow-up mode inherits from the current meeting.
-     */
-    private Boolean scheduleNextMeeting;
+    private String reason;
+    private LocalTime nextPlanTime;
+    private String currentInvestmentCompany;
+    private String currentAdvisor;
+    private InvestmentType investmentType;
+    private String investmentCompany;
+    private String currentStage;
 
-    /** Required when outcome is FOLLOW_UP_REQUIRED */
-    private LocalDate nextMeetingDate;
-
-    /** Required when outcome is FOLLOW_UP_REQUIRED */
-    private LocalTime nextMeetingTime;
+    // GPS fields — capturedAt is intentionally excluded: backend generates it server-side
+    private java.math.BigDecimal latitude;
+    private java.math.BigDecimal longitude;
+    private String address;
+    private Double accuracy;
 }
 

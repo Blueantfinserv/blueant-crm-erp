@@ -4,7 +4,8 @@ import com.blueant_crm_erp.lead.enums.LeadStatus;
 import com.blueant_crm_erp.meeting.constants.MeetingConstants;
 import com.blueant_crm_erp.meeting.dto.request.MeetingWorkflowRequest;
 import com.blueant_crm_erp.meeting.entity.Meeting;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
+import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -14,35 +15,12 @@ import java.util.Set;
 
 /**
  * ============================================================================
- * Meeting Workflow Validator
+ * Meeting Workflow Validator (Redesigned)
  * ============================================================================
- *
- * Dedicated validator for the meeting workflow update request.
- * Enforces all business guard rules before the workflow is executed.
- *
- * Business Rules:
- * - FOLLOW_UP_REQUIRED and INTERESTED outcomes require next meeting date + time.
- * - Completed/Cancelled meetings cannot be updated.
- * - Converted, Already Client, or Removed leads cannot receive new meetings.
- * - Next meeting date cannot be in the past.
- * - Outcome is required.
  */
 @Component
 @RequiredArgsConstructor
 public class MeetingWorkflowValidator {
-
-    /** Outcomes that do NOT require a next meeting date */
-    private static final Set<MeetingOutcome> TERMINAL_OUTCOMES = Set.of(
-            MeetingOutcome.CONVERTED,
-            MeetingOutcome.SUCCESS,
-            MeetingOutcome.NOT_INTERESTED,
-            MeetingOutcome.ALREADY_CLIENT,
-            MeetingOutcome.REMOVED,
-            MeetingOutcome.REJECTED,
-            MeetingOutcome.DOCUMENT_PENDING,
-            MeetingOutcome.NO_RESPONSE,
-            MeetingOutcome.PENDING
-    );
 
     /** Lead statuses that block any new meeting creation */
     private static final Set<LeadStatus> BLOCKING_LEAD_STATUSES = Set.of(
@@ -60,17 +38,90 @@ public class MeetingWorkflowValidator {
         if (request == null) {
             throw new IllegalArgumentException("Workflow request cannot be null.");
         }
-        if (request.getMeetingOutcome() == null) {
-            throw new IllegalArgumentException("Meeting outcome is required.");
+
+        if (request.getMeetingConducted() == null) {
+            throw new IllegalArgumentException("Meeting Conducted status is required.");
         }
 
-        boolean requiresFollowUp = !TERMINAL_OUTCOMES.contains(request.getMeetingOutcome());
-        if (requiresFollowUp) {
-            if (request.getNextMeetingDate() == null || request.getNextMeetingTime() == null) {
-                throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_REQUIRED);
+        // EVERY submission must capture live GPS location.
+        // NOTE: capturedAt is NOT required from the frontend — it is generated server-side.
+        if (request.getLatitude() == null || request.getLongitude() == null ||
+                request.getAccuracy() == null) {
+            throw new IllegalArgumentException("GPS parameters (latitude, longitude, accuracy) are mandatory for every submission.");
+        }
+
+        if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
+            // CASE 1: Not Conducted
+            if (request.getMeetingRemarks() == null || request.getMeetingRemarks().isBlank()) {
+                throw new IllegalArgumentException("Remarks are mandatory when meeting is not conducted.");
             }
-            if (request.getNextMeetingDate().isBefore(LocalDate.now())) {
+            if (request.getNextPlanDate() == null) {
+                throw new IllegalArgumentException("Next Plan Date is mandatory when meeting is not conducted.");
+            }
+            if (request.getNextPlanDate().isBefore(LocalDate.now())) {
                 throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
+            }
+        } else {
+            // CASE 2: Conducted
+            if (request.getLeadStatus() == null) {
+                throw new IllegalArgumentException("Lead Status is mandatory when meeting is conducted.");
+            }
+
+            // Remarks are mandatory for all Conducted sub-cases
+            if (request.getMeetingRemarks() == null || request.getMeetingRemarks().isBlank()) {
+                throw new IllegalArgumentException("Remarks are mandatory when meeting is conducted.");
+            }
+
+            switch (request.getLeadStatus()) {
+                case ALREADY_CLIENT -> {
+                    if (request.getCurrentInvestmentCompany() == null || request.getCurrentInvestmentCompany().isBlank()) {
+                        throw new IllegalArgumentException("Current Investment Company is mandatory for Already Client status.");
+                    }
+                    if (request.getCurrentAdvisor() == null || request.getCurrentAdvisor().isBlank()) {
+                        throw new IllegalArgumentException("Current Advisor is mandatory for Already Client status.");
+                    }
+                }
+                case CONVERTED_CLIENT -> {
+                    if (request.getPanNumber() == null || request.getPanNumber().isBlank()) {
+                        throw new IllegalArgumentException("PAN Number is mandatory for Converted Client status.");
+                    }
+                    if (request.getInvestmentAmount() == null || request.getInvestmentAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                        throw new IllegalArgumentException("Investment Amount must be greater than zero.");
+                    }
+                    if (request.getInvestmentType() == null) {
+                        throw new IllegalArgumentException("Investment Type is mandatory for Converted Client status.");
+                    }
+                }
+                case REMOVE_CLIENT -> {
+                    if (request.getReason() == null || request.getReason().isBlank()) {
+                        throw new IllegalArgumentException("Reason is mandatory for Remove Client status.");
+                    }
+                    String r = request.getReason().trim();
+                    Set<String> validReasons = Set.of("Duplicate Lead", "Wrong Number", "Fake Lead", "Shifted", "Other");
+                    boolean isValid = validReasons.stream().anyMatch(val -> val.equalsIgnoreCase(r));
+                    if (!isValid) {
+                        throw new IllegalArgumentException("Reason must be one of: Duplicate Lead, Wrong Number, Fake Lead, Shifted, Other.");
+                    }
+                }
+                case CLIENT_NOT_INTERESTED -> {
+                    if (request.getReason() == null || request.getReason().isBlank()) {
+                        throw new IllegalArgumentException("Reason is mandatory for Client Not Interested status.");
+                    }
+                    String r = request.getReason().trim();
+                    Set<String> validReasons = Set.of("Already Investing", "No Interest", "No Funds", "Need Time", "Other");
+                    boolean isValid = validReasons.stream().anyMatch(val -> val.equalsIgnoreCase(r));
+                    if (!isValid) {
+                        throw new IllegalArgumentException("Reason must be one of: Already Investing, No Interest, No Funds, Need Time, Other.");
+                    }
+                }
+                case WORK_IN_PROGRESS -> {
+                    if (request.getNextPlanDate() == null) {
+                        throw new IllegalArgumentException("Next Plan Date is mandatory for Work In Progress status.");
+                    }
+                    if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+                        throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
+                    }
+                }
             }
         }
     }
@@ -83,6 +134,9 @@ public class MeetingWorkflowValidator {
     public void validateMeetingState(Meeting meeting) {
         if (MeetingStatus.COMPLETED.equals(meeting.getMeetingStatus())) {
             throw new IllegalArgumentException(MeetingConstants.MEETING_ALREADY_COMPLETED);
+        }
+        if (MeetingStatus.NOT_CONDUCTED.equals(meeting.getMeetingStatus())) {
+            throw new IllegalArgumentException("Not conducted meetings cannot be updated via workflow.");
         }
         if (MeetingStatus.CANCELLED.equals(meeting.getMeetingStatus())) {
             throw new IllegalArgumentException("Cancelled meetings cannot be updated via workflow.");

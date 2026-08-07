@@ -37,7 +37,7 @@ public class ActivityTimelineListener {
                 .description(event.getDescription())
                 .status(event.getEventType())
                 .sequenceNumber(event.getMeeting().getMeetingNumber())
-                .outcome(event.getMeeting().getMeetingOutcome() != null ? event.getMeeting().getMeetingOutcome().name() : null)
+                .outcome(event.getMeeting().getLeadStatus() != null ? event.getMeeting().getLeadStatus().name() : (event.getMeeting().getMeetingConducted() != null ? event.getMeeting().getMeetingConducted().name() : null))
                 .previousStatus(event.getPreviousStatus())
                 .currentStatus(event.getMeeting().getMeetingStatus() != null ? event.getMeeting().getMeetingStatus().name() : null)
                 .build();

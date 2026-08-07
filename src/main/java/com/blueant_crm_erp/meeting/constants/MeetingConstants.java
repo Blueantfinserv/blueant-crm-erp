@@ -38,8 +38,8 @@ public final class MeetingConstants {
     public static final String INVALID_MEETING_STATUS =
             "Invalid meeting status.";
 
-    public static final String INVALID_MEETING_OUTCOME =
-            "Invalid meeting outcome.";
+
+
 
     public static final String INVALID_MEETING_DATE =
             "Meeting date is invalid.";
@@ -66,7 +66,7 @@ public final class MeetingConstants {
             "Completed meeting cannot be deleted.";
 
     public static final String WORKFLOW_NEXT_MEETING_DATE_REQUIRED =
-            "Next meeting date and time are required when scheduleNextMeeting is true.";
+            "Next plan date is required for follow-up scheduling.";
 
     public static final String WORKFLOW_NEXT_MEETING_DATE_PAST =
             "Next meeting date cannot be in the past.";

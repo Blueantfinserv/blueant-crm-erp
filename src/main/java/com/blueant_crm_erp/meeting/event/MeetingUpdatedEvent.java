@@ -15,7 +15,7 @@ public class MeetingUpdatedEvent extends MeetingWorkflowEvent {
 
     public MeetingUpdatedEvent(Object source, Meeting meeting, MeetingUpdate meetingUpdate, String triggeredBy) {
         super(source, meeting, "WORKFLOW_UPDATE", null,
-                "Meeting update #" + meetingUpdate.getUpdateNumber() + " submitted. Outcome: " + meetingUpdate.getMeetingOutcome(),
+                "Meeting update #" + meetingUpdate.getUpdateNumber() + " submitted. Conducted: " + meetingUpdate.getMeetingConducted() + (meetingUpdate.getLeadStatus() != null ? ", Lead Status: " + meetingUpdate.getLeadStatus() : ""),
                 triggeredBy);
         this.meetingUpdate = meetingUpdate;
     }

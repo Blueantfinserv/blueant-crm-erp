@@ -51,9 +51,9 @@ public class NotificationListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onWorkflowTerminated(LeadWorkflowTerminatedEvent event) {
-        log.info("[Notification] Workflow terminated for lead: {} | Outcome: {}",
+        log.info("[Notification] Workflow terminated for lead: {} | Status: {}",
                 event.getMeeting().getLead().getLeadCode(),
-                event.getTerminalOutcome());
+                event.getTerminalStatus());
         // TODO: Notify team that lead is closed
     }
 

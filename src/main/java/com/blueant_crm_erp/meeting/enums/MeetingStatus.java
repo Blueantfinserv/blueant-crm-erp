@@ -30,7 +30,12 @@ public enum MeetingStatus {
     /**
      * Client did not attend the meeting.
      */
-    NO_SHOW("No Show");
+    NO_SHOW("No Show"),
+
+    /**
+     * Meeting was not conducted.
+     */
+    NOT_CONDUCTED("Not Conducted");
 
     private final String displayName;
 

@@ -72,11 +72,6 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>,
     boolean existsByLeadIdAndMeetingStatus(Long leadId, MeetingStatus meetingStatus);
 
     /**
-     * Find meetings by outcome
-     */
-    List<Meeting> findByMeetingOutcome(com.blueant_crm_erp.meeting.enums.MeetingOutcome meetingOutcome);
-
-    /**
      * Find meetings after or equal to date
      */
     List<Meeting> findByMeetingDateGreaterThanEqual(java.time.LocalDate date);

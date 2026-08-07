@@ -1,23 +1,22 @@
 package com.blueant_crm_erp.meeting.event;
 
 import com.blueant_crm_erp.meeting.entity.Meeting;
-import com.blueant_crm_erp.meeting.enums.MeetingOutcome;
+import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import lombok.Getter;
 
 /**
- * Published when the meeting workflow is terminated due to a terminal outcome.
- * Covers: NOT_INTERESTED, ALREADY_CLIENT, REMOVED, REJECTED.
+ * Published when the meeting workflow is terminated due to a terminal status.
  */
 @Getter
 public class LeadWorkflowTerminatedEvent extends MeetingWorkflowEvent {
 
-    private final MeetingOutcome terminalOutcome;
+    private final MeetingLeadStatus terminalStatus;
 
-    public LeadWorkflowTerminatedEvent(Object source, Meeting meeting, MeetingOutcome terminalOutcome,
+    public LeadWorkflowTerminatedEvent(Object source, Meeting meeting, MeetingLeadStatus terminalStatus,
                                        String previousStatus, String triggeredBy) {
         super(source, meeting, "WORKFLOW_TERMINATED", previousStatus,
-                "Workflow terminated. Outcome: " + terminalOutcome.getDisplayName(),
+                "Workflow terminated. Status: " + terminalStatus.getDisplayName(),
                 triggeredBy);
-        this.terminalOutcome = terminalOutcome;
+        this.terminalStatus = terminalStatus;
     }
 }

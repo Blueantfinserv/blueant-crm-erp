@@ -30,9 +30,10 @@ public class AnalyticsListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMeetingCompleted(MeetingCompletedEvent event) {
-        log.info("[Analytics] Meeting completed: {} | Outcome: {}",
+        log.info("[Analytics] Meeting completed: {} | Conducted: {} | Lead Status: {}",
                 event.getMeeting().getMeetingCode(),
-                event.getMeeting().getMeetingOutcome());
+                event.getMeeting().getMeetingConducted(),
+                event.getMeeting().getLeadStatus());
         // TODO: Increment meeting_completed counter in Redis/analytics store
     }
 
@@ -66,9 +67,9 @@ public class AnalyticsListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onWorkflowTerminated(LeadWorkflowTerminatedEvent event) {
-        log.info("[Analytics] Workflow terminated for lead: {} | Outcome: {}",
+        log.info("[Analytics] Workflow terminated for lead: {} | Status: {}",
                 event.getMeeting().getLead().getLeadCode(),
-                event.getTerminalOutcome());
+                event.getTerminalStatus());
         // TODO: Track termination reasons by category
     }
 

@@ -1,5 +1,2 @@
--- ============================================================================
--- Migration: Add missing google_maps_url column to meeting_updates table
--- ============================================================================
-
-ALTER TABLE meeting_updates ADD COLUMN google_maps_url VARCHAR(512) NULL;
+-- This migration has been intentionally left blank.
+-- The columns (google_maps_url) were already added in V22__redesign_meeting_workflow.sql.

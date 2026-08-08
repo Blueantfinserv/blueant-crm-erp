@@ -24,8 +24,12 @@ WORKDIR /app
 # Copy the exact compiled jar from builder stage
 COPY --from=builder /app/target/blueant-crm-erp-0.0.1-SNAPSHOT.jar app.jar
 
+# Download Flyway CLI
+RUN apk add --no-cache curl tar bash jq && \
+    curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/10.10.0/flyway-commandline-10.10.0.tar.gz | tar xvz
+
 # Expose port 8080
 EXPOSE 8080
 
-# Execute the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Execute the application after one-time repair
+ENTRYPOINT ["sh", "-c", "./flyway-10.10.0/flyway repair -url=\"jdbc:mysql://${MYSQLHOST}:${MYSQLPORT}/${MYSQLDATABASE}\" -user=\"${MYSQLUSER}\" -password=\"${MYSQLPASSWORD}\" && java -jar app.jar"]

@@ -7,6 +7,7 @@ import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
+import com.blueant_crm_erp.exception.lead.LeadTerminalStateException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -150,7 +151,7 @@ public class MeetingWorkflowValidator {
         if (meeting.getLead() != null && meeting.getLead().getLeadStatus() != null) {
             LeadStatus currentLeadStatus = meeting.getLead().getLeadStatus();
             if (BLOCKING_LEAD_STATUSES.contains(currentLeadStatus)) {
-                throw new IllegalArgumentException(
+                throw new LeadTerminalStateException(
                         "Lead is already in a terminal state [" + currentLeadStatus + "]. No further meetings can be processed.");
             }
         }

@@ -304,6 +304,16 @@
 
 			</plugin>
 
+			<plugin>
+				<groupId>org.flywaydb</groupId>
+				<artifactId>flyway-maven-plugin</artifactId>
+				<configuration>
+					<url>jdbc:mysql://localhost:3306/blueant_crm?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=Asia/Kolkata</url>
+					<user>root</user>
+					<password>root</password>
+				</configuration>
+			</plugin>
+
 		</plugins>
 
 	</build>

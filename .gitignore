@@ -35,3 +35,18 @@ build/
 ### Custom Artifacts ###
 logs/
 compile_output.txt
+
+# Cleanup Ignores
+.gemini/
+.antigravity/
+.cursor/
+playwright-report/
+test-results/
+screenshots/
+logs/
+*.log
+verification_report.md
+walkthrough.md
+e2e-result.json
+tmp/
+temp/

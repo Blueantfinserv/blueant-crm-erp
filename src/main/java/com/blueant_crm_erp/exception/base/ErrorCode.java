@@ -89,6 +89,7 @@ public enum ErrorCode {
     LEAD_ACCESS_DENIED,
     LEAD_TRANSFER_NOT_ALLOWED,
     INVALID_LEAD_STATUS,
+    LEAD_TERMINAL_STATE,
 
     /*
      * =====================================================

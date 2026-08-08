@@ -1,7 +1,8 @@
 -- ============================================================================
--- Migration: Modify meeting_conducted column type from BIT to VARCHAR(30)
+-- V27: Fix meeting_conducted column type on meeting_updates
+-- ============================================================================
+-- SAFE NO-OP: meeting_conducted was already converted to VARCHAR(30) by V22.
+-- This migration is retained to preserve Flyway version history.
 -- ============================================================================
 
-ALTER TABLE meeting_updates MODIFY COLUMN meeting_conducted VARCHAR(30) NULL;
-UPDATE meeting_updates SET meeting_conducted = CASE WHEN meeting_conducted = '1' OR meeting_conducted = 'true' THEN 'CONDUCTED' ELSE 'NOT_CONDUCTED' END;
-ALTER TABLE meeting_updates MODIFY COLUMN meeting_conducted VARCHAR(30) NOT NULL DEFAULT 'NOT_CONDUCTED';
+SELECT 1;

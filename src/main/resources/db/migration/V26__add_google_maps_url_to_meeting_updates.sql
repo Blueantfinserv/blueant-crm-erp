@@ -1,5 +1,8 @@
 -- ============================================================================
--- Migration: Add missing google_maps_url column to meeting_updates table
+-- V26: Add google_maps_url to meeting_updates
+-- ============================================================================
+-- SAFE NO-OP: google_maps_url was already added by V22.
+-- This migration is retained to preserve Flyway version history.
 -- ============================================================================
 
-ALTER TABLE meeting_updates ADD COLUMN google_maps_url VARCHAR(512) NULL;
+SELECT 1;

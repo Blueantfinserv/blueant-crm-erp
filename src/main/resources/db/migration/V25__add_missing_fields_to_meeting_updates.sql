@@ -1,8 +1,23 @@
 -- ============================================================================
--- V25: Add missing fields to meeting_updates
+-- Migration: V25 — No-op (superseded by V21)
 -- ============================================================================
--- SAFE NO-OP: All columns below were already added by V21.
--- This migration is retained to preserve Flyway version history.
+-- HISTORY: This migration was originally written to add workflow and GPS fields
+-- to the meeting_updates table. However, ALL of these columns were already added
+-- by V21__extend_meeting_workflow_fields.sql:
+--
+--   reason                    VARCHAR(255)  — added by V21
+--   next_plan_time            TIME          — added by V21
+--   current_investment_company VARCHAR(150) — added by V21
+--   current_advisor           VARCHAR(150)  — added by V21
+--   investment_type           VARCHAR(50)   — added by V21
+--   investment_company        VARCHAR(150)  — added by V21
+--   current_stage             VARCHAR(100)  — added by V21
+--   latitude                  DECIMAL(10,7) — added by V21
+--   longitude                 DECIMAL(10,7) — added by V21
+--   location_captured_at      DATETIME      — added by V21
+--   location_accuracy         DOUBLE        — added by V21
+--
+-- Attempting to re-add these columns causes Error 1060: Duplicate column name.
+-- This migration is intentionally left as a no-op to preserve version history.
 -- ============================================================================
-
 SELECT 1;

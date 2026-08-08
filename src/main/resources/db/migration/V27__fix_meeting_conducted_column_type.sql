@@ -1,8 +1,17 @@
 -- ============================================================================
--- V27: Fix meeting_conducted column type on meeting_updates
+-- Migration: V27 — No-op (superseded by V22)
 -- ============================================================================
--- SAFE NO-OP: meeting_conducted was already converted to VARCHAR(30) by V22.
--- This migration is retained to preserve Flyway version history.
+-- HISTORY: This migration was originally written to modify the meeting_conducted
+-- column on meeting_updates from TINYINT to VARCHAR(30). However, this was
+-- already done by V22__redesign_meeting_workflow.sql (lines 9-11):
+--
+--   ALTER TABLE meeting_updates MODIFY COLUMN meeting_conducted VARCHAR(30);
+--   UPDATE meeting_updates SET meeting_conducted = ...;
+--   ALTER TABLE meeting_updates MODIFY COLUMN meeting_conducted VARCHAR(30) NOT NULL DEFAULT 'NOT_CONDUCTED';
+--
+-- Re-running the UPDATE in this migration would incorrectly convert rows already
+-- holding 'CONDUCTED'/'NOT_CONDUCTED' values back to 'NOT_CONDUCTED', causing
+-- data corruption. This migration is a no-op to preserve version history and
+-- protect production data.
 -- ============================================================================
-
 SELECT 1;

@@ -1,8 +1,13 @@
 -- ============================================================================
--- V26: Add google_maps_url to meeting_updates
+-- Migration: V26 — No-op (superseded by V22)
 -- ============================================================================
--- SAFE NO-OP: google_maps_url was already added by V22.
--- This migration is retained to preserve Flyway version history.
+-- HISTORY: This migration was originally written to add the google_maps_url
+-- column to the meeting_updates table. However, this column was already added
+-- by V22__redesign_meeting_workflow.sql:
+--
+--   google_maps_url  VARCHAR(512)  — added by V22 (line 20)
+--
+-- Attempting to re-add this column causes Error 1060: Duplicate column name.
+-- This migration is intentionally left as a no-op to preserve version history.
 -- ============================================================================
-
 SELECT 1;

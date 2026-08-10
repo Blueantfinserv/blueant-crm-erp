@@ -7,12 +7,12 @@
 # Version     : 1.0.0
 # ==============================================================================
 
+
 # ==============================================================================
 # Server Configuration
 # ==============================================================================
 
 server:
-
   port: ${PORT:8080}
 
   servlet:
@@ -31,6 +31,7 @@ server:
       - text/css
       - application/javascript
 
+
 # ==============================================================================
 # Spring Configuration
 # ==============================================================================
@@ -43,12 +44,12 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+
   # ============================================================================
   # Database
   # ============================================================================
 
   datasource:
-
     driver-class-name: com.mysql.cj.jdbc.Driver
 
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQLHOST:localhost}:${MYSQLPORT:3306}/${MYSQLDATABASE:blueant_crm}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata&nullCatalogMeansCurrent=true}
@@ -58,7 +59,6 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:${MYSQLPASSWORD:root}}
 
     hikari:
-
       pool-name: BlueantHikariPool
 
       minimum-idle: 5
@@ -74,26 +74,25 @@ spring:
 
       leak-detection-threshold: 60000
 
+
   # ============================================================================
   # Hibernate / JPA
   # ============================================================================
 
   jpa:
-
     open-in-view: false
 
-    show-sql: true
+    # Production-safe: SQL logging disabled
+    show-sql: false
 
     hibernate:
       ddl-auto: validate
 
     properties:
-
       hibernate:
-
-        format_sql: true
-        highlight_sql: true
-        use_sql_comments: true
+        format_sql: false
+        highlight_sql: false
+        use_sql_comments: false
 
         jdbc:
           batch_size: 50
@@ -103,21 +102,21 @@ spring:
 
         generate_statistics: false
 
+
   # ============================================================================
   # SQL Initialization
   # ============================================================================
 
   sql:
-
     init:
       mode: never
+
 
   # ============================================================================
   # Flyway Migration
   # ============================================================================
 
   flyway:
-
     enabled: true
 
     locations:
@@ -126,52 +125,51 @@ spring:
     baseline-on-migrate: true
     validate-on-migrate: true
 
-    # Production Safe Configuration
+    # Production-safe configuration
     clean-disabled: true
     clean-on-validation-error: false
+
 
   # ============================================================================
   # Redis
   # ============================================================================
 
   data:
-
     redis:
-
       repositories:
         enabled: false
 
       host: ${SPRING_DATA_REDIS_HOST:${REDISHOST:localhost}}
+
       port: ${SPRING_DATA_REDIS_PORT:${REDISPORT:6379}}
+
       password: ${SPRING_DATA_REDIS_PASSWORD:${REDISPASSWORD:}}
 
       timeout: 2s
 
       lettuce:
-
         pool:
-
           max-active: 16
           max-idle: 8
           min-idle: 2
+
 
   # ============================================================================
   # Cache
   # ============================================================================
 
   cache:
-
     type: redis
 
     redis:
       time-to-live: 86400000
+
 
   # ============================================================================
   # Mail
   # ============================================================================
 
   mail:
-
     host: ${SPRING_MAIL_HOST:smtp.gmail.com}
 
     port: ${SPRING_MAIL_PORT:587}
@@ -181,11 +179,8 @@ spring:
     password: ${MAIL_PASSWORD:}
 
     properties:
-
       mail:
-
         smtp:
-
           auth: true
 
           connectiontimeout: 5000
@@ -196,12 +191,12 @@ spring:
             enable: true
             required: true
 
+
   # ============================================================================
   # Jackson
   # ============================================================================
 
   jackson:
-
     time-zone: Asia/Kolkata
 
     date-format: yyyy-MM-dd HH:mm:ss
@@ -211,6 +206,7 @@ spring:
 
     deserialization:
       fail-on-unknown-properties: false
+
 
 # ==============================================================================
 # OpenAPI / Swagger
@@ -226,13 +222,14 @@ springdoc:
     enabled: true
     path: /swagger-ui.html
 
-openapi:
-  dev-url: ${OPENAPI_DEV_URL:http://localhost:8080/api}
-  prod-url: ${OPENAPI_PROD_URL:https://blueant-crm-erp.up.railway.app/api}
+  openapi:
+    dev-url: ${OPENAPI_DEV_URL:http://localhost:8080/api}
+
+    prod-url: ${OPENAPI_PROD_URL:https://blueant-crm-erp.up.railway.app/api}
+
 
 # ==============================================================================
-# ==============================================================================
-# Application
+# Application Configuration
 # ==============================================================================
 
 app:
@@ -246,17 +243,16 @@ app:
   frontend-url: ${FRONTEND_URL:http://localhost:8081}
 
   cors:
-
     allowed-origins:
-
       - ${FRONTEND_URL:http://localhost:8081}
       - http://localhost:3000
       - http://localhost:5173
       - http://localhost:8081
       - https://crm.blueant.in
 
+
 # ==============================================================================
-# JWT
+# JWT Configuration
 # ==============================================================================
 
 jwt:
@@ -266,6 +262,7 @@ jwt:
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
   refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+
 
 # ==============================================================================
 # Lead Module
@@ -281,59 +278,80 @@ lead:
 
   app-visible-delay-minutes: 5
 
+
 # ==============================================================================
-# Logging
+# Logging Configuration
 # ==============================================================================
 
 logging:
 
   level:
 
+    # Global
     root: INFO
 
-    com.blueant_crm_erp: DEBUG
+    # BlueAnt Application
+    com.blueant_crm_erp: INFO
 
+    # Spring Security
     org.springframework.security: INFO
 
-    org.hibernate.SQL: DEBUG
+    # Hibernate SQL
+    # Disabled in production to prevent Railway log flooding
+    org.hibernate.SQL: OFF
 
-    org.hibernate.orm.jdbc.bind: TRACE
+    # Hibernate parameter binding
+    # VERY IMPORTANT: prevents thousands of parameter logs
+    org.hibernate.orm.jdbc.bind: OFF
 
-    com.blueant_crm_erp.meeting.controller: DEBUG
-    com.blueant_crm_erp.meeting.service: DEBUG
-    com.blueant_crm_erp.meeting.mapper: DEBUG
-    org.springframework.http.converter.json: DEBUG
-    com.fasterxml.jackson: DEBUG
+    # Hibernate SQL type logging
+    org.hibernate.type.descriptor.sql: OFF
+
+    # HTTP / JSON
+    org.springframework.http.converter.json: INFO
+
+    # Jackson
+    com.fasterxml.jackson: INFO
+
 
   pattern:
 
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId}] %-5level %logger{40} - %msg%n"
 
+
   file:
 
     name: logs/blueant-crm-erp.log
+
 
 # ==============================================================================
 # Actuator Configuration
 # ==============================================================================
 
 management:
+
   endpoints:
     web:
       exposure:
-        include: health, info, metrics, prometheus
+        include: health,info,metrics,prometheus
+
   endpoint:
     health:
       show-details: always
+
   health:
     redis:
       enabled: false
+
 
 # ==============================================================================
 # AWS Configuration
 # ==============================================================================
 
 aws:
+
   s3:
+
     bucket:
+
       name: ${AWS_S3_BUCKET_NAME:blueant-documents}

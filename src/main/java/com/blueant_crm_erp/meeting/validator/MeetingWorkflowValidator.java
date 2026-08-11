@@ -99,4 +99,15 @@ public class MeetingWorkflowValidator {
             }
         }
     }
+
+    /**
+     * Validates the transition itself between the current meeting state and request parameters.
+     */
+    public void validateWorkflowTransition(Meeting meeting, MeetingWorkflowRequest request) {
+        if (request.getNextPlanDate() != null && request.getLeadStatus() == MeetingLeadStatus.WORK_IN_PROGRESS) {
+            if (meeting.getMeetingNumber() >= 10) {
+                throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");
+            }
+        }
+    }
 }

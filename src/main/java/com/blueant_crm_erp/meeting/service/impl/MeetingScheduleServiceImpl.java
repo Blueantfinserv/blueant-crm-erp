@@ -1,6 +1,11 @@
 package com.blueant_crm_erp.meeting.service.impl;
 
 import com.blueant_crm_erp.common.enums.Status;
+import com.blueant_crm_erp.lead.enums.LeadStatus;
+import com.blueant_crm_erp.lead.enums.LeadStage;
+import com.blueant_crm_erp.lead.dto.request.UpdateLeadStatusRequest;
+import com.blueant_crm_erp.lead.service.LeadService;
+import org.springframework.context.annotation.Lazy;
 import com.blueant_crm_erp.exception.lead.LeadNotFoundException;
 import com.blueant_crm_erp.exception.meeting.MeetingNotFoundException;
 import com.blueant_crm_erp.lead.entity.Lead;
@@ -37,6 +42,7 @@ public class MeetingScheduleServiceImpl implements MeetingScheduleService {
     private final LeadRepository leadRepository;
     private final MeetingMapper meetingMapper;
     private final MeetingScheduleValidator meetingScheduleValidator;
+    private final @Lazy LeadService leadService;
 
     @Override
     public MeetingResponse scheduleMeeting(CreateMeetingRequest request, String currentUserEmail) {
@@ -52,9 +58,29 @@ public class MeetingScheduleServiceImpl implements MeetingScheduleService {
         meeting.setMeetingCode(MeetingCodeGenerator.generate(count));
         
         Optional<Meeting> lastMeeting = meetingRepository.findTopByLeadIdOrderByMeetingNumberDesc(lead.getId());
-        meeting.setMeetingNumber(lastMeeting.map(m -> m.getMeetingNumber() + 1).orElse(MeetingConstants.FIRST_MEETING_NUMBER));
+        int nextMeetingNumber = lastMeeting.map(m -> m.getMeetingNumber() + 1).orElse(MeetingConstants.FIRST_MEETING_NUMBER);
+        if (nextMeetingNumber > 10) {
+            throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");
+        }
+        meeting.setMeetingNumber(nextMeetingNumber);
         meeting.setMeetingType(com.blueant_crm_erp.meeting.enums.MeetingType.INTRO);
-        meeting.setMeetingTitle(meeting.getMeetingNumber() == MeetingConstants.INTRO_MEETING_NUMBER ? "Intro Meeting" : "Meeting " + meeting.getMeetingNumber());
+
+        String title;
+        if (nextMeetingNumber == 1) {
+            title = "Intro Meeting";
+        } else {
+            int meetingIndex = nextMeetingNumber - 1;
+            if (meetingIndex == 1) {
+                title = "1st Meeting";
+            } else if (meetingIndex == 2) {
+                title = "2nd Meeting";
+            } else if (meetingIndex == 3) {
+                title = "3rd Meeting";
+            } else {
+                title = meetingIndex + "th Meeting";
+            }
+        }
+        meeting.setMeetingTitle(title);
 
         meeting.setLead(lead);
         meeting.setAssignedEmployee(lead.getAssignedSalesPerson());
@@ -62,6 +88,19 @@ public class MeetingScheduleServiceImpl implements MeetingScheduleService {
         meeting.setStatus(Status.ACTIVE);
 
         Meeting savedMeeting = meetingRepository.save(meeting);
+
+        // Update Lead status/stage to MEETING_SCHEDULED / INTRO_MEETING_SCHEDULED for the first meeting
+        if (nextMeetingNumber == 1) {
+            UpdateLeadStatusRequest statusReq = UpdateLeadStatusRequest.builder()
+                    .leadId(lead.getId())
+                    .leadStatus(LeadStatus.MEETING_SCHEDULED)
+                    .leadStage(LeadStage.INTRO_MEETING_SCHEDULED)
+                    .remarks("Intro Meeting scheduled manually. Lead moved to Meeting Scheduled.")
+                    .build();
+            leadService.changeStatus(statusReq, currentUserEmail);
+            log.info("Lead {} status updated to MEETING_SCHEDULED after manual Intro Meeting creation.", lead.getLeadCode());
+        }
+
         return meetingMapper.toResponse(savedMeeting);
     }
 

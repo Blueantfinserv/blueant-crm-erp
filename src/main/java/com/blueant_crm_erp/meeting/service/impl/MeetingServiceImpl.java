@@ -83,8 +83,29 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.setMeetingCode(MeetingCodeGenerator.generate(count));
         
         Optional<Meeting> lastMeeting = meetingRepository.findTopByLeadIdOrderByMeetingNumberDesc(lead.getId());
-        meeting.setMeetingNumber(lastMeeting.map(m -> m.getMeetingNumber() + 1).orElse(MeetingConstants.FIRST_MEETING_NUMBER));
+        int nextMeetingNumber = lastMeeting.map(m -> m.getMeetingNumber() + 1).orElse(MeetingConstants.FIRST_MEETING_NUMBER);
+        if (nextMeetingNumber > 10) {
+            throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");
+        }
+        meeting.setMeetingNumber(nextMeetingNumber);
         meeting.setMeetingType(com.blueant_crm_erp.meeting.enums.MeetingType.INTRO);
+
+        String title;
+        if (nextMeetingNumber == 1) {
+            title = "Intro Meeting";
+        } else {
+            int meetingIndex = nextMeetingNumber - 1;
+            if (meetingIndex == 1) {
+                title = "1st Meeting";
+            } else if (meetingIndex == 2) {
+                title = "2nd Meeting";
+            } else if (meetingIndex == 3) {
+                title = "3rd Meeting";
+            } else {
+                title = meetingIndex + "th Meeting";
+            }
+        }
+        meeting.setMeetingTitle(title);
 
         meeting.setLead(lead);
         meeting.setAssignedEmployee(lead.getAssignedSalesPerson());
@@ -92,6 +113,18 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.setStatus(Status.ACTIVE);
 
         Meeting savedMeeting = meetingRepository.save(meeting);
+
+        // Update Lead status/stage to MEETING_SCHEDULED / INTRO_MEETING_SCHEDULED for the first meeting
+        if (nextMeetingNumber == 1) {
+            UpdateLeadStatusRequest statusReq = UpdateLeadStatusRequest.builder()
+                    .leadId(lead.getId())
+                    .leadStatus(LeadStatus.MEETING_SCHEDULED)
+                    .leadStage(com.blueant_crm_erp.lead.enums.LeadStage.INTRO_MEETING_SCHEDULED)
+                    .remarks("Intro Meeting scheduled manually. Lead moved to Meeting Scheduled.")
+                    .build();
+            leadService.changeStatus(statusReq, currentUserEmail);
+            log.info("Lead {} status updated to MEETING_SCHEDULED after manual Intro Meeting creation.", lead.getLeadCode());
+        }
         
         eventPublisher.publishEvent(new MeetingWorkflowEvent(this, savedMeeting, "SCHEDULED", null, "Meeting scheduled manually", currentUserEmail));
         

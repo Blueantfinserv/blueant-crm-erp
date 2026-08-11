@@ -42,6 +42,9 @@ public class FollowUpServiceImpl implements FollowUpService {
                 currentMeeting.getMeetingNumber(), currentMeeting.getLead().getLeadCode());
 
         int nextMeetingNumber = currentMeeting.getMeetingNumber() + 1;
+        if (nextMeetingNumber > 10) {
+            throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");
+        }
 
         // Rule 6: Only ONE meeting should have Status = SCHEDULED per lead
         if (meetingRepository.existsByLeadIdAndMeetingStatus(

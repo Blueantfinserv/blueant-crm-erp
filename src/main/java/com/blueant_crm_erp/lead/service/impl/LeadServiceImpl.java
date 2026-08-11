@@ -166,6 +166,9 @@ public class LeadServiceImpl implements LeadService {
                 .orElseThrow(() -> new LeadNotFoundException(request.getLeadId().toString()));
         
         lead.setLeadStatus(request.getLeadStatus());
+        if (request.getLeadStage() != null) {
+            lead.setLeadStage(request.getLeadStage());
+        }
         if(request.getRemarks() != null) {
             lead.setRemarks(request.getRemarks());
         }

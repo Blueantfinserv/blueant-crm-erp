@@ -67,6 +67,7 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
         // ── Step 1: Guard Conditions ─────────────────────────────────────────
         workflowValidator.validate(request);
         workflowValidator.validateMeetingState(meeting);
+        workflowValidator.validateWorkflowTransition(meeting, request);
 
         // ── Step 2: Persist Immutable Audit Record ───────────────────────────
         MeetingUpdate savedUpdate = meetingUpdateService.persistUpdate(meeting, request, currentUserEmail);

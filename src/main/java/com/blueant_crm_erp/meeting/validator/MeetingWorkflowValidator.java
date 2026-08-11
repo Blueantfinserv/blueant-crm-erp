@@ -40,89 +40,32 @@ public class MeetingWorkflowValidator {
             throw new IllegalArgumentException("Workflow request cannot be null.");
         }
 
-        if (request.getMeetingConducted() == null) {
-            throw new IllegalArgumentException("Meeting Conducted status is required.");
+        if (request.getMeetingConducted() != null && request.getMeetingConducted() != MeetingConductStatus.CONDUCTED) {
+            throw new IllegalArgumentException("Meeting Workflow Update only supports conducted meetings.");
         }
 
-        // EVERY submission must capture live GPS location.
-        // NOTE: capturedAt is NOT required from the frontend — it is generated server-side.
-        if (request.getLatitude() == null || request.getLongitude() == null ||
-                request.getAccuracy() == null) {
-            throw new IllegalArgumentException("GPS parameters (latitude, longitude, accuracy) are mandatory for every submission.");
+        if (request.getLeadStatus() == null) {
+            throw new IllegalArgumentException("Lead Status is mandatory when meeting is conducted.");
         }
 
-        if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
-            // CASE 1: Not Conducted
-            if (request.getMeetingRemarks() == null || request.getMeetingRemarks().isBlank()) {
-                throw new IllegalArgumentException("Remarks are mandatory when meeting is not conducted.");
+        // Validate aloneWith value if provided
+        if (request.getAloneWith() != null) {
+            String aw = request.getAloneWith().trim();
+            if (!"SELF".equalsIgnoreCase(aw) && !"SOMEONE".equalsIgnoreCase(aw)) {
+                throw new IllegalArgumentException("Alone with must be either SELF or SOMEONE.");
             }
-            if (request.getNextPlanDate() == null) {
-                throw new IllegalArgumentException("Next Plan Date is mandatory when meeting is not conducted.");
+            if ("SELF".equalsIgnoreCase(aw)) {
+                if ((request.getPersonName() != null && !request.getPersonName().isBlank()) ||
+                    (request.getPosition() != null && !request.getPosition().isBlank())) {
+                    throw new IllegalArgumentException("Person name and position must be null when aloneWith is SELF.");
+                }
             }
+        }
+
+        // Validate nextPlanDate if provided
+        if (request.getNextPlanDate() != null) {
             if (request.getNextPlanDate().isBefore(LocalDate.now())) {
                 throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
-            }
-        } else {
-            // CASE 2: Conducted
-            if (request.getLeadStatus() == null) {
-                throw new IllegalArgumentException("Lead Status is mandatory when meeting is conducted.");
-            }
-
-            // Remarks are mandatory for all Conducted sub-cases
-            if (request.getMeetingRemarks() == null || request.getMeetingRemarks().isBlank()) {
-                throw new IllegalArgumentException("Remarks are mandatory when meeting is conducted.");
-            }
-
-            switch (request.getLeadStatus()) {
-                case ALREADY_CLIENT -> {
-                    if (request.getCurrentInvestmentCompany() == null || request.getCurrentInvestmentCompany().isBlank()) {
-                        throw new IllegalArgumentException("Current Investment Company is mandatory for Already Client status.");
-                    }
-                    if (request.getCurrentAdvisor() == null || request.getCurrentAdvisor().isBlank()) {
-                        throw new IllegalArgumentException("Current Advisor is mandatory for Already Client status.");
-                    }
-                }
-                case CONVERTED_CLIENT -> {
-                    if (request.getPanNumber() == null || request.getPanNumber().isBlank()) {
-                        throw new IllegalArgumentException("PAN Number is mandatory for Converted Client status.");
-                    }
-                    if (request.getInvestmentAmount() == null || request.getInvestmentAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
-                        throw new IllegalArgumentException("Investment Amount must be greater than zero.");
-                    }
-                    if (request.getInvestmentType() == null) {
-                        throw new IllegalArgumentException("Investment Type is mandatory for Converted Client status.");
-                    }
-                }
-                case REMOVE_CLIENT -> {
-                    if (request.getReason() == null || request.getReason().isBlank()) {
-                        throw new IllegalArgumentException("Reason is mandatory for Remove Client status.");
-                    }
-                    String r = request.getReason().trim();
-                    Set<String> validReasons = Set.of("Duplicate Lead", "Wrong Number", "Fake Lead", "Shifted", "Other");
-                    boolean isValid = validReasons.stream().anyMatch(val -> val.equalsIgnoreCase(r));
-                    if (!isValid) {
-                        throw new IllegalArgumentException("Reason must be one of: Duplicate Lead, Wrong Number, Fake Lead, Shifted, Other.");
-                    }
-                }
-                case CLIENT_NOT_INTERESTED -> {
-                    if (request.getReason() == null || request.getReason().isBlank()) {
-                        throw new IllegalArgumentException("Reason is mandatory for Client Not Interested status.");
-                    }
-                    String r = request.getReason().trim();
-                    Set<String> validReasons = Set.of("Already Investing", "No Interest", "No Funds", "Need Time", "Other");
-                    boolean isValid = validReasons.stream().anyMatch(val -> val.equalsIgnoreCase(r));
-                    if (!isValid) {
-                        throw new IllegalArgumentException("Reason must be one of: Already Investing, No Interest, No Funds, Need Time, Other.");
-                    }
-                }
-                case WORK_IN_PROGRESS -> {
-                    if (request.getNextPlanDate() == null) {
-                        throw new IllegalArgumentException("Next Plan Date is mandatory for Work In Progress status.");
-                    }
-                    if (request.getNextPlanDate().isBefore(LocalDate.now())) {
-                        throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
-                    }
-                }
             }
         }
     }

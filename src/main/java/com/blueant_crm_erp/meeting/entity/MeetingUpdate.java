@@ -93,6 +93,15 @@ public class MeetingUpdate extends BaseAuditEntity {
     @Column(name = "joined_meeting_with", length = 255)
     private String joinedMeetingWith;
 
+    @Column(name = "alone_with", length = 20)
+    private String aloneWith;
+
+    @Column(name = "person_name", length = 100)
+    private String personName;
+
+    @Column(name = "position", length = 100)
+    private String position;
+
     @Column(name = "leader_name", length = 100)
     private String leaderName;
 

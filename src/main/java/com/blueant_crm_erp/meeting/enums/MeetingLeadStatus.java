@@ -9,7 +9,7 @@ public enum MeetingLeadStatus {
 
     ALREADY_CLIENT("Already Client"),
     CONVERTED_CLIENT("Converted Client"),
-    REMOVE_CLIENT("Remove Client"),
+    CLIENT_REMOVED("Client Removed"),
     CLIENT_NOT_INTERESTED("Client Not Interested"),
     WORK_IN_PROGRESS("Work In Progress");
 

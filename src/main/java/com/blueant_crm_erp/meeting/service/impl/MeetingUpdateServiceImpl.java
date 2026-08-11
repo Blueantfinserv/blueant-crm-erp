@@ -65,6 +65,9 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
                 .clientStatus(request.getClientStatus())
                 .remarks(request.getMeetingRemarks())
                 .joinedMeetingWith(request.getJoinedMeetingWith())
+                .aloneWith(request.getAloneWith())
+                .personName("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPersonName())
+                .position("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPosition())
                 .leaderName(request.getLeaderName())
                 .nextPlanDate(request.getNextPlanDate())
                 .panNumber(request.getPanNumber())
@@ -118,11 +121,20 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
         if (request.getPanNumber() != null)                   meeting.setPanNumber(request.getPanNumber());
         if (request.getInvestmentAmount() != null)            meeting.setInvestmentAmount(request.getInvestmentAmount());
         
-        if (request.getLatitude() != null)                    meeting.setLatitude(request.getLatitude());
-        if (request.getLongitude() != null)                   meeting.setLongitude(request.getLongitude());
-        if (capturedAt != null)                               meeting.setLocationCapturedAt(capturedAt);
-        if (request.getAccuracy() != null)                    meeting.setLocationAccuracy(request.getAccuracy());
-        if (googleMapsUrl != null)                            meeting.setGoogleMapsUrl(googleMapsUrl);
+        // Persist GPS fields directly to allow optional NULLs
+        meeting.setLatitude(request.getLatitude());
+        meeting.setLongitude(request.getLongitude());
+        meeting.setLocationCapturedAt(capturedAt);
+        meeting.setLocationAccuracy(request.getAccuracy());
+        meeting.setGoogleMapsUrl(googleMapsUrl);
+        meeting.setAddress(request.getAddress());
+
+        // Persist aloneWith fields if provided
+        if (request.getAloneWith() != null) {
+            meeting.setAloneWith(request.getAloneWith());
+            meeting.setPersonName("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPersonName());
+            meeting.setPosition("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPosition());
+        }
 
         meetingRepository.save(meeting);
 

@@ -35,6 +35,9 @@ public class MeetingUpdateResponse {
     private String clientStatus;
     private String remarks;
     private String joinedMeetingWith;
+    private String aloneWith;
+    private String personName;
+    private String position;
     private String leaderName;
     private LocalDate nextPlanDate;
 

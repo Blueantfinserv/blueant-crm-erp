@@ -64,6 +64,19 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleIllegalArgumentException(IllegalArgumentException ex, HttpServletRequest request) {
+        log.error("Validation error: {}", ex.getMessage(), ex);
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.BAD_REQUEST,
+                ErrorCode.VALIDATION_FAILED,
+                ErrorType.VALIDATION,
+                ex.getMessage(),
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);

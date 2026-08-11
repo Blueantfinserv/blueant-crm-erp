@@ -4,6 +4,7 @@ import com.blueant_crm_erp.meeting.enums.MeetingMode;
 import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.meeting.enums.InvestmentType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,102 +17,110 @@ import java.time.LocalTime;
 
 /**
  * Sales-friendly workflow request.
- *
- * Lead details are NOT accepted here — they are fetched internally by the backend.
- * Only the fields a sales representative needs to complete a meeting update.
- *
- * All new fields are optional for backward compatibility.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(description = "Request schema for submitting a completed meeting update workflow.")
 public class MeetingWorkflowRequest {
 
-    // ─── Current Meeting Updates ───────────────────────────────────────────
-
-    /** Optional: override meeting date (e.g. meeting ran on a different day) */
+    @Schema(description = "Optional override for meeting date", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private LocalDate meetingDate;
 
-    /** Optional: override meeting time */
+    @Schema(description = "Optional override for meeting time", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private LocalTime meetingTime;
 
-    /** Optional: override meeting mode — PHYSICAL, ONLINE, PHONE */
+    @Schema(description = "Optional override for meeting mode (PHYSICAL, ONLINE, PHONE)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private MeetingMode meetingMode;
 
-    /** Whether the meeting was physically conducted */
+    @Schema(description = "Conducted status (Defaults to CONDUCTED. Rejects NOT_CONDUCTED)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private MeetingConductStatus meetingConducted;
 
-    /** What was discussed in the meeting (max 2000 chars) */
     @Size(max = 2000, message = "Discussion cannot exceed 2000 characters.")
+    @Schema(description = "Discussion details", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String discussion;
 
-    /** Any additional remarks (max 1000 chars) */
     @Size(max = 1000, message = "Remarks cannot exceed 1000 characters.")
+    @Schema(description = "Optional meeting remarks", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String meetingRemarks;
 
-    // ─── Sales Stage Fields ────────────────────────────────────────────────
-
-    /** Stage completed in this meeting (e.g. INTRO_MEETING, PRODUCT_DISCUSSION) */
     @Size(max = 50, message = "Completed stage cannot exceed 50 characters.")
+    @Schema(description = "Stage completed during the meeting", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String completedStage;
 
-    /** Current lead status as observed by sales rep */
+    @Schema(description = "Lead status outcome (ALREADY_CLIENT, CONVERTED_CLIENT, CLIENT_REMOVED, CLIENT_NOT_INTERESTED, WORK_IN_PROGRESS)", requiredMode = Schema.RequiredMode.REQUIRED)
     private MeetingLeadStatus leadStatus;
 
-    /** Client engagement status (e.g. Interested, Thinking, Not Interested) */
     @Size(max = 50, message = "Client status cannot exceed 50 characters.")
+    @Schema(description = "Client engagement status", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String clientStatus;
 
-    /** Who joined the meeting from the company side */
     @Size(max = 255, message = "Joined meeting with cannot exceed 255 characters.")
+    @Schema(description = "Who from company side joined", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String joinedMeetingWith;
 
-    /** Alone with (SELF or SOMEONE) */
     @Size(max = 20, message = "Alone with cannot exceed 20 characters.")
+    @Schema(description = "Alone with status (SELF or SOMEONE)", allowableValues = {"SELF", "SOMEONE"}, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String aloneWith;
 
-    /** Person Name if SOMEONE */
     @Size(max = 100, message = "Person name cannot exceed 100 characters.")
+    @Schema(description = "Person name if aloneWith is SOMEONE", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String personName;
 
-    /** Position if SOMEONE */
     @Size(max = 100, message = "Position cannot exceed 100 characters.")
+    @Schema(description = "Position if aloneWith is SOMEONE", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String position;
 
-    /** Leader/Manager name who attended */
     @Size(max = 100, message = "Leader name cannot exceed 100 characters.")
+    @Schema(description = "Leader/Manager name who attended", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String leaderName;
 
-    /** Next plan / follow-up date */
+    @Schema(description = "Next plan / follow-up date", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private LocalDate nextPlanDate;
 
-    // ─── Investment Fields ─────────────────────────────────────────────────
-
-    /** Client PAN number (optional, captured for KYC) */
     @Size(max = 20, message = "PAN number cannot exceed 20 characters.")
+    @Schema(description = "Client PAN number", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String panNumber;
 
-    /** Estimated investment amount discussed */
+    @Schema(description = "Estimated investment amount discussed", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private BigDecimal investmentAmount;
 
-    /** Product type discussed (e.g. Mutual Fund, SIP, Lump Sum) */
     @Size(max = 100, message = "Product type cannot exceed 100 characters.")
+    @Schema(description = "Product type discussed", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String productType;
 
-
+    @Schema(description = "Legacy reason field (optional)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String reason;
+
+    @Schema(description = "Next plan time", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private LocalTime nextPlanTime;
+
+    @Schema(description = "Current investment company (optional)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String currentInvestmentCompany;
+
+    @Schema(description = "Current advisor (optional)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String currentAdvisor;
+
+    @Schema(description = "Investment type (optional)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private InvestmentType investmentType;
+
+    @Schema(description = "Investment company (optional)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String investmentCompany;
+
+    @Schema(description = "Current stage (optional)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String currentStage;
 
-    // GPS fields — capturedAt is intentionally excluded: backend generates it server-side
+    @Schema(description = "GPS latitude", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private java.math.BigDecimal latitude;
+
+    @Schema(description = "GPS longitude", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private java.math.BigDecimal longitude;
+
+    @Schema(description = "GPS location address", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String address;
+
+    @Schema(description = "GPS location accuracy", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private Double accuracy;
 }
 

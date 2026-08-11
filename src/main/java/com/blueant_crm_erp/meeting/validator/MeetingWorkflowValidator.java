@@ -48,17 +48,19 @@ public class MeetingWorkflowValidator {
             throw new IllegalArgumentException("Lead Status is mandatory when meeting is conducted.");
         }
 
-        // Validate aloneWith value if provided
-        if (request.getAloneWith() != null) {
-            String aw = request.getAloneWith().trim();
-            if (!"SELF".equalsIgnoreCase(aw) && !"SOMEONE".equalsIgnoreCase(aw)) {
-                throw new IllegalArgumentException("Alone with must be either SELF or SOMEONE.");
-            }
-            if ("SELF".equalsIgnoreCase(aw)) {
-                if ((request.getPersonName() != null && !request.getPersonName().isBlank()) ||
-                    (request.getPosition() != null && !request.getPosition().isBlank())) {
-                    throw new IllegalArgumentException("Person name and position must be null when aloneWith is SELF.");
-                }
+        // Validate aloneWith value (Mandatory)
+        if (request.getAloneWith() == null || request.getAloneWith().trim().isEmpty()) {
+            throw new IllegalArgumentException("Joined with (aloneWith) is mandatory.");
+        }
+
+        String aw = request.getAloneWith().trim();
+        if (!"SELF".equalsIgnoreCase(aw) && !"SOMEONE".equalsIgnoreCase(aw)) {
+            throw new IllegalArgumentException("Alone with must be either SELF or SOMEONE.");
+        }
+        if ("SELF".equalsIgnoreCase(aw)) {
+            if ((request.getPersonName() != null && !request.getPersonName().isBlank()) ||
+                (request.getPosition() != null && !request.getPosition().isBlank())) {
+                throw new IllegalArgumentException("Person name and position must be null when aloneWith is SELF.");
             }
         }
 

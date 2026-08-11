@@ -110,10 +110,33 @@ public class MeetingController {
 
     @PostMapping("/{meetingCode}/workflow-update")
     @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "Submit meeting workflow update (conducted/not conducted, lead status, GPS location)")
-    public ApiResponse<MeetingResponse> processMeetingWorkflow(@PathVariable String meetingCode,
-                                                               @Valid @RequestBody MeetingWorkflowRequest request,
-                                                               Principal principal) {
+    @Operation(
+        summary = "Submit meeting workflow update",
+        description = "Processes the update of a conducted meeting, updating the meeting status and the lead status based on the outcome."
+    )
+    public ApiResponse<MeetingResponse> processMeetingWorkflow(
+            @PathVariable String meetingCode,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Meeting workflow update details",
+                required = true,
+                content = @io.swagger.v3.oas.annotations.media.Content(
+                    mediaType = "application/json",
+                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = MeetingWorkflowRequest.class),
+                    examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                        name = "Conducted Meeting Update Example",
+                        summary = "Example workflow update request",
+                        value = "{\n" +
+                                "  \"meetingMode\": \"VIRTUAL/ONLINE\",\n" +
+                                "  \"aloneWith\": \"SELF\",\n" +
+                                "  \"leadStatus\": \"WORK_IN_PROGRESS\",\n" +
+                                "  \"meetingRemarks\": \"Discussion went well, client is interested in mutual funds.\",\n" +
+                                "  \"nextPlanDate\": \"2026-08-20\"\n" +
+                                "}"
+                    )
+                )
+            )
+            @Valid @RequestBody MeetingWorkflowRequest request,
+            Principal principal) {
         return ApiResponse.success("Meeting workflow processed successfully",
                 meetingService.processMeetingUpdateWorkflow(meetingCode, request, principal.getName()));
     }

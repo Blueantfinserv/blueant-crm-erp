@@ -77,6 +77,19 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleHttpMessageNotReadable(org.springframework.http.converter.HttpMessageNotReadableException ex, HttpServletRequest request) {
+        log.error("JSON parse / message not readable error: {}", ex.getMessage(), ex);
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.BAD_REQUEST,
+                ErrorCode.VALIDATION_FAILED,
+                ErrorType.VALIDATION,
+                "Invalid input format or invalid enum value.",
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);

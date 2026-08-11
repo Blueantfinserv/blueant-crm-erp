@@ -46,7 +46,7 @@ public class MeetingControllerIntegrationTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("leadId", leadResponse.getUniqueLeadId());
         payload.put("meetingMode", "PHYSICAL");
-        payload.put("meetingDate", "2026-08-10");
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(1).toString());
         payload.put("meetingTime", "10:14:00");
         payload.put("meetingLocation", "Noida");
         payload.put("meetingRemarks", "Testing for meeting update");

@@ -79,6 +79,10 @@ public class MeetingResponse {
     private String panNumber;
     private java.math.BigDecimal investmentAmount;
 
+    private String aloneWith;
+    private String personName;
+    private String position;
+
     // GPS fields
     private java.math.BigDecimal latitude;
     private java.math.BigDecimal longitude;

@@ -76,6 +76,7 @@ public class MeetingWorkflowVerificationTest {
         // 4. Update the Intro Meeting
         MeetingWorkflowRequest update1 = new MeetingWorkflowRequest();
         update1.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+        update1.setAloneWith("SELF");
         update1.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
         update1.setMeetingRemarks("Intro remarks: Work in progress");
         update1.setDiscussion("Intro was good");
@@ -93,6 +94,7 @@ public class MeetingWorkflowVerificationTest {
         String meeting1Code = getActiveMeetingCode(leadResponse.getUniqueLeadId());
         MeetingWorkflowRequest update2 = new MeetingWorkflowRequest();
         update2.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+        update2.setAloneWith("SELF");
         update2.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
         update2.setMeetingRemarks("Meeting 1 remarks: WIP");
         update2.setDiscussion("Needs another follow-up");
@@ -110,6 +112,7 @@ public class MeetingWorkflowVerificationTest {
         String meeting2Code = getActiveMeetingCode(leadResponse.getUniqueLeadId());
         MeetingWorkflowRequest update3 = new MeetingWorkflowRequest();
         update3.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+        update3.setAloneWith("SELF");
         update3.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
         update3.setMeetingRemarks("Meeting 2 remarks: WIP");
         update3.setDiscussion("Still discussing");
@@ -127,6 +130,7 @@ public class MeetingWorkflowVerificationTest {
         String meeting3Code = getActiveMeetingCode(leadResponse.getUniqueLeadId());
         MeetingWorkflowRequest update4 = new MeetingWorkflowRequest();
         update4.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+        update4.setAloneWith("SELF");
         update4.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
         update4.setMeetingRemarks("Meeting 3 remarks: WIP");
         update4.setDiscussion("Deciding amount");
@@ -144,6 +148,7 @@ public class MeetingWorkflowVerificationTest {
         String meeting4Code = getActiveMeetingCode(leadResponse.getUniqueLeadId());
         MeetingWorkflowRequest terminalUpdate = new MeetingWorkflowRequest();
         terminalUpdate.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+        terminalUpdate.setAloneWith("SELF");
         terminalUpdate.setLeadStatus(MeetingLeadStatus.CONVERTED_CLIENT);
         terminalUpdate.setMeetingRemarks("Client Converted!");
         terminalUpdate.setDiscussion("Client Converted with SIP!");

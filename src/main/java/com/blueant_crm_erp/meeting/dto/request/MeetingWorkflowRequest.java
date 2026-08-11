@@ -31,7 +31,7 @@ public class MeetingWorkflowRequest {
     @Schema(description = "Optional override for meeting time", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private LocalTime meetingTime;
 
-    @Schema(description = "Optional override for meeting mode (PHYSICAL, ONLINE, PHONE)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Schema(description = "Optional override for meeting mode (PHYSICAL, VIRTUAL/ONLINE)", allowableValues = {"PHYSICAL", "VIRTUAL/ONLINE"}, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private MeetingMode meetingMode;
 
     @Schema(description = "Conducted status (Defaults to CONDUCTED. Rejects NOT_CONDUCTED)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
@@ -61,7 +61,7 @@ public class MeetingWorkflowRequest {
     private String joinedMeetingWith;
 
     @Size(max = 20, message = "Alone with cannot exceed 20 characters.")
-    @Schema(description = "Alone with status (SELF or SOMEONE)", allowableValues = {"SELF", "SOMEONE"}, requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Schema(description = "Alone with status (SELF or SOMEONE)", allowableValues = {"SELF", "SOMEONE"}, requiredMode = Schema.RequiredMode.REQUIRED)
     private String aloneWith;
 
     @Size(max = 100, message = "Person name cannot exceed 100 characters.")

@@ -52,14 +52,16 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
             googleMapsUrl = "https://www.google.com/maps?q=" + request.getLatitude() + "," + request.getLongitude();
         }
 
+        MeetingConductStatus conductStatus = request.getMeetingConducted() != null ? request.getMeetingConducted() : MeetingConductStatus.CONDUCTED;
+
         // ── Build immutable audit record ──────────────────────────────────────
         MeetingUpdate update = MeetingUpdate.builder()
                 .meeting(meeting)
                 .updateNumber(nextUpdateNumber)
-                .meetingDate(request.getMeetingDate())
-                .meetingTime(request.getMeetingTime())
-                .meetingMode(request.getMeetingMode())
-                .meetingConducted(request.getMeetingConducted() != null ? request.getMeetingConducted() : MeetingConductStatus.NOT_CONDUCTED)
+                .meetingDate(request.getMeetingDate() != null ? request.getMeetingDate() : meeting.getMeetingDate())
+                .meetingTime(request.getMeetingTime() != null ? request.getMeetingTime() : meeting.getMeetingTime())
+                .meetingMode(request.getMeetingMode() != null ? request.getMeetingMode() : meeting.getMeetingMode())
+                .meetingConducted(conductStatus)
                 .completedStage(request.getCompletedStage())
                 .leadStatus(request.getLeadStatus())
                 .clientStatus(request.getClientStatus())
@@ -103,13 +105,11 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
         if (request.getNextPlanDate() != null)    meeting.setNextMeetingDate(request.getNextPlanDate());
         if (request.getNextPlanTime() != null)    meeting.setNextMeetingTime(request.getNextPlanTime());
 
-        if (request.getMeetingConducted() != null) {
-            meeting.setMeetingConducted(request.getMeetingConducted());
-            if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
-                meeting.setMeetingStatus(MeetingStatus.NOT_CONDUCTED);
-            } else {
-                meeting.setMeetingStatus(MeetingStatus.COMPLETED);
-            }
+        meeting.setMeetingConducted(conductStatus);
+        if (conductStatus == MeetingConductStatus.NOT_CONDUCTED) {
+            meeting.setMeetingStatus(MeetingStatus.NOT_CONDUCTED);
+        } else {
+            meeting.setMeetingStatus(MeetingStatus.COMPLETED);
         }
         if (request.getLeadStatus() != null)                  meeting.setLeadStatus(request.getLeadStatus());
         if (request.getReason() != null)                      meeting.setReason(request.getReason());

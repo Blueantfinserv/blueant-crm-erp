@@ -65,6 +65,7 @@ public class JacksonConfig {
 
         return new ObjectMapper()
                 .registerModule(javaTimeModule)
+                .setTimeZone(java.util.TimeZone.getTimeZone("Asia/Kolkata"))
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);

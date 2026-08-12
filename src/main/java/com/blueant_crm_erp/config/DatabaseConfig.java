@@ -67,21 +67,51 @@ public class DatabaseConfig {
                     jdbcUrl.append("?").append(query);
                 }
 
-                String fixedUrl = jdbcUrl.toString();
+                String fixedUrl = addTimezoneParameters(jdbcUrl.toString());
                 logger.info("Parsed mysql:// URL. Clean JDBC URL: {}", sanitizeUrl(fixedUrl));
                 properties.setUrl(fixedUrl);
             } catch (URISyntaxException e) {
                 logger.error("Failed to parse mysql:// database URL: {}", url, e);
                 // Fallback
-                properties.setUrl("jdbc:" + url);
+                properties.setUrl(addTimezoneParameters("jdbc:" + url));
             }
-        } else {
-            logger.info("Using database URL: {}", sanitizeUrl(url));
+        } else if (url != null) {
+            String fixedUrl = addTimezoneParameters(url);
+            logger.info("Using database URL: {}", sanitizeUrl(fixedUrl));
+            properties.setUrl(fixedUrl);
         }
         return properties
                 .initializeDataSourceBuilder()
                 .type(HikariDataSource.class)
                 .build();
+    }
+
+    private String addTimezoneParameters(String url) {
+        if (url == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(url);
+        if (!url.contains("?")) {
+            sb.append("?");
+        } else if (!url.endsWith("&") && !url.endsWith("?")) {
+            sb.append("&");
+        }
+        
+        if (!url.contains("connectionTimeZone=")) {
+            sb.append("connectionTimeZone=%2B05:30&");
+        }
+        if (!url.contains("forceConnectionTimeZoneToSession=")) {
+            sb.append("forceConnectionTimeZoneToSession=true&");
+        }
+        if (!url.contains("serverTimezone=")) {
+            sb.append("serverTimezone=%2B05:30&");
+        }
+        
+        String result = sb.toString();
+        if (result.endsWith("&")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 
     private String sanitizeUrl(String url) {

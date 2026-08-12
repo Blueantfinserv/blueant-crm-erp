@@ -60,7 +60,9 @@ public class MeetingWorkflowDirectorTest {
         scheduleRequest.setMeetingDate(LocalDate.now().plusDays(1));
         scheduleRequest.setMeetingTime(LocalTime.of(10, 0));
         scheduleRequest.setMeetingLocation("Meeting Room 1");
-        return meetingScheduleService.scheduleMeeting(scheduleRequest, "EMP000001");
+        MeetingResponse response = meetingScheduleService.scheduleMeeting(scheduleRequest, "EMP000001");
+        org.junit.jupiter.api.Assertions.assertEquals(com.blueant_crm_erp.meeting.enums.MeetingType.INTRO, response.getMeetingType());
+        return response;
     }
 
     // 1. Successful update with SELF + WORK_IN_PROGRESS
@@ -467,5 +469,32 @@ public class MeetingWorkflowDirectorTest {
                 .andExpect(jsonPath("$.data", hasSize(greaterThanOrEqualTo(1))))
                 .andExpect(jsonPath("$.data[0].remarks").value("First audit test remarks"))
                 .andExpect(jsonPath("$.data[0].aloneWith").value("SELF"));
+    }
+
+    // 20. Verify dynamic meetingType calculation (INTRO for sequence 1, FOLLOW_UP for sequences > 1)
+    @Test
+    @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
+    public void test20_VerifyDynamicMeetingTypeCalculation() throws Exception {
+        LeadResponse lead = createTestLead();
+        MeetingResponse meeting1 = scheduleIntroMeeting(lead.getUniqueLeadId());
+        org.junit.jupiter.api.Assertions.assertEquals("INTRO", meeting1.getMeetingType().name());
+
+        // Update sequence 1 with nextPlanDate to create sequence 2
+        Map<String, Object> payload1 = new HashMap<>();
+        payload1.put("aloneWith", "SELF");
+        payload1.put("leadStatus", "WORK_IN_PROGRESS");
+        payload1.put("nextPlanDate", LocalDate.now().plusDays(2).toString());
+
+        String resJson1 = mockMvc.perform(post("/v1/meetings/" + meeting1.getMeetingCode() + "/workflow-update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.meetingNumber").value(2))
+                .andExpect(jsonPath("$.data.meetingType").value("FOLLOW_UP"))
+                .andReturn().getResponse().getContentAsString();
+
+        MeetingResponse meeting2 = objectMapper.readValue(
+                objectMapper.readTree(resJson1).path("data").toString(), MeetingResponse.class);
+        org.junit.jupiter.api.Assertions.assertEquals("FOLLOW_UP", meeting2.getMeetingType().name());
     }
 }

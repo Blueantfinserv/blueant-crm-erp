@@ -88,7 +88,7 @@ public class MeetingServiceImpl implements MeetingService {
             throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");
         }
         meeting.setMeetingNumber(nextMeetingNumber);
-        meeting.setMeetingType(com.blueant_crm_erp.meeting.enums.MeetingType.INTRO);
+        meeting.setMeetingType(nextMeetingNumber == 1 ? com.blueant_crm_erp.meeting.enums.MeetingType.INTRO : com.blueant_crm_erp.meeting.enums.MeetingType.FOLLOW_UP);
 
         String title;
         if (nextMeetingNumber == 1) {

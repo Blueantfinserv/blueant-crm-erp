@@ -63,8 +63,8 @@ public class FollowUpServiceImpl implements FollowUpService {
         // Sequential meeting number — never skip
         nextMeeting.setMeetingNumber(nextMeetingNumber);
 
-        // Business rule: all meetings are INTRO category
-        nextMeeting.setMeetingType(MeetingType.INTRO);
+        // Business rule: First meeting is INTRO, subsequent meetings are FOLLOW_UP
+        nextMeeting.setMeetingType(nextMeetingNumber == 1 ? MeetingType.INTRO : MeetingType.FOLLOW_UP);
 
         // Title
         String title;

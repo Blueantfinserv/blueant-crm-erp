@@ -17,8 +17,7 @@ import java.util.TimeZone;
 @EnableRetry
 public class BlueantCrmErpApplication {
 
-	@PostConstruct
-	public void init() {
+	static {
 		TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"));
 	}
 

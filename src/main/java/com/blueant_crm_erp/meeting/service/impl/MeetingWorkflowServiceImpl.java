@@ -132,8 +132,7 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
 
             if (!wasAlreadyCompleted && !nextSequenceExists) {
                 java.time.LocalDate nextDate = request.getNextPlanDate();
-                java.time.LocalTime nextTime = request.getNextPlanTime() != null
-                        ? request.getNextPlanTime() : java.time.LocalTime.of(10, 0);
+                java.time.LocalTime nextTime = request.getNextPlanTime();
 
                 Meeting nextMeeting = followUpService.createFollowUp(
                         meeting, nextDate, nextTime, currentUserEmail);

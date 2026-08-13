@@ -144,7 +144,7 @@ public class MeetingServiceImpl implements MeetingService {
         
         // Defaults since it's auto-created.
         meeting.setMeetingDate(java.time.LocalDate.now());
-        meeting.setMeetingTime(java.time.LocalTime.of(10, 0));
+        meeting.setMeetingTime(null);
         meeting.setMeetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL); // Changed default slightly, PHYSICAL is more common based on options
         
         meeting.setLead(lead);
@@ -191,7 +191,7 @@ public class MeetingServiceImpl implements MeetingService {
             dummy.setMeetingType(com.blueant_crm_erp.meeting.enums.MeetingType.INTRO);
             dummy.setMeetingStatus(MeetingStatus.SCHEDULED);
             dummy.setMeetingDate(java.time.LocalDate.now());
-            dummy.setMeetingTime(java.time.LocalTime.of(10, 0));
+            dummy.setMeetingTime(null);
             dummy.setMeetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL);
             dummy.setAloneWith("SELF");
             

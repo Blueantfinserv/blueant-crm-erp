@@ -33,9 +33,7 @@ public class MeetingValidator {
             throw new IllegalArgumentException("Meeting date is required.");
         }
 
-        if (request.getMeetingTime() == null) {
-            throw new IllegalArgumentException("Meeting time is required.");
-        }
+
 
         if (!StringUtils.hasText(request.getMeetingLocation())) {
             throw new IllegalArgumentException("Meeting location is required.");

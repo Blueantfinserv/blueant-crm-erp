@@ -71,7 +71,7 @@ public class Meeting extends BaseVersionEntity {
     @Column(name = "meeting_date", nullable = false)
     private LocalDate meetingDate;
 
-    @Column(name = "meeting_time", nullable = false)
+    @Column(name = "meeting_time")
     private LocalTime meetingTime;
 
     @Column(name = "address", length = 500)

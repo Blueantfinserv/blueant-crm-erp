@@ -16,6 +16,8 @@ import com.blueant_crm_erp.lead.dto.request.CreateLeadRequest;
 import com.blueant_crm_erp.lead.dto.response.LeadResponse;
 import com.blueant_crm_erp.meeting.dto.request.CreateMeetingRequest;
 import com.blueant_crm_erp.meeting.dto.request.MeetingWorkflowRequest;
+import com.blueant_crm_erp.meeting.dto.request.RescheduleMeetingRequest;
+import com.blueant_crm_erp.meeting.dto.request.UpdateMeetingRequest;
 import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.meeting.dto.response.MeetingDetailResponse;
 import com.blueant_crm_erp.meeting.enums.MeetingMode;
@@ -124,6 +126,86 @@ public class TimezoneVerificationTest {
         MeetingDetailResponse nextDetail = meetingService.getMeetingByCode(nextMeetingCode);
         org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingRemarks(), "Next scheduled meeting remarks should be null");
         assertEquals(LocalTime.of(11, 0), nextDetail.getMeetingTime(), "Next scheduled meetingTime should be 11:00");
+    }
+
+    @Test
+    public void testNullableMeetingTimeBehavior() {
+        String currentUserEmail = "EMP000001";
+        
+        // 1. Create a lead
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Nullable Time Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, currentUserEmail);
+
+        // 2. Schedule meeting WITHOUT time
+        CreateMeetingRequest scheduleRequest = new CreateMeetingRequest();
+        scheduleRequest.setLeadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()));
+        scheduleRequest.setMeetingMode(MeetingMode.PHYSICAL);
+        scheduleRequest.setMeetingDate(LocalDate.now().plusDays(1));
+        scheduleRequest.setMeetingTime(null); // Omitted/null time
+        scheduleRequest.setMeetingLocation("Office");
+        
+        MeetingResponse introMeeting = meetingScheduleService.scheduleMeeting(scheduleRequest, currentUserEmail);
+        org.junit.jupiter.api.Assertions.assertNull(introMeeting.getMeetingTime(), "Scheduled meetingTime must be null");
+
+        // 3. Verify meetingTime is null in DB
+        LocalTime timeInDb = jdbcTemplate.queryForObject(
+                "SELECT meeting_time FROM meetings WHERE meeting_code = ?", 
+                LocalTime.class, 
+                introMeeting.getMeetingCode());
+        org.junit.jupiter.api.Assertions.assertNull(timeInDb, "Meeting time in DB must be null");
+
+        // 4. Update the meeting with a valid time
+        UpdateMeetingRequest updateRequest = UpdateMeetingRequest.builder()
+                .meetingCode(introMeeting.getMeetingCode())
+                .meetingDate(introMeeting.getMeetingDate())
+                .meetingTime(LocalTime.of(12, 0))
+                .meetingMode(introMeeting.getMeetingMode())
+                .meetingLocation(introMeeting.getMeetingLocation())
+                .build();
+        MeetingResponse updatedIntroMeeting = meetingService.updateMeeting(introMeeting.getMeetingCode(), updateRequest, currentUserEmail);
+        assertEquals(LocalTime.of(12, 0), updatedIntroMeeting.getMeetingTime(), "Updated meetingTime must be 12:00");
+
+        // 5. Verify updated meetingTime is in DB
+        timeInDb = jdbcTemplate.queryForObject(
+                "SELECT meeting_time FROM meetings WHERE meeting_code = ?", 
+                LocalTime.class, 
+                introMeeting.getMeetingCode());
+        assertEquals(LocalTime.of(12, 0), timeInDb, "Meeting time in DB must be 12:00 after update");
+
+        // 6. Perform workflow update with null nextPlanTime
+        MeetingWorkflowRequest update1 = new MeetingWorkflowRequest();
+        update1.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+        update1.setAloneWith("SELF");
+        update1.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
+        update1.setMeetingRemarks("Test remarks");
+        update1.setDiscussion("Discussion");
+        update1.setNextPlanDate(LocalDate.now().plusDays(2));
+        update1.setNextPlanTime(null); // Next meeting time is optional / null
+        
+        meetingService.processMeetingUpdateWorkflow(introMeeting.getMeetingCode(), update1, currentUserEmail);
+
+        // 7. Verify current completed meeting retains its time of 12:00
+        MeetingDetailResponse detail = meetingService.getMeetingByCode(introMeeting.getMeetingCode());
+        assertEquals(LocalTime.of(12, 0), detail.getMeetingTime(), "Completed current meeting must retain its meetingTime (12:00)");
+
+        // 8. Verify next scheduled meeting has NULL meetingTime
+        String nextMeetingCode = meetingService.getActiveMeetingByLeadId(leadResponse.getUniqueLeadId()).getMeetingCode();
+        MeetingDetailResponse nextDetail = meetingService.getMeetingByCode(nextMeetingCode);
+        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingTime(), "Next scheduled meetingTime should be null");
+
+        // 9. Reschedule next meeting to 14:00
+        RescheduleMeetingRequest rescheduleRequest = RescheduleMeetingRequest.builder()
+                .meetingCode(nextMeetingCode)
+                .meetingDate(nextDetail.getMeetingDate().plusDays(1))
+                .meetingTime(LocalTime.of(14, 0))
+                .meetingLocation(nextDetail.getMeetingLocation())
+                .rescheduleReason("Rescheduled")
+                .build();
+        MeetingResponse rescheduledMeeting = meetingScheduleService.rescheduleMeeting(nextMeetingCode, rescheduleRequest, currentUserEmail);
+        assertEquals(LocalTime.of(14, 0), rescheduledMeeting.getMeetingTime(), "Rescheduled meetingTime must be 14:00");
     }
 
     @Test

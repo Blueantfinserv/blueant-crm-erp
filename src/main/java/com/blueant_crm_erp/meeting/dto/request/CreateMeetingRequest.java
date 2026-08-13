@@ -28,7 +28,6 @@ public class CreateMeetingRequest {
     @FutureOrPresent(message = "Meeting date cannot be in the past.")
     private LocalDate meetingDate;
 
-    @NotNull(message = "Meeting time is required.")
     private LocalTime meetingTime;
 
     @NotBlank(message = "Meeting location is required.")

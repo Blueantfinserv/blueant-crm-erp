@@ -104,10 +104,15 @@ public interface UserMapper {
     // Entity → Response
     // =========================================================================
 
+    @Mapping(target = "roleId", source = "role.id")
     @Mapping(target = "roleName", source = "role.name")
+    @Mapping(target = "departmentId", source = "department.id")
     @Mapping(target = "departmentName", source = "department.name")
+    @Mapping(target = "designationId", source = "designation.id")
     @Mapping(target = "designationName", source = "designation.name")
+    @Mapping(target = "teamId", source = "team.id")
     @Mapping(target = "teamName", source = "team.teamName")
+    @Mapping(target = "reportingManagerId", source = "reportingManager.id")
     @Mapping(
             target = "reportingManagerName",
             expression =

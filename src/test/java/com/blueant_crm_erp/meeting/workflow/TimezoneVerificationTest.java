@@ -148,6 +148,11 @@ public class TimezoneVerificationTest {
         scheduleRequest.setMeetingLocation("Office");
         
         MeetingResponse introMeeting = meetingScheduleService.scheduleMeeting(scheduleRequest, currentUserEmail);
+        String rawDateInDb = jdbcTemplate.queryForObject(
+                "SELECT CAST(meeting_date AS CHAR) FROM meetings WHERE meeting_code = ?", 
+                String.class, 
+                introMeeting.getMeetingCode());
+        assertEquals(LocalDate.now().plusDays(1).toString(), rawDateInDb, "Raw meeting_date in database must match the scheduled date");
         org.junit.jupiter.api.Assertions.assertNull(introMeeting.getMeetingTime(), "Scheduled meetingTime must be null");
 
         // 3. Verify meetingTime is null in DB
@@ -235,12 +240,18 @@ public class TimezoneVerificationTest {
         assertEquals(nextMeetingDate, introMeeting.getNextMeetingDate(), "Scheduled meeting nextMeetingDate must be correct");
         assertEquals(nextMeetingTime, introMeeting.getNextMeetingTime(), "Scheduled meeting nextMeetingTime must be correct");
 
-        // 3. Verify nextMeetingDate is in DB
-        LocalDate nextDateInDb = jdbcTemplate.queryForObject(
-                "SELECT next_meeting_date FROM meetings WHERE meeting_code = ?", 
-                LocalDate.class, 
+        // 3. Verify meetingDate and nextMeetingDate are in DB as exact matching raw strings (no timezone shift)
+        String rawMeetingDateInDb = jdbcTemplate.queryForObject(
+                "SELECT CAST(meeting_date AS CHAR) FROM meetings WHERE meeting_code = ?", 
+                String.class, 
                 introMeeting.getMeetingCode());
-        assertEquals(nextMeetingDate, nextDateInDb, "next_meeting_date in DB must match");
+        assertEquals(LocalDate.now().plusDays(1).toString(), rawMeetingDateInDb, "Raw meeting_date in database must match the scheduled date");
+
+        String rawNextMeetingDateInDb = jdbcTemplate.queryForObject(
+                "SELECT CAST(next_meeting_date AS CHAR) FROM meetings WHERE meeting_code = ?", 
+                String.class, 
+                introMeeting.getMeetingCode());
+        assertEquals(nextMeetingDate.toString(), rawNextMeetingDateInDb, "Raw next_meeting_date in database must match the requested date");
 
         LocalTime nextTimeInDb = jdbcTemplate.queryForObject(
                 "SELECT next_meeting_time FROM meetings WHERE meeting_code = ?", 

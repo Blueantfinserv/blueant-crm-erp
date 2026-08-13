@@ -60,6 +60,11 @@ public class UpdateMeetingRequest {
     @Size(max = 500)
     private String attachment;
 
+    @FutureOrPresent(message = "Next meeting date cannot be in the past.")
+    private LocalDate nextMeetingDate;
+
+    private LocalTime nextMeetingTime;
+
     private com.blueant_crm_erp.meeting.enums.MeetingStatus meetingStatus;
 
 }

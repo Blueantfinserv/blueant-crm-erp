@@ -100,6 +100,7 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
         if (request.getMeetingDate() != null)     meeting.setMeetingDate(request.getMeetingDate());
         if (request.getMeetingTime() != null)     meeting.setMeetingTime(request.getMeetingTime());
         if (request.getMeetingMode() != null)     meeting.setMeetingMode(request.getMeetingMode());
+        if (request.getMeetingLocation() != null)  meeting.setMeetingLocation(request.getMeetingLocation());
         if (request.getDiscussion() != null)      meeting.setDiscussion(request.getDiscussion());
         if (request.getMeetingRemarks() != null)  meeting.setMeetingRemarks(request.getMeetingRemarks());
         if (request.getNextPlanDate() != null)    meeting.setNextMeetingDate(request.getNextPlanDate());

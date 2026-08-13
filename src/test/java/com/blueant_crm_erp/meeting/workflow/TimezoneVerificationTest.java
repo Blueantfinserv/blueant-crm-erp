@@ -209,6 +209,86 @@ public class TimezoneVerificationTest {
     }
 
     @Test
+    public void testNextMeetingDateAndLocationPersistence() {
+        String currentUserEmail = "EMP000001";
+        LocalDate nextMeetingDate = LocalDate.now().plusDays(10);
+        LocalTime nextMeetingTime = LocalTime.of(15, 0);
+        
+        // 1. Create a lead
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Persistence Verification Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, currentUserEmail);
+
+        // 2. Schedule meeting WITH nextMeetingDate and nextMeetingTime
+        CreateMeetingRequest scheduleRequest = new CreateMeetingRequest();
+        scheduleRequest.setLeadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()));
+        scheduleRequest.setMeetingMode(MeetingMode.PHYSICAL);
+        scheduleRequest.setMeetingDate(LocalDate.now().plusDays(1));
+        scheduleRequest.setMeetingTime(LocalTime.of(10, 0));
+        scheduleRequest.setMeetingLocation("Initial Location");
+        scheduleRequest.setNextMeetingDate(nextMeetingDate);
+        scheduleRequest.setNextMeetingTime(nextMeetingTime);
+        
+        MeetingResponse introMeeting = meetingScheduleService.scheduleMeeting(scheduleRequest, currentUserEmail);
+        assertEquals(nextMeetingDate, introMeeting.getNextMeetingDate(), "Scheduled meeting nextMeetingDate must be correct");
+        assertEquals(nextMeetingTime, introMeeting.getNextMeetingTime(), "Scheduled meeting nextMeetingTime must be correct");
+
+        // 3. Verify nextMeetingDate is in DB
+        LocalDate nextDateInDb = jdbcTemplate.queryForObject(
+                "SELECT next_meeting_date FROM meetings WHERE meeting_code = ?", 
+                LocalDate.class, 
+                introMeeting.getMeetingCode());
+        assertEquals(nextMeetingDate, nextDateInDb, "next_meeting_date in DB must match");
+
+        LocalTime nextTimeInDb = jdbcTemplate.queryForObject(
+                "SELECT next_meeting_time FROM meetings WHERE meeting_code = ?", 
+                LocalTime.class, 
+                introMeeting.getMeetingCode());
+        assertEquals(nextMeetingTime, nextTimeInDb, "next_meeting_time in DB must match");
+
+        // 4. Perform workflow update with location and remarks
+        MeetingWorkflowRequest update1 = new MeetingWorkflowRequest();
+        update1.setMeetingConducted(MeetingConductStatus.CONDUCTED);
+        update1.setAloneWith("SELF");
+        update1.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
+        update1.setMeetingLocation("Noida");
+        update1.setMeetingRemarks("Client interested in mutual fund investment");
+        update1.setDiscussion("Discussion");
+        update1.setNextPlanDate(LocalDate.now().plusDays(20));
+        update1.setNextPlanTime(LocalTime.of(16, 0));
+        
+        meetingService.processMeetingUpdateWorkflow(introMeeting.getMeetingCode(), update1, currentUserEmail);
+
+        // 5. Verify current completed meeting has Noida and remarks
+        MeetingDetailResponse detail = meetingService.getMeetingByCode(introMeeting.getMeetingCode());
+        assertEquals("Noida", detail.getMeetingLocation(), "Completed current meeting location must be Noida");
+        assertEquals("Client interested in mutual fund investment", detail.getMeetingRemarks(), "Completed current meeting remarks must be set");
+
+        // 6. Verify current completed meeting location and remarks in DB
+        String locInDb = jdbcTemplate.queryForObject(
+                "SELECT meeting_location FROM meetings WHERE meeting_code = ?", 
+                String.class, 
+                introMeeting.getMeetingCode());
+        assertEquals("Noida", locInDb, "Completed meeting location in DB must be Noida");
+
+        String remInDb = jdbcTemplate.queryForObject(
+                "SELECT remarks FROM meetings WHERE meeting_code = ?", 
+                String.class, 
+                introMeeting.getMeetingCode());
+        assertEquals("Client interested in mutual fund investment", remInDb, "Completed meeting remarks in DB must be set");
+
+        // 7. Verify next scheduled meeting does not copy completed meeting's remarks or location
+        String nextMeetingCode = meetingService.getActiveMeetingByLeadId(leadResponse.getUniqueLeadId()).getMeetingCode();
+        MeetingDetailResponse nextDetail = meetingService.getMeetingByCode(nextMeetingCode);
+        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingRemarks(), "Next scheduled meeting remarks must be null");
+        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingLocation(), "Next scheduled meeting location must be null");
+        assertEquals(LocalDate.now().plusDays(20), nextDetail.getMeetingDate(), "Next scheduled meeting date must be correct");
+        assertEquals(LocalTime.of(16, 0), nextDetail.getMeetingTime(), "Next scheduled meeting time must be 16:00");
+    }
+
+    @Test
     public void testLocalDateTimeSerialization() throws Exception {
         LocalDateTime testDateTime = LocalDateTime.of(2026, 8, 12, 15, 30, 45);
         String json = objectMapper.writeValueAsString(testDateTime);

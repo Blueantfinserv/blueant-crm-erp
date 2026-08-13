@@ -122,5 +122,8 @@ public class MeetingWorkflowRequest {
 
     @Schema(description = "GPS location accuracy", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private Double accuracy;
+
+    @Schema(description = "Optional override for meeting location", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    private String meetingLocation;
 }
 

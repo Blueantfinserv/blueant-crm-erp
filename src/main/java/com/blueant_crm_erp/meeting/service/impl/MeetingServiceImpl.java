@@ -198,6 +198,8 @@ public class MeetingServiceImpl implements MeetingService {
             dummy.setLeadId(lead.getId());
             dummy.setLeadCode(lead.getLeadCode());
             dummy.setClientName(lead.getClientName());
+            dummy.setMobileNumber(lead.getMobileNumber());
+            dummy.setMeetingLocation(lead.getLocation());
             
             if (lead.getAssignedSalesPerson() != null) {
                 dummy.setAssignedEmployeeId(lead.getAssignedSalesPerson().getId());

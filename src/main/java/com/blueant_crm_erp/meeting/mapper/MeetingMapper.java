@@ -37,6 +37,7 @@ public interface MeetingMapper {
     @Mapping(source = "assignedEmployee.firstName", target = "employeeName")
     @Mapping(target = "companyParticipantIds", expression = "java(stringToLongList(meeting.getCompanyParticipants()))")
     @Mapping(target = "clientParticipants", expression = "java(stringToStringList(meeting.getClientParticipants()))")
+    @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
     MeetingResponse toResponse(Meeting meeting);
 
     /**
@@ -51,7 +52,21 @@ public interface MeetingMapper {
     @Mapping(source = "assignedEmployee.firstName", target = "employeeName")
     @Mapping(target = "companyParticipantIds", expression = "java(stringToLongList(meeting.getCompanyParticipants()))")
     @Mapping(target = "clientParticipants", expression = "java(stringToStringList(meeting.getClientParticipants()))")
+    @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
     MeetingDetailResponse toDetailResponse(Meeting meeting);
+
+    default String getMeetingLocation(Meeting meeting) {
+        if (meeting == null) {
+            return null;
+        }
+        if (meeting.getMeetingLocation() != null && !meeting.getMeetingLocation().trim().isEmpty()) {
+            return meeting.getMeetingLocation();
+        }
+        if (meeting.getLead() != null) {
+            return meeting.getLead().getLocation();
+        }
+        return null;
+    }
 
     /**
      * Entity -> Summary Response

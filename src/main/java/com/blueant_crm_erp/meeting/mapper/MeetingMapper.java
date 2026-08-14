@@ -75,7 +75,7 @@ public interface MeetingMapper {
     @Mapping(source = "lead.leadCode", target = "leadCode")
     @Mapping(source = "lead.clientName", target = "clientName")
     @Mapping(source = "assignedEmployee.firstName", target = "assignedEmployeeName")
-    @Mapping(source = "meetingLocation", target = "location")
+    @Mapping(target = "location", expression = "java(getMeetingLocation(meeting))")
     MeetingSummaryResponse toSummaryResponse(Meeting meeting);
 
     /**

@@ -171,9 +171,9 @@ spring:
   # ============================================================================
 
   mail:
-    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    host: ${MAIL_HOST:${SPRING_MAIL_HOST:smtp.gmail.com}}
 
-    port: ${SPRING_MAIL_PORT:587}
+    port: ${MAIL_PORT:${SPRING_MAIL_PORT:587}}
 
     username: ${MAIL_USERNAME:noreply@blueant.in}
 
@@ -242,6 +242,9 @@ app:
   support-email: support@blueant.in
 
   frontend-url: ${FRONTEND_URL:http://localhost:8081}
+
+  mail:
+    from: ${MAIL_FROM:${MAIL_USERNAME:noreply@blueant.in}}
 
   password-reset:
     token-expiry-minutes: 15

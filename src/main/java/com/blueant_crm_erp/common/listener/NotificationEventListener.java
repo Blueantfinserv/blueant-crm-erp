@@ -3,6 +3,7 @@ package com.blueant_crm_erp.common.listener;
 import com.blueant_crm_erp.common.event.NotificationEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -16,6 +17,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationEventListener {
+
+    @Value("${app.mail.from}")
+    private String mailFrom;
 
     private final JavaMailSender mailSender;
 
@@ -34,10 +38,14 @@ public class NotificationEventListener {
             message.setTo(event.getRecipient());
             message.setSubject(event.getSubject());
             message.setText(event.getMessage());
-            message.setFrom("noreply@blueant.com");
+            message.setFrom(mailFrom);
             
-            // mailSender.send(message); // Uncomment when SMTP is configured
-            log.info("Mock Email sent to {}", event.getRecipient());
+            mailSender.send(message);
+            if ("Password Reset Request".equalsIgnoreCase(event.getSubject())) {
+                log.info("Password reset email sent successfully to recipient: {}", event.getRecipient());
+            } else {
+                log.info("Email sent successfully to recipient: {}", event.getRecipient());
+            }
         } else {
             log.info("Mock SMS/WhatsApp sent to {}", event.getRecipient());
         }

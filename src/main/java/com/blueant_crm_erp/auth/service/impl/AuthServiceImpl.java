@@ -279,7 +279,7 @@ public class AuthServiceImpl implements AuthService {
                         + "BlueAnt CRM ERP Team";
 
                 eventPublisher.publishEvent(new NotificationEvent(this, user.getEmail(), "Password Reset Request", emailText, "EMAIL"));
-                log.info("Password reset token generated and sent to email for user: {}", user.getEmployeeCode());
+                log.info("Sending password reset email for employee: {} to configured recipient", user.getEmployeeCode());
             } else {
                 log.warn("Password reset request inputs did not match user info for: {}", request.getEmployeeCode());
             }

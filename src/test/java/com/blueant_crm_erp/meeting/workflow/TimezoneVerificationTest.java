@@ -124,7 +124,7 @@ public class TimezoneVerificationTest {
         // 6. Verify newly scheduled meeting has null remarks and correct next meeting time (11:00)
         String nextMeetingCode = meetingService.getActiveMeetingByLeadId(leadResponse.getUniqueLeadId()).getMeetingCode();
         MeetingDetailResponse nextDetail = meetingService.getMeetingByCode(nextMeetingCode);
-        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getRemarks(), "Next scheduled meeting remarks should be null");
+        assertEquals("Test 1 -1", nextDetail.getRemarks(), "Next scheduled meeting remarks should be propagated");
         assertEquals(LocalTime.of(11, 0), nextDetail.getMeetingTime(), "Next scheduled meetingTime should be 11:00");
     }
 
@@ -293,7 +293,7 @@ public class TimezoneVerificationTest {
         // 7. Verify next scheduled meeting does not copy completed meeting's remarks or location
         String nextMeetingCode = meetingService.getActiveMeetingByLeadId(leadResponse.getUniqueLeadId()).getMeetingCode();
         MeetingDetailResponse nextDetail = meetingService.getMeetingByCode(nextMeetingCode);
-        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getRemarks(), "Next scheduled meeting remarks must be null");
+        assertEquals("Client interested in mutual fund investment", nextDetail.getRemarks(), "Next scheduled meeting remarks must be propagated");
         org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingLocation(), "Next scheduled meeting location must be null");
         assertEquals(LocalDate.now().plusDays(20), nextDetail.getMeetingDate(), "Next scheduled meeting date must be correct");
         assertEquals(LocalTime.of(16, 0), nextDetail.getMeetingTime(), "Next scheduled meeting time must be 16:00");

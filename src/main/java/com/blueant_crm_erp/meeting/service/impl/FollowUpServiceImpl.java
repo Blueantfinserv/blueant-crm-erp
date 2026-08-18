@@ -91,11 +91,7 @@ public class FollowUpServiceImpl implements FollowUpService {
         // Schedule
         nextMeeting.setMeetingDate(nextMeetingDate);
         nextMeeting.setMeetingTime(nextMeetingTime);
-        if ("WORK IN PROGRESS".equalsIgnoreCase(remarks)) {
-            nextMeeting.setMeetingRemarks(remarks);
-        } else {
-            nextMeeting.setMeetingRemarks(null);
-        }
+        nextMeeting.setMeetingRemarks(remarks);
 
         // Status
         nextMeeting.setMeetingStatus(MeetingStatus.SCHEDULED);

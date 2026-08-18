@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
@@ -40,11 +41,21 @@ public class NotificationEventListener {
             message.setText(event.getMessage());
             message.setFrom(mailFrom);
             
-            mailSender.send(message);
-            if ("Password Reset Request".equalsIgnoreCase(event.getSubject())) {
-                log.info("Password reset email sent successfully to recipient: {}", event.getRecipient());
+            if (mailSender instanceof JavaMailSenderImpl javaMailSender) {
+                log.info("Resolved SMTP configuration - Host: {}, Port: {}, Username: {}, MailSender initialized: true",
+                        javaMailSender.getHost(),
+                        javaMailSender.getPort(),
+                        (javaMailSender.getUsername() != null && !javaMailSender.getUsername().isBlank()) ? "PRESENT" : "ABSENT");
             } else {
-                log.info("Email sent successfully to recipient: {}", event.getRecipient());
+                log.info("SMTP MailSender is active (custom implementation: {})", mailSender.getClass().getName());
+            }
+
+            try {
+                mailSender.send(message);
+                log.info("SMTP send success: email sent successfully to recipient: {}", event.getRecipient());
+            } catch (Exception ex) {
+                log.error("SMTP send failed. Exception type: {}, message: {}", ex.getClass().getName(), ex.getMessage());
+                throw ex; // Re-throw to allow Spring Retry to process
             }
         } else {
             log.info("Mock SMS/WhatsApp sent to {}", event.getRecipient());

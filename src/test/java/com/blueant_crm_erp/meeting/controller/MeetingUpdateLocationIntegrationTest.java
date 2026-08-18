@@ -90,7 +90,7 @@ public class MeetingUpdateLocationIntegrationTest {
         payload.put("meetingMode", "PHYSICAL");
         payload.put("leadStatus", "WORK_IN_PROGRESS");
         payload.put("aloneWith", "SELF");
-        payload.put("meetingRemarks", "Intro conducted");
+        payload.put("remarks", "Intro conducted");
         payload.put("nextPlanDate", LocalDate.now().plusDays(2).toString());
 
         mockMvc.perform(post("/v1/meetings/NEW_" + lead.getUniqueLeadId() + "/workflow-update")
@@ -123,7 +123,7 @@ public class MeetingUpdateLocationIntegrationTest {
         payload1.put("meetingMode", "PHYSICAL");
         payload1.put("leadStatus", "WORK_IN_PROGRESS");
         payload1.put("aloneWith", "SELF");
-        payload1.put("meetingRemarks", "Intro conducted");
+        payload1.put("remarks", "Intro conducted");
         payload1.put("nextPlanDate", LocalDate.now().plusDays(1).toString());
 
         mockMvc.perform(post("/v1/meetings/NEW_" + lead.getUniqueLeadId() + "/workflow-update")
@@ -138,7 +138,7 @@ public class MeetingUpdateLocationIntegrationTest {
         payload2.put("meetingMode", "PHYSICAL");
         payload2.put("leadStatus", "WORK_IN_PROGRESS");
         payload2.put("aloneWith", "SELF");
-        payload2.put("meetingRemarks", "Follow Up #1 conducted");
+        payload2.put("remarks", "Follow Up #1 conducted");
         payload2.put("nextPlanDate", LocalDate.now().plusDays(2).toString());
 
         mockMvc.perform(post("/v1/meetings/" + followUp1.getMeetingCode() + "/workflow-update")
@@ -216,7 +216,7 @@ public class MeetingUpdateLocationIntegrationTest {
         payload.put("meetingMode", "PHYSICAL");
         payload.put("leadStatus", "WORK_IN_PROGRESS");
         payload.put("aloneWith", "SELF");
-        payload.put("meetingRemarks", "Completed with new location");
+        payload.put("remarks", "Completed with new location");
         payload.put("nextPlanDate", LocalDate.now().plusDays(2).toString());
         payload.put("meetingLocation", "Greater Noida");
 

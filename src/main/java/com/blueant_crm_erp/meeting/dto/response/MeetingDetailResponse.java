@@ -96,7 +96,7 @@ public class MeetingDetailResponse {
     /**
      * Remarks
      */
-    private String meetingRemarks;
+    private String remarks;
 
     /**
      * Active / Inactive

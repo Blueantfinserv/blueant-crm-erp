@@ -64,7 +64,7 @@ public class MeetingResponse {
     private String meetingPhoto;
     private String visitingCard;
     private String meetingNotes;
-    private String meetingRemarks;
+    private String remarks;
     private LocalDate nextMeetingDate;
     private LocalTime nextMeetingTime;
 

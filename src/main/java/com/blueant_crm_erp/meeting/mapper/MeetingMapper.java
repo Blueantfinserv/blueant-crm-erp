@@ -38,6 +38,7 @@ public interface MeetingMapper {
     @Mapping(target = "companyParticipantIds", expression = "java(stringToLongList(meeting.getCompanyParticipants()))")
     @Mapping(target = "clientParticipants", expression = "java(stringToStringList(meeting.getClientParticipants()))")
     @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
+    @Mapping(source = "meetingRemarks", target = "remarks")
     MeetingResponse toResponse(Meeting meeting);
 
     /**
@@ -53,6 +54,7 @@ public interface MeetingMapper {
     @Mapping(target = "companyParticipantIds", expression = "java(stringToLongList(meeting.getCompanyParticipants()))")
     @Mapping(target = "clientParticipants", expression = "java(stringToStringList(meeting.getClientParticipants()))")
     @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
+    @Mapping(source = "meetingRemarks", target = "remarks")
     MeetingDetailResponse toDetailResponse(Meeting meeting);
 
     default String getMeetingLocation(Meeting meeting) {

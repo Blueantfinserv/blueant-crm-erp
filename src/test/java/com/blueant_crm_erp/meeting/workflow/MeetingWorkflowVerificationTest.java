@@ -78,7 +78,7 @@ public class MeetingWorkflowVerificationTest {
         update1.setMeetingConducted(MeetingConductStatus.CONDUCTED);
         update1.setAloneWith("SELF");
         update1.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
-        update1.setMeetingRemarks("Intro remarks: Work in progress");
+        update1.setRemarks("Intro remarks: Work in progress");
         update1.setDiscussion("Intro was good");
         update1.setNextPlanDate(LocalDate.now().plusDays(2));
         update1.setNextPlanTime(LocalTime.of(11, 0));
@@ -96,7 +96,7 @@ public class MeetingWorkflowVerificationTest {
         update2.setMeetingConducted(MeetingConductStatus.CONDUCTED);
         update2.setAloneWith("SELF");
         update2.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
-        update2.setMeetingRemarks("Meeting 1 remarks: WIP");
+        update2.setRemarks("Meeting 1 remarks: WIP");
         update2.setDiscussion("Needs another follow-up");
         update2.setNextPlanDate(LocalDate.now().plusDays(3));
         update2.setNextPlanTime(LocalTime.of(14, 0));
@@ -114,7 +114,7 @@ public class MeetingWorkflowVerificationTest {
         update3.setMeetingConducted(MeetingConductStatus.CONDUCTED);
         update3.setAloneWith("SELF");
         update3.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
-        update3.setMeetingRemarks("Meeting 2 remarks: WIP");
+        update3.setRemarks("Meeting 2 remarks: WIP");
         update3.setDiscussion("Still discussing");
         update3.setNextPlanDate(LocalDate.now().plusDays(4));
         update3.setNextPlanTime(LocalTime.of(15, 0));
@@ -132,7 +132,7 @@ public class MeetingWorkflowVerificationTest {
         update4.setMeetingConducted(MeetingConductStatus.CONDUCTED);
         update4.setAloneWith("SELF");
         update4.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
-        update4.setMeetingRemarks("Meeting 3 remarks: WIP");
+        update4.setRemarks("Meeting 3 remarks: WIP");
         update4.setDiscussion("Deciding amount");
         update4.setNextPlanDate(LocalDate.now().plusDays(5));
         update4.setNextPlanTime(LocalTime.of(16, 0));
@@ -150,7 +150,7 @@ public class MeetingWorkflowVerificationTest {
         terminalUpdate.setMeetingConducted(MeetingConductStatus.CONDUCTED);
         terminalUpdate.setAloneWith("SELF");
         terminalUpdate.setLeadStatus(MeetingLeadStatus.CONVERTED_CLIENT);
-        terminalUpdate.setMeetingRemarks("Client Converted!");
+        terminalUpdate.setRemarks("Client Converted!");
         terminalUpdate.setDiscussion("Client Converted with SIP!");
         terminalUpdate.setPanNumber("ABCDE1234F");
         terminalUpdate.setInvestmentAmount(new BigDecimal("5000.00"));

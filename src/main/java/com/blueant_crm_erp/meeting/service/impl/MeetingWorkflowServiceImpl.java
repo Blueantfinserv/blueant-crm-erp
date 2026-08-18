@@ -79,9 +79,6 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
 
         // ── Step 4: Act on Workflow Transitions ──────────────────────────────
         String workflowRemarks = request.getRemarks();
-        if (workflowRemarks == null || workflowRemarks.isBlank()) {
-            workflowRemarks = request.getMeetingRemarks();
-        }
 
         switch (request.getLeadStatus()) {
             case ALREADY_CLIENT -> {
@@ -93,39 +90,27 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
             }
             case CONVERTED_CLIENT -> {
                 changeLeadStatus(meeting, LeadStatus.CONVERTED, LeadStage.INVESTMENT_CONFIRMED,
-                        "Converted client from meeting: " + meeting.getMeetingCode(), currentUserEmail);
+                        workflowRemarks, currentUserEmail);
                 eventPublisher.publishEvent(new LeadConvertedEvent(this, meeting, previousStatus, currentUserEmail));
                 log.info("[WorkflowOrchestrator] Lead {} converted.", meeting.getLead().getLeadCode());
             }
             case CLIENT_REMOVED -> {
-                String remarks = "Lead removed.";
-                if (workflowRemarks != null && !workflowRemarks.isBlank()) {
-                    remarks += " Remarks: " + workflowRemarks;
-                }
                 changeLeadStatus(meeting, LeadStatus.REMOVED, meeting.getLead().getLeadStage(),
-                        remarks, currentUserEmail);
+                        workflowRemarks, currentUserEmail);
                 eventPublisher.publishEvent(new LeadWorkflowTerminatedEvent(this, meeting,
                         MeetingLeadStatus.CLIENT_REMOVED, previousStatus, currentUserEmail));
                 log.info("[WorkflowOrchestrator] Lead {} removed.", meeting.getLead().getLeadCode());
             }
             case CLIENT_NOT_INTERESTED -> {
-                String remarks = "Lead not interested.";
-                if (workflowRemarks != null && !workflowRemarks.isBlank()) {
-                    remarks += " Remarks: " + workflowRemarks;
-                }
                 changeLeadStatus(meeting, LeadStatus.NOT_INTERESTED, meeting.getLead().getLeadStage(),
-                        remarks, currentUserEmail);
+                        workflowRemarks, currentUserEmail);
                 eventPublisher.publishEvent(new LeadWorkflowTerminatedEvent(this, meeting,
                         MeetingLeadStatus.CLIENT_NOT_INTERESTED, previousStatus, currentUserEmail));
                 log.info("[WorkflowOrchestrator] Lead {} marked NOT_INTERESTED.", meeting.getLead().getLeadCode());
             }
             case WORK_IN_PROGRESS -> {
-                String remarks = "Meeting conducted. Status updated to Work In Progress.";
-                if (workflowRemarks != null && !workflowRemarks.isBlank()) {
-                    remarks += " Remarks: " + workflowRemarks;
-                }
                 changeLeadStatus(meeting, LeadStatus.WORK_IN_PROGRESS, meeting.getLead().getLeadStage(),
-                        remarks, currentUserEmail);
+                        workflowRemarks, currentUserEmail);
                 log.info("[WorkflowOrchestrator] Lead {} marked WORK_IN_PROGRESS.", meeting.getLead().getLeadCode());
             }
         }

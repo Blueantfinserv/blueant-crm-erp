@@ -239,7 +239,7 @@ public class MeetingWorkflowDirectorTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.meetingRemarks").value(nullValue()));
+                .andExpect(jsonPath("$.data.remarks").value(nullValue()));
     }
 
     // 9. Next plan date omitted
@@ -456,7 +456,7 @@ public class MeetingWorkflowDirectorTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("aloneWith", "SELF");
         payload.put("leadStatus", "WORK_IN_PROGRESS");
-        payload.put("meetingRemarks", "First audit test remarks");
+        payload.put("remarks", "First audit test remarks");
 
         mockMvc.perform(post("/v1/meetings/" + meeting.getMeetingCode() + "/workflow-update")
                 .contentType(MediaType.APPLICATION_JSON)

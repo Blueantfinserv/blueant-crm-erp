@@ -96,7 +96,7 @@ public class TimezoneVerificationTest {
         update1.setMeetingConducted(MeetingConductStatus.CONDUCTED);
         update1.setAloneWith("SELF");
         update1.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
-        update1.setMeetingRemarks("Test 1 -1");
+        update1.setRemarks("Test 1 -1");
         update1.setDiscussion("Intro was good");
         update1.setNextPlanDate(LocalDate.now().plusDays(2));
         update1.setNextPlanTime(LocalTime.of(11, 0));
@@ -118,13 +118,13 @@ public class TimezoneVerificationTest {
 
         // 5. Verify remarks and meetingTime through API / service response
         MeetingDetailResponse detail = meetingService.getMeetingByCode(introMeeting.getMeetingCode());
-        assertEquals("Test 1 -1", detail.getMeetingRemarks(), "GET meeting response should return the persisted remarks");
+        assertEquals("Test 1 -1", detail.getRemarks(), "GET meeting response should return the persisted remarks");
         assertEquals(LocalTime.of(10, 0), detail.getMeetingTime(), "GET meeting response should return the correct meetingTime (10:00)");
 
         // 6. Verify newly scheduled meeting has null remarks and correct next meeting time (11:00)
         String nextMeetingCode = meetingService.getActiveMeetingByLeadId(leadResponse.getUniqueLeadId()).getMeetingCode();
         MeetingDetailResponse nextDetail = meetingService.getMeetingByCode(nextMeetingCode);
-        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingRemarks(), "Next scheduled meeting remarks should be null");
+        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getRemarks(), "Next scheduled meeting remarks should be null");
         assertEquals(LocalTime.of(11, 0), nextDetail.getMeetingTime(), "Next scheduled meetingTime should be 11:00");
     }
 
@@ -185,7 +185,7 @@ public class TimezoneVerificationTest {
         update1.setMeetingConducted(MeetingConductStatus.CONDUCTED);
         update1.setAloneWith("SELF");
         update1.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
-        update1.setMeetingRemarks("Test remarks");
+        update1.setRemarks("Test remarks");
         update1.setDiscussion("Discussion");
         update1.setNextPlanDate(LocalDate.now().plusDays(2));
         update1.setNextPlanTime(null); // Next meeting time is optional / null
@@ -265,7 +265,7 @@ public class TimezoneVerificationTest {
         update1.setAloneWith("SELF");
         update1.setLeadStatus(MeetingLeadStatus.WORK_IN_PROGRESS);
         update1.setMeetingLocation("Noida");
-        update1.setMeetingRemarks("Client interested in mutual fund investment");
+        update1.setRemarks("Client interested in mutual fund investment");
         update1.setDiscussion("Discussion");
         update1.setNextPlanDate(LocalDate.now().plusDays(20));
         update1.setNextPlanTime(LocalTime.of(16, 0));
@@ -275,7 +275,7 @@ public class TimezoneVerificationTest {
         // 5. Verify current completed meeting has Noida and remarks
         MeetingDetailResponse detail = meetingService.getMeetingByCode(introMeeting.getMeetingCode());
         assertEquals("Noida", detail.getMeetingLocation(), "Completed current meeting location must be Noida");
-        assertEquals("Client interested in mutual fund investment", detail.getMeetingRemarks(), "Completed current meeting remarks must be set");
+        assertEquals("Client interested in mutual fund investment", detail.getRemarks(), "Completed current meeting remarks must be set");
 
         // 6. Verify current completed meeting location and remarks in DB
         String locInDb = jdbcTemplate.queryForObject(
@@ -293,7 +293,7 @@ public class TimezoneVerificationTest {
         // 7. Verify next scheduled meeting does not copy completed meeting's remarks or location
         String nextMeetingCode = meetingService.getActiveMeetingByLeadId(leadResponse.getUniqueLeadId()).getMeetingCode();
         MeetingDetailResponse nextDetail = meetingService.getMeetingByCode(nextMeetingCode);
-        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingRemarks(), "Next scheduled meeting remarks must be null");
+        org.junit.jupiter.api.Assertions.assertNull(nextDetail.getRemarks(), "Next scheduled meeting remarks must be null");
         org.junit.jupiter.api.Assertions.assertNull(nextDetail.getMeetingLocation(), "Next scheduled meeting location must be null");
         assertEquals(LocalDate.now().plusDays(20), nextDetail.getMeetingDate(), "Next scheduled meeting date must be correct");
         assertEquals(LocalTime.of(16, 0), nextDetail.getMeetingTime(), "Next scheduled meeting time must be 16:00");

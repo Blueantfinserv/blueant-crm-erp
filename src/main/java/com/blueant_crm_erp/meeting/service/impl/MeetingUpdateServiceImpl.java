@@ -54,6 +54,11 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
 
         MeetingConductStatus conductStatus = request.getMeetingConducted() != null ? request.getMeetingConducted() : MeetingConductStatus.CONDUCTED;
 
+        String auditRemarks = request.getRemarks();
+        if (auditRemarks == null || auditRemarks.isBlank()) {
+            auditRemarks = request.getMeetingRemarks();
+        }
+
         // ── Build immutable audit record ──────────────────────────────────────
         MeetingUpdate update = MeetingUpdate.builder()
                 .meeting(meeting)
@@ -65,7 +70,7 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
                 .completedStage(request.getCompletedStage())
                 .leadStatus(request.getLeadStatus())
                 .clientStatus(request.getClientStatus())
-                .remarks(request.getMeetingRemarks())
+                .remarks(auditRemarks)
                 .joinedMeetingWith(request.getJoinedMeetingWith())
                 .aloneWith(request.getAloneWith())
                 .personName("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPersonName())

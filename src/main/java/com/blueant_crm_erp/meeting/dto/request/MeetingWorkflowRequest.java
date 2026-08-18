@@ -45,6 +45,10 @@ public class MeetingWorkflowRequest {
     @Schema(description = "Optional meeting remarks", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String meetingRemarks;
 
+    @Size(max = 1000, message = "Remarks cannot exceed 1000 characters.")
+    @Schema(description = "Workflow/outcome remark/status information", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    private String remarks;
+
     @Size(max = 50, message = "Completed stage cannot exceed 50 characters.")
     @Schema(description = "Stage completed during the meeting", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String completedStage;

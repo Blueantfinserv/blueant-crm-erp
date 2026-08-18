@@ -37,7 +37,7 @@ public class FollowUpServiceImpl implements FollowUpService {
     private final MeetingRepository meetingRepository;
 
     @Override
-    public Meeting createFollowUp(Meeting currentMeeting, LocalDate nextMeetingDate, LocalTime nextMeetingTime, String triggeredBy) {
+    public Meeting createFollowUp(Meeting currentMeeting, LocalDate nextMeetingDate, LocalTime nextMeetingTime, String remarks, String triggeredBy) {
         log.info("Creating follow-up meeting after meeting #{} for lead {}",
                 currentMeeting.getMeetingNumber(), currentMeeting.getLead().getLeadCode());
 
@@ -91,6 +91,7 @@ public class FollowUpServiceImpl implements FollowUpService {
         // Schedule
         nextMeeting.setMeetingDate(nextMeetingDate);
         nextMeeting.setMeetingTime(nextMeetingTime);
+        nextMeeting.setMeetingRemarks(remarks);
 
         // Status
         nextMeeting.setMeetingStatus(MeetingStatus.SCHEDULED);

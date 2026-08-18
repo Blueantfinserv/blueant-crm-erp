@@ -78,10 +78,15 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
         eventPublisher.publishEvent(new MeetingUpdatedEvent(this, meeting, savedUpdate, currentUserEmail));
 
         // ── Step 4: Act on Workflow Transitions ──────────────────────────────
+        String workflowRemarks = request.getRemarks();
+        if (workflowRemarks == null || workflowRemarks.isBlank()) {
+            workflowRemarks = request.getMeetingRemarks();
+        }
+
         switch (request.getLeadStatus()) {
             case ALREADY_CLIENT -> {
                 changeLeadStatus(meeting, LeadStatus.ALREADY_CLIENT, meeting.getLead().getLeadStage(),
-                        request.getMeetingRemarks(), currentUserEmail);
+                        workflowRemarks, currentUserEmail);
                 eventPublisher.publishEvent(new LeadWorkflowTerminatedEvent(this, meeting,
                         MeetingLeadStatus.ALREADY_CLIENT, previousStatus, currentUserEmail));
                 log.info("[WorkflowOrchestrator] Lead {} marked ALREADY_CLIENT.", meeting.getLead().getLeadCode());
@@ -94,8 +99,8 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
             }
             case CLIENT_REMOVED -> {
                 String remarks = "Lead removed.";
-                if (request.getMeetingRemarks() != null && !request.getMeetingRemarks().isBlank()) {
-                    remarks += " Remarks: " + request.getMeetingRemarks();
+                if (workflowRemarks != null && !workflowRemarks.isBlank()) {
+                    remarks += " Remarks: " + workflowRemarks;
                 }
                 changeLeadStatus(meeting, LeadStatus.REMOVED, meeting.getLead().getLeadStage(),
                         remarks, currentUserEmail);
@@ -105,8 +110,8 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
             }
             case CLIENT_NOT_INTERESTED -> {
                 String remarks = "Lead not interested.";
-                if (request.getMeetingRemarks() != null && !request.getMeetingRemarks().isBlank()) {
-                    remarks += " Remarks: " + request.getMeetingRemarks();
+                if (workflowRemarks != null && !workflowRemarks.isBlank()) {
+                    remarks += " Remarks: " + workflowRemarks;
                 }
                 changeLeadStatus(meeting, LeadStatus.NOT_INTERESTED, meeting.getLead().getLeadStage(),
                         remarks, currentUserEmail);
@@ -115,8 +120,12 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
                 log.info("[WorkflowOrchestrator] Lead {} marked NOT_INTERESTED.", meeting.getLead().getLeadCode());
             }
             case WORK_IN_PROGRESS -> {
+                String remarks = "Meeting conducted. Status updated to Work In Progress.";
+                if (workflowRemarks != null && !workflowRemarks.isBlank()) {
+                    remarks += " Remarks: " + workflowRemarks;
+                }
                 changeLeadStatus(meeting, LeadStatus.WORK_IN_PROGRESS, meeting.getLead().getLeadStage(),
-                        "Meeting conducted. Status updated to Work In Progress.", currentUserEmail);
+                        remarks, currentUserEmail);
                 log.info("[WorkflowOrchestrator] Lead {} marked WORK_IN_PROGRESS.", meeting.getLead().getLeadCode());
             }
         }
@@ -135,7 +144,7 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
                 java.time.LocalTime nextTime = request.getNextPlanTime();
 
                 Meeting nextMeeting = followUpService.createFollowUp(
-                        meeting, nextDate, nextTime, currentUserEmail);
+                        meeting, nextDate, nextTime, workflowRemarks, currentUserEmail);
                 eventPublisher.publishEvent(new FollowUpCreatedEvent(this, meeting, nextMeeting, currentUserEmail));
                 log.info("[WorkflowOrchestrator] Next sequential meeting #{} created: {}",
                          nextMeeting.getMeetingNumber(), nextMeeting.getMeetingCode());

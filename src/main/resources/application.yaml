@@ -167,30 +167,8 @@ spring:
 
 
   # ============================================================================
-  # Mail
+  # Mail configuration removed in favor of Brevo REST API over HTTPS
   # ============================================================================
-
-  mail:
-    host: ${MAIL_HOST:${SPRING_MAIL_HOST:smtp.gmail.com}}
-
-    port: ${MAIL_PORT:${SPRING_MAIL_PORT:587}}
-
-    username: ${MAIL_USERNAME:noreply@blueant.in}
-
-    password: ${MAIL_PASSWORD:}
-
-    properties:
-      mail:
-        smtp:
-          auth: true
-
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
-
-          starttls:
-            enable: true
-            required: true
 
 
   # ============================================================================
@@ -244,7 +222,7 @@ app:
   frontend-url: ${FRONTEND_URL:http://localhost:8081}
 
   mail:
-    from: ${MAIL_FROM:${MAIL_USERNAME:noreply@blueant.in}}
+    from: ${MAIL_FROM:${BREVO_FROM_EMAIL:support@blueant.in}}
 
   password-reset:
     token-expiry-minutes: 15
@@ -362,4 +340,15 @@ aws:
 
     bucket:
 
-      name: ${AWS_S3_BUCKET_NAME:blueant-documents}
+      name: ${AWS_S3_BUCKET_NAME:blueant-documents}
+
+
+# ==============================================================================
+# Brevo Mail REST Configuration
+# ==============================================================================
+
+brevo:
+  api-key: ${BREVO_API_KEY}
+  from-email: ${BREVO_FROM_EMAIL}
+  from-name: ${BREVO_FROM_NAME:BlueAnt CRM ERP}
+  api-url: ${BREVO_API_URL:https://api.brevo.com/v3}

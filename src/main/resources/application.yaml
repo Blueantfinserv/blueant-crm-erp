@@ -212,11 +212,8 @@ springdoc:
 # ==============================================================================
 
 app:
-
   name: BlueAnt CRM ERP Platform
-
   version: 1.0.0
-
   support-email: support@blueant.in
 
   frontend-url: ${FRONTEND_URL:http://localhost:8081}
@@ -235,6 +232,7 @@ app:
       - http://localhost:5173
       - http://localhost:8081
       - https://crm.blueant.in
+      - https://blueantfinserv.github.io
 
 
 # ==============================================================================
@@ -351,4 +349,4 @@ brevo:
   api-key: ${BREVO_API_KEY}
   from-email: ${BREVO_FROM_EMAIL}
   from-name: ${BREVO_FROM_NAME:BlueAnt CRM ERP}
-  api-url: ${BREVO_API_URL:https://api.brevo.com/v3}
+  api-url: ${BREVO_API_URL:https://api.brevo.com/v3}

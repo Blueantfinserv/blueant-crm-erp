@@ -3,10 +3,12 @@ package com.blueant_crm_erp.meeting.service.impl;
 import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.entity.MeetingVerification;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
+import com.blueant_crm_erp.meeting.mapper.MeetingMapper;
 import com.blueant_crm_erp.meeting.repository.MeetingRepository;
 import com.blueant_crm_erp.meeting.repository.MeetingVerificationRepository;
 import com.blueant_crm_erp.meeting.service.ProcessCoordinatorService;
 import com.blueant_crm_erp.meeting.dto.request.MeetingVerificationRequest;
+import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,9 +27,10 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
     private final MeetingRepository meetingRepository;
     private final MeetingVerificationRepository meetingVerificationRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final MeetingMapper meetingMapper;
 
     @Override
-    public Meeting verifyMeeting(String meetingCode, MeetingVerificationRequest request, String currentUserEmail) {
+    public MeetingResponse verifyMeeting(String meetingCode, MeetingVerificationRequest request, String currentUserEmail) {
         log.info("Verifying meeting: {} by Sales Coordinator: {}", meetingCode, currentUserEmail);
         
         Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
@@ -78,12 +81,14 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         meeting.setMeetingVerificationDate(LocalDateTime.now());
         meeting.setVerificationRemarks(request.getRemarks());
         meeting.setVerifiedBy(currentUserEmail);
+        meeting.setVerification(verification);
         
-        return meetingRepository.save(meeting);
+        Meeting savedMeeting = meetingRepository.save(meeting);
+        return meetingMapper.toResponse(savedMeeting);
     }
 
     @Override
-    public Meeting rejectMeeting(String meetingCode, String reason, String currentUserEmail) {
+    public MeetingResponse rejectMeeting(String meetingCode, String reason, String currentUserEmail) {
         log.info("Rejecting meeting verification: {} by Sales Coordinator: {}", meetingCode, currentUserEmail);
         
         Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
@@ -113,8 +118,10 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         meeting.setMeetingVerificationDate(LocalDateTime.now());
         meeting.setVerificationRemarks("REJECTED: " + reason);
         meeting.setVerifiedBy(currentUserEmail);
+        meeting.setVerification(verification);
         
-        return meetingRepository.save(meeting);
+        Meeting savedMeeting = meetingRepository.save(meeting);
+        return meetingMapper.toResponse(savedMeeting);
     }
 
     private void validateCoordinatorData(MeetingVerificationRequest request) {
@@ -123,15 +130,15 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         }
         if ("SOMEONE".equalsIgnoreCase(request.getAloneWith())) {
             if (request.getPersonName() == null || request.getPersonName().isBlank()) {
-                throw new IllegalArgumentException("Person name is required when aloneWith is SOMEONE.");
+                throw new IllegalArgumentException("Person name is required if aloneWith is SOMEONE");
             }
             if (request.getPosition() == null || request.getPosition().isBlank()) {
-                throw new IllegalArgumentException("Position is required when aloneWith is SOMEONE.");
+                throw new IllegalArgumentException("Position is required if aloneWith is SOMEONE");
             }
         }
         if (Boolean.TRUE.equals(request.getAnyChildren())) {
-            if (request.getNumberOfChildren() == null || request.getNumberOfChildren() < 0) {
-                throw new IllegalArgumentException("Number of children is required and must be non-negative when anyChildren is true.");
+            if (request.getNumberOfChildren() == null || request.getNumberOfChildren() <= 0) {
+                throw new IllegalArgumentException("Number of children must be greater than 0 if anyChildren is true");
             }
         }
     }

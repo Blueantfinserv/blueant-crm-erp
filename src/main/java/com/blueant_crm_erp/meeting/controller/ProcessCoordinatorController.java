@@ -1,6 +1,6 @@
 package com.blueant_crm_erp.meeting.controller;
 
-import com.blueant_crm_erp.meeting.entity.Meeting;
+import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.meeting.service.ProcessCoordinatorService;
 import com.blueant_crm_erp.meeting.dto.request.MeetingVerificationRequest;
 import jakarta.validation.Valid;
@@ -20,7 +20,7 @@ public class ProcessCoordinatorController {
 
     @PostMapping("/{meetingCode}/verify")
     @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasRole('ADMIN')")
-    public ResponseEntity<Meeting> verifyMeeting(
+    public ResponseEntity<MeetingResponse> verifyMeeting(
             @PathVariable String meetingCode,
             @Valid @RequestBody MeetingVerificationRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -29,7 +29,7 @@ public class ProcessCoordinatorController {
 
     @PostMapping("/{meetingCode}/reject")
     @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasRole('ADMIN')")
-    public ResponseEntity<Meeting> rejectMeeting(
+    public ResponseEntity<MeetingResponse> rejectMeeting(
             @PathVariable String meetingCode,
             @RequestParam String reason) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

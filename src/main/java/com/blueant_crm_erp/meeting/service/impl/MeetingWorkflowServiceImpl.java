@@ -79,6 +79,7 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
                 .orElseGet(() -> com.blueant_crm_erp.meeting.entity.MeetingVerification.builder().meeting(meeting).build());
         verification.setVerificationStatus(com.blueant_crm_erp.servicerequest.enums.VerificationStatus.PENDING);
         meetingVerificationRepository.save(verification);
+        meeting.setVerification(verification);
 
         // ── Step 3: Publish MeetingCompleted + MeetingUpdated Events ────────
         eventPublisher.publishEvent(new MeetingCompletedEvent(this, meeting, previousStatus,

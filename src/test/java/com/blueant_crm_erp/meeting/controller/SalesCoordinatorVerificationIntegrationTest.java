@@ -31,6 +31,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -196,7 +197,9 @@ public class SalesCoordinatorVerificationIntegrationTest {
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(validRequest)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meetingCode").value(meetingResponse.getMeetingCode()))
+                .andExpect(jsonPath("$.verificationStatus").value("VERIFIED"));
 
         // Verify database states
         MeetingVerification verifiedVal = meetingVerificationRepository.findByMeetingMeetingCode(meetingResponse.getMeetingCode())
@@ -252,7 +255,9 @@ public class SalesCoordinatorVerificationIntegrationTest {
         // 3. Test successful rejection by Sales Coordinator
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/reject")
                 .param("reason", "Client age is wrong"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meetingCode").value(meetingResponse.getMeetingCode()))
+                .andExpect(jsonPath("$.verificationStatus").value("REJECTED"));
 
         // Verify database states
         MeetingVerification verifiedVal = meetingVerificationRepository.findByMeetingMeetingCode(meetingResponse.getMeetingCode())

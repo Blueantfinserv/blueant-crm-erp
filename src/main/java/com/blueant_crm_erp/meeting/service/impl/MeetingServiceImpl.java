@@ -117,12 +117,6 @@ public class MeetingServiceImpl implements MeetingService {
 
         Meeting savedMeeting = meetingRepository.save(meeting);
 
-        MeetingVerification verification = MeetingVerification.builder()
-                .meeting(savedMeeting)
-                .verificationStatus(com.blueant_crm_erp.servicerequest.enums.VerificationStatus.PENDING)
-                .build();
-        meetingVerificationRepository.save(verification);
-
         // Update Lead status/stage to MEETING_SCHEDULED / INTRO_MEETING_SCHEDULED for the first meeting
         if (nextMeetingNumber == 1) {
             UpdateLeadStatusRequest statusReq = UpdateLeadStatusRequest.builder()
@@ -162,12 +156,6 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.setStatus(Status.ACTIVE);
 
         Meeting savedMeeting = meetingRepository.save(meeting);
-
-        MeetingVerification verification = MeetingVerification.builder()
-                .meeting(savedMeeting)
-                .verificationStatus(com.blueant_crm_erp.servicerequest.enums.VerificationStatus.PENDING)
-                .build();
-        meetingVerificationRepository.save(verification);
         
         eventPublisher.publishEvent(new MeetingWorkflowEvent(this, savedMeeting, "SCHEDULED", null, "Initial Meeting auto-created on demand", "SYSTEM"));
         return savedMeeting;

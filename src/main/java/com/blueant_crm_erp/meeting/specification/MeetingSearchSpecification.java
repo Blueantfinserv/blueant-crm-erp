@@ -35,7 +35,7 @@ public final class MeetingSearchSpecification {
 
         // 1. Status Filter (Queue Rules)
         Specification<Meeting> statusSpec;
-        if ("completed".equalsIgnoreCase(statusFilter)) {
+        if ("completed".equalsIgnoreCase(statusFilter) || verificationStatus != null) {
             statusSpec = (root, query, cb) -> cb.equal(root.get("meetingStatus"), MeetingStatus.COMPLETED);
         } else if ("all".equalsIgnoreCase(statusFilter)) {
             // Exclude cancelled

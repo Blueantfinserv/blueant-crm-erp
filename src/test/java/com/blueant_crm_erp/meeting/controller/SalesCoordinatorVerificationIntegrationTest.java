@@ -391,4 +391,154 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @WithMockUser(username = "EMP000001", authorities = {"ROLE_EMPLOYEE", "LEAD_CREATE", "LEAD_READ", "LEAD_UPDATE", "MEETING_CREATE", "MEETING_READ", "MEETING_UPDATE"})
+    public void testSalesExecutiveWorkflowAndSecurity() throws Exception {
+        // 1. Sales Executive creates a lead
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Sales Exec Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+
+        String leadResponseJson = mockMvc.perform(post("/v1/leads")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(leadRequest)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        LeadResponse leadResponse = objectMapper.readValue(
+                objectMapper.readTree(leadResponseJson).get("data").toString(),
+                LeadResponse.class
+        );
+
+        // 2. Sales Executive creates a meeting
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("RM test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+
+        String meetingResponseJson = mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(meetingRequest)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        // Deserialize response
+        MeetingResponse meetingResponse = objectMapper.readValue(
+                objectMapper.readTree(meetingResponseJson).get("data").toString(),
+                MeetingResponse.class
+        );
+
+        // 3. Sales Executive performs workflow update
+        Map<String, Object> workflowPayload = new HashMap<>();
+        workflowPayload.put("aloneWith", "SELF");
+        workflowPayload.put("leadStatus", "WORK_IN_PROGRESS");
+        workflowPayload.put("remarks", "Meeting conducted");
+
+        mockMvc.perform(post("/v1/meetings/" + meetingResponse.getMeetingCode() + "/workflow-update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(workflowPayload)))
+                .andExpect(status().isOk());
+
+        // 4. Sales Executive attempts to verify/reject meeting (should be forbidden)
+        MeetingVerificationRequest validRequest = MeetingVerificationRequest.builder()
+                .remarks("Verification test")
+                .aloneWith("SELF")
+                .clientAge(30)
+                .maritalStatus("SINGLE")
+                .profession("EMPLOYEE")
+                .email("test@test.com")
+                .companyName("None")
+                .anyChildren(false)
+                .previousInvestment(false)
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/reject")
+                .param("reason", "rejection test"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testSalesCoordinatorLeadCreationForbidden() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Unauth Coordinator Client");
+        leadRequest.setMobileNumber("9998887776");
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+
+        mockMvc.perform(post("/v1/leads")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(leadRequest)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testVerificationPayloadStrictness() throws Exception {
+        // 1. Create a lead first
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Strictness Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        // 2. Schedule a meeting
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Need verification test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // Conduct/Complete it
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Client is not interested")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+
+        // Verification payload with extra malicious fields
+        String maliciousPayload = "{" +
+                "\"remarks\": \"Verified\"," +
+                "\"aloneWith\": \"SELF\"," +
+                "\"clientAge\": 35," +
+                "\"maritalStatus\": \"SINGLE\"," +
+                "\"profession\": \"EMPLOYEE\"," +
+                "\"email\": \"test@test.com\"," +
+                "\"companyName\": \"None\"," +
+                "\"anyChildren\": false," +
+                "\"previousInvestment\": false," +
+                "\"meetingTitle\": \"Hacked Title\"," +
+                "\"meetingRemarks\": \"Hacked Remarks\"" +
+                "}";
+
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(maliciousPayload))
+                .andExpect(status().isOk());
+
+        // Assert that meeting title and other meeting-level RM data were NOT altered
+        Meeting meeting = meetingRepository.findByMeetingCode(meetingResponse.getMeetingCode()).orElse(null);
+        assertThat(meeting).isNotNull();
+        assertThat(meeting.getMeetingTitle()).isEqualTo("Intro Meeting");
+    }
 }

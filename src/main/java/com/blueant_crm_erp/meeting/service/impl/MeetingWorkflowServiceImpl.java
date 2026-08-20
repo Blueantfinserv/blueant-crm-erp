@@ -64,6 +64,20 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
         Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
                 .orElseThrow(() -> new MeetingNotFoundException(MeetingConstants.MEETING_NOT_FOUND));
                 
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null) {
+            boolean hasElevated = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SUPER_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SALES_COORDINATOR"));
+            if (!hasElevated) {
+                String empCode = auth.getName();
+                if (meeting.getAssignedEmployee() != null && !meeting.getAssignedEmployee().getEmployeeCode().equalsIgnoreCase(empCode)) {
+                    throw new org.springframework.security.access.AccessDeniedException("You can only access your own meetings.");
+                }
+            }
+        }
+                
         String previousStatus = meeting.getMeetingStatus().name();
 
         // ── Step 1: Guard Conditions ─────────────────────────────────────────

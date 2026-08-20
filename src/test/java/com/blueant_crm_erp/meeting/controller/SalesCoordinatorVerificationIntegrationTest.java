@@ -60,6 +60,21 @@ public class SalesCoordinatorVerificationIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.blueant_crm_erp.user.repository.UserRepository userRepository;
+
+    @Autowired
+    private com.blueant_crm_erp.role.repository.RoleRepository roleRepository;
+
+    @Autowired
+    private com.blueant_crm_erp.user.repository.DepartmentRepository departmentRepository;
+
+    @Autowired
+    private com.blueant_crm_erp.user.repository.DesignationRepository designationRepository;
+
+    @Autowired
+    private com.blueant_crm_erp.user.repository.TeamRepository teamRepository;
+
     @Test
     @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
     public void testVerificationLifecycleFlow() throws Exception {
@@ -540,5 +555,489 @@ public class SalesCoordinatorVerificationIntegrationTest {
         Meeting meeting = meetingRepository.findByMeetingCode(meetingResponse.getMeetingCode()).orElse(null);
         assertThat(meeting).isNotNull();
         assertThat(meeting.getMeetingTitle()).isEqualTo("Intro Meeting");
+    }
+
+    private com.blueant_crm_erp.user.entity.User getOrCreateSecondSalesperson() {
+        return userRepository.findByEmployeeCodeIgnoreCaseAndDeletedFalse("EMP000002")
+                .orElseGet(() -> {
+                    com.blueant_crm_erp.user.entity.User secondSalesperson = com.blueant_crm_erp.user.entity.User.builder()
+                            .employeeCode("EMP000002")
+                            .firstName("Second")
+                            .lastName("RM")
+                            .email("secondrm@blueant.com")
+                            .mobileNumber("9876543210")
+                            .password("Password@123")
+                            .gender(com.blueant_crm_erp.common.enums.Gender.MALE)
+                            .joiningDate(LocalDate.now())
+                            .status(com.blueant_crm_erp.common.enums.Status.ACTIVE)
+                            .role(roleRepository.findByCodeIgnoreCase(com.blueant_crm_erp.bootstrap.constant.BootstrapConstants.ROLE_EMPLOYEE).orElse(null))
+                            .department(departmentRepository.findByCodeIgnoreCase(com.blueant_crm_erp.bootstrap.constant.BootstrapConstants.DEPT_SALES).orElse(null))
+                            .designation(designationRepository.findByCodeIgnoreCase(com.blueant_crm_erp.bootstrap.constant.BootstrapConstants.DESIG_SM).orElse(null))
+                            .team(teamRepository.findByTeamCodeIgnoreCase(com.blueant_crm_erp.bootstrap.constant.BootstrapConstants.TEAM_ST1).orElse(null))
+                            .accountEnabled(true)
+                            .accountLocked(false)
+                            .accountNonExpired(true)
+                            .credentialsNonExpired(true)
+                            .emailVerified(true)
+                            .mobileVerified(true)
+                            .build();
+                    return userRepository.save(secondSalesperson);
+                });
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testPendingVerificationQueueReturnsCompletedConductedPendingMeetings() throws Exception {
+        // 1. Create lead
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Queue Flow Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        // 2. Schedule meeting
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Queue test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // 3. Complete and conduct meeting via workflow
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted successfully")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000001");
+
+        // 4. Assert queue contains this completed conducted pending meeting
+        mockMvc.perform(get("/v1/meetings")
+                .param("verificationStatus", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse.getMeetingCode() + "')]").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testPendingVerificationQueueReturnsMeetingsAcrossSalesExecutives() throws Exception {
+        // 1. Create RM 2
+        getOrCreateSecondSalesperson();
+
+        // 2. Create lead assigned to Super Admin (RM 1)
+        CreateLeadRequest leadRequest1 = new CreateLeadRequest();
+        leadRequest1.setClientName("RM1 Client");
+        leadRequest1.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest1.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest1.setLocation("Delhi");
+        LeadResponse leadResponse1 = leadService.createLead(leadRequest1, "EMP000001");
+
+        CreateMeetingRequest meetingRequest1 = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse1.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("RM 1 Meeting")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse1 = meetingService.createMeeting(meetingRequest1, "EMP000001");
+
+        MeetingWorkflowRequest workflowRequest1 = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.WORK_IN_PROGRESS)
+                .remarks("RM 1 Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse1.getMeetingCode(), workflowRequest1, "EMP000001");
+
+        // 3. Create lead assigned to RM 2
+        CreateLeadRequest leadRequest2 = new CreateLeadRequest();
+        leadRequest2.setClientName("RM2 Client");
+        leadRequest2.setMobileNumber(String.valueOf(System.currentTimeMillis() + 100).substring(3, 13));
+        leadRequest2.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest2.setLocation("Delhi");
+        LeadResponse leadResponse2 = leadService.createLead(leadRequest2, "EMP000002");
+
+        CreateMeetingRequest meetingRequest2 = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse2.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Mumbai Office")
+                .meetingRemarks("RM 2 Meeting")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse2 = meetingService.createMeeting(meetingRequest2, "EMP000002");
+
+        MeetingWorkflowRequest workflowRequest2 = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.WORK_IN_PROGRESS)
+                .remarks("RM 2 Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse2.getMeetingCode(), workflowRequest2, "EMP000002");
+
+        // 4. Assert both meetings are in the queue for the Sales Coordinator
+        mockMvc.perform(get("/v1/meetings")
+                .param("verificationStatus", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse1.getMeetingCode() + "')]").exists())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse2.getMeetingCode() + "')]").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testPendingVerificationQueueExcludesScheduledMeetings() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Scheduled Exclude Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Queue test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // Assert that the scheduled meeting (no verification record) is excluded
+        mockMvc.perform(get("/v1/meetings")
+                .param("verificationStatus", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse.getMeetingCode() + "')]").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testPendingVerificationQueueExcludesNotConductedMeetings() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Not Conducted Exclude Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Queue test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // Manually complete but mark as NOT_CONDUCTED in DB to test exclusion
+        Meeting meeting = meetingRepository.findByMeetingCode(meetingResponse.getMeetingCode()).orElseThrow();
+        meeting.setMeetingStatus(MeetingStatus.COMPLETED);
+        meeting.setMeetingConducted(com.blueant_crm_erp.meeting.enums.MeetingConductStatus.NOT_CONDUCTED);
+        
+        MeetingVerification verification = MeetingVerification.builder()
+                .meeting(meeting)
+                .verificationStatus(VerificationStatus.PENDING)
+                .build();
+        meetingVerificationRepository.save(verification);
+        meeting.setVerification(verification);
+        meetingRepository.save(meeting);
+
+        // Assert it is excluded
+        mockMvc.perform(get("/v1/meetings")
+                .param("verificationStatus", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse.getMeetingCode() + "')]").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testPendingVerificationQueueExcludesVerifiedMeetings() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Verified Exclude Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Queue test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000001");
+
+        // Verify meeting
+        MeetingVerificationRequest validRequest = MeetingVerificationRequest.builder()
+                .remarks("Verified")
+                .aloneWith("SELF")
+                .clientAge(30)
+                .maritalStatus("SINGLE")
+                .profession("EMPLOYEE")
+                .email("verified@test.com")
+                .companyName("None")
+                .anyChildren(false)
+                .previousInvestment(false)
+                .build();
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isOk());
+
+        // Assert verified meeting is excluded
+        mockMvc.perform(get("/v1/meetings")
+                .param("verificationStatus", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse.getMeetingCode() + "')]").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testPendingVerificationQueueExcludesRejectedMeetings() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Rejected Exclude Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Queue test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000001");
+
+        // Reject meeting
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/reject")
+                .param("reason", "Rejected test"))
+                .andExpect(status().isOk());
+
+        // Assert rejected meeting is excluded
+        mockMvc.perform(get("/v1/meetings")
+                .param("verificationStatus", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse.getMeetingCode() + "')]").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testSalesCoordinatorCanVerifyAnotherSalesExecutivesMeeting() throws Exception {
+        getOrCreateSecondSalesperson();
+        
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("RM2 Flow Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000002");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("RM2 test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000002");
+
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000002");
+
+        // Verify meeting
+        MeetingVerificationRequest validRequest = MeetingVerificationRequest.builder()
+                .remarks("Verified by coordinator")
+                .aloneWith("SELF")
+                .clientAge(30)
+                .maritalStatus("SINGLE")
+                .profession("EMPLOYEE")
+                .email("rm2@test.com")
+                .companyName("None")
+                .anyChildren(false)
+                .previousInvestment(false)
+                .build();
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ"})
+    public void testSalesCoordinatorCannotCreateMeeting() throws Exception {
+        CreateMeetingRequest createRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.randomUUID())
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Office")
+                .build();
+
+        mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ"})
+    public void testSalesCoordinatorCannotUpdateMeeting() throws Exception {
+        UpdateMeetingRequest updateRequest = UpdateMeetingRequest.builder()
+                .meetingCode("MEET000001")
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Office")
+                .build();
+
+        mockMvc.perform(put("/v1/meetings/MEET000001")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ"})
+    public void testSalesCoordinatorCannotWorkflowUpdate() throws Exception {
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.WORK_IN_PROGRESS)
+                .remarks("RM 1 Conducted")
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/MEET000001/workflow-update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(workflowRequest)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", authorities = {"ROLE_EMPLOYEE", "LEAD_CREATE", "LEAD_READ", "LEAD_UPDATE", "MEETING_CREATE", "MEETING_READ", "MEETING_UPDATE"})
+    public void testSalesExecutiveCanOnlyAccessOwnMeetingWorkflow() throws Exception {
+        getOrCreateSecondSalesperson();
+
+        // 1. Create meeting assigned to RM2
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("RM2 Owner Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000002");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("RM2 test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000002");
+
+        // 2. Attempt to update workflow as RM1 (EMP000001) -> should be forbidden (403)
+        Map<String, Object> workflowPayload = new java.util.HashMap<>();
+        workflowPayload.put("aloneWith", "SELF");
+        workflowPayload.put("leadStatus", "WORK_IN_PROGRESS");
+        workflowPayload.put("remarks", "Hacker update");
+
+        mockMvc.perform(post("/v1/meetings/" + meetingResponse.getMeetingCode() + "/workflow-update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(workflowPayload)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", authorities = {"ROLE_EMPLOYEE", "LEAD_CREATE", "LEAD_READ", "LEAD_UPDATE", "MEETING_CREATE", "MEETING_READ", "MEETING_UPDATE"})
+    public void testScheduledMeetingHasNullVerificationStatus() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Scheduled Null Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Queue test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        Meeting meeting = meetingRepository.findByMeetingCode(meetingResponse.getMeetingCode()).orElseThrow();
+        assertThat(meeting.getVerification()).isNull();
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", authorities = {"ROLE_EMPLOYEE", "LEAD_CREATE", "LEAD_READ", "LEAD_UPDATE", "MEETING_CREATE", "MEETING_READ", "MEETING_UPDATE"})
+    public void testWorkflowCompletionCreatesPendingVerification() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Workflow Complete Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        leadRequest.setLocation("Delhi");
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Queue test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000001");
+
+        Meeting meeting = meetingRepository.findByMeetingCode(meetingResponse.getMeetingCode()).orElseThrow();
+        assertThat(meeting.getVerification()).isNotNull();
+        assertThat(meeting.getVerification().getVerificationStatus()).isEqualTo(VerificationStatus.PENDING);
     }
 }

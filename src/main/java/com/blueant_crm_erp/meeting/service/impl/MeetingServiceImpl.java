@@ -165,6 +165,20 @@ public class MeetingServiceImpl implements MeetingService {
     public MeetingResponse updateMeeting(String meetingCode, UpdateMeetingRequest request, String currentUserEmail) {
         log.info("Updating meeting with code: {}, requested by: {}", meetingCode, currentUserEmail);
         Meeting meeting = getMeetingByCodeInternal(meetingCode);
+        
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null) {
+            boolean hasElevated = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SUPER_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SALES_COORDINATOR"));
+            if (!hasElevated) {
+                String empCode = auth.getName();
+                if (meeting.getAssignedEmployee() != null && !meeting.getAssignedEmployee().getEmployeeCode().equalsIgnoreCase(empCode)) {
+                    throw new org.springframework.security.access.AccessDeniedException("You can only update your own meetings.");
+                }
+            }
+        }
                 
         String previousStatus = meeting.getMeetingStatus().name();
         meetingValidator.validateUpdate(meeting.getId(), request, meeting);
@@ -229,7 +243,22 @@ public class MeetingServiceImpl implements MeetingService {
     @Transactional(readOnly = true)
     public PageResponse<MeetingSummaryResponse> searchMeetings(MeetingSearchRequest request, Pageable pageable) {
         log.info("Searching meetings");
-        Page<Meeting> meetingPage = meetingRepository.findAll(MeetingSearchSpecification.build(request), pageable);
+        
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String empCode = null;
+        if (auth != null) {
+            boolean hasElevated = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SUPER_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SALES_COORDINATOR"));
+            if (!hasElevated) {
+                empCode = auth.getName();
+            }
+        }
+        
+        org.springframework.data.jpa.domain.Specification<Meeting> spec = MeetingSearchSpecification.build(
+                request.getKeyword(), null, "completed", null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName(), empCode);
+        Page<Meeting> meetingPage = meetingRepository.findAll(spec, pageable);
         List<MeetingSummaryResponse> responses = meetingMapper.toSummaryResponseList(meetingPage.getContent());
         
         return PageResponse.<MeetingSummaryResponse>builder()
@@ -254,8 +283,21 @@ public class MeetingServiceImpl implements MeetingService {
                                                  Long salesPersonId, String salesPersonName) {
         log.info("Fetching meetings queue with filters - search: {}, date: {}, status: {}, sequence: {}, verificationStatus: {}, salesPersonId: {}, salesPersonName: {}",
                  search, date, status, sequence, verificationStatus, salesPersonId, salesPersonName);
+        
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String empCode = null;
+        if (auth != null) {
+            boolean hasElevated = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SUPER_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_SALES_COORDINATOR"));
+            if (!hasElevated) {
+                empCode = auth.getName();
+            }
+        }
+
         org.springframework.data.jpa.domain.Specification<Meeting> spec = MeetingSearchSpecification.build(
-                search, date, status, sequence, verificationStatus, salesPersonId, salesPersonName);
+                search, date, status, sequence, verificationStatus, salesPersonId, salesPersonName, empCode);
         List<Meeting> meetings = meetingRepository.findAll(spec, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "meetingDate", "meetingTime"));
         return meetingMapper.toResponseList(meetings);
     }

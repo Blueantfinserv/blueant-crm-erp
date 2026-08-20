@@ -18,32 +18,39 @@ public final class MeetingSearchSpecification {
 
     public static Specification<Meeting> build(MeetingSearchRequest request) {
         if (request == null) {
-            return build(null, null, "completed", null, null, null, null);
+            return build(null, null, "completed", null, null, null, null, null);
         }
-        return build(request.getKeyword(), null, "completed", null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName());
+        return build(request.getKeyword(), null, "completed", null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName(), null);
     }
 
     public static Specification<Meeting> build(String keyword, String dateFilter, String statusFilter, Integer sequenceFilter) {
-        return build(keyword, dateFilter, statusFilter, sequenceFilter, null, null, null);
+        return build(keyword, dateFilter, statusFilter, sequenceFilter, null, null, null, null);
     }
 
     public static Specification<Meeting> build(String keyword, String dateFilter, String statusFilter, Integer sequenceFilter,
                                                com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus,
                                                Long salesPersonId,
-                                               String salesPersonName) {
+                                               String salesPersonName,
+                                               String salesPersonEmployeeCode) {
         Specification<Meeting> spec = Specification.where(null);
 
         // 1. Status Filter (Queue Rules)
         Specification<Meeting> statusSpec;
         if ("completed".equalsIgnoreCase(statusFilter) || verificationStatus != null) {
-            statusSpec = (root, query, cb) -> cb.equal(root.get("meetingStatus"), MeetingStatus.COMPLETED);
+            statusSpec = (root, query, cb) -> cb.and(
+                cb.equal(root.get("meetingStatus"), MeetingStatus.COMPLETED),
+                cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
+            );
         } else if ("all".equalsIgnoreCase(statusFilter)) {
             // Exclude cancelled
             statusSpec = (root, query, cb) -> cb.notEqual(root.get("meetingStatus"), MeetingStatus.CANCELLED);
         } else {
             // Default to Actionable Queue: SCHEDULED, RESCHEDULED
             List<MeetingStatus> actionableStatuses = Arrays.asList(MeetingStatus.SCHEDULED, MeetingStatus.RESCHEDULED);
-            statusSpec = (root, query, cb) -> root.get("meetingStatus").in(actionableStatuses);
+            statusSpec = (root, query, cb) -> cb.and(
+                root.get("meetingStatus").in(actionableStatuses),
+                cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
+            );
         }
         spec = spec.and(statusSpec);
 
@@ -100,8 +107,10 @@ public final class MeetingSearchSpecification {
 
         // 5. Verification Status Filter
         if (verificationStatus != null) {
-            Specification<Meeting> verificationSpec = (root, query, cb) -> 
-                cb.equal(root.join("verification").get("verificationStatus"), verificationStatus);
+            Specification<Meeting> verificationSpec = (root, query, cb) -> cb.and(
+                cb.equal(root.join("verification").get("verificationStatus"), verificationStatus),
+                cb.equal(root.get("meetingConducted"), com.blueant_crm_erp.meeting.enums.MeetingConductStatus.CONDUCTED)
+            );
             spec = spec.and(verificationSpec);
         }
 
@@ -120,6 +129,13 @@ public final class MeetingSearchSpecification {
                 cb.like(root.get("assignedEmployee").get("lastName"), likeName)
             );
             spec = spec.and(nameSpec);
+        }
+
+        // 8. Sales Person Employee Code Filter
+        if (salesPersonEmployeeCode != null && !salesPersonEmployeeCode.isBlank()) {
+            Specification<Meeting> empCodeSpec = (root, query, cb) ->
+                cb.equal(root.get("assignedEmployee").get("employeeCode"), salesPersonEmployeeCode);
+            spec = spec.and(empCodeSpec);
         }
 
         return spec;

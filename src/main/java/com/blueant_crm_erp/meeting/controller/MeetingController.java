@@ -26,6 +26,7 @@ import java.util.List;
 import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Slf4j
 @RestController
@@ -36,6 +37,7 @@ public class MeetingController {
 
     private final MeetingService meetingService;
 
+    @PreAuthorize("hasAuthority('MEETING_CREATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new meeting")
@@ -44,6 +46,7 @@ public class MeetingController {
         return ApiResponse.success("Meeting created successfully", meetingService.createMeeting(request, principal.getName()));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/{meetingCode}")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Update an existing meeting")
@@ -53,6 +56,7 @@ public class MeetingController {
         return ApiResponse.success("Meeting updated successfully", meetingService.updateMeeting(meetingCode, request, principal.getName()));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/{meetingCode}")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Get meeting details by code")
@@ -60,6 +64,7 @@ public class MeetingController {
         return ApiResponse.success(meetingService.getMeetingByCode(meetingCode));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Get meetings queue based on filters")
@@ -74,6 +79,7 @@ public class MeetingController {
         return ApiResponse.success(meetingService.getAllMeetings(search, date, status, sequence, verificationStatus, salesPersonId, salesPersonName));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/search")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Search meetings")
@@ -81,6 +87,7 @@ public class MeetingController {
         return ApiResponse.success(meetingService.searchMeetings(request, pageable));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/dropdown")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Get meeting dropdown data")
@@ -88,6 +95,7 @@ public class MeetingController {
         return ApiResponse.success(meetingService.getMeetingDropdown());
     }
 
+    @PreAuthorize("hasAuthority('MEETING_DELETE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @DeleteMapping("/{meetingCode}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete a meeting")
@@ -96,6 +104,7 @@ public class MeetingController {
         return ApiResponse.success("Meeting deleted successfully", null);
     }
 
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/{meetingCode}/activate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Activate a meeting")
@@ -104,6 +113,7 @@ public class MeetingController {
         return ApiResponse.success("Meeting activated successfully", null);
     }
 
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/{meetingCode}/deactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Deactivate a meeting")
@@ -112,6 +122,7 @@ public class MeetingController {
         return ApiResponse.success("Meeting deactivated successfully", null);
     }
 
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/{meetingCode}/workflow-update")
     @ResponseStatus(HttpStatus.OK)
     @Operation(
@@ -145,6 +156,7 @@ public class MeetingController {
                 meetingService.processMeetingUpdateWorkflow(meetingCode, request, principal.getName()));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/lead/{leadId}/active")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Get the active (SCHEDULED) meeting code for a lead",
@@ -159,6 +171,7 @@ public class MeetingController {
         return ApiResponse.success(meetingService.getActiveMeetingByLeadId(leadId));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/lead/{leadId}/journey")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Get meetings by sequence for a lead (Journey)")
@@ -166,6 +179,7 @@ public class MeetingController {
         return ApiResponse.success(meetingService.getMeetingsBySequence(leadId));
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/lead/{leadId}/history")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Get meeting history for a lead")
@@ -178,6 +192,7 @@ public class MeetingController {
         return ApiResponse.success(history);
     }
 
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/lead/{leadId}/convert")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Explicitly convert a lead")
@@ -186,6 +201,7 @@ public class MeetingController {
         return ApiResponse.success("Lead converted successfully", null);
     }
 
+    @PreAuthorize("hasAuthority('MEETING_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/reports")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "Get meeting reports")

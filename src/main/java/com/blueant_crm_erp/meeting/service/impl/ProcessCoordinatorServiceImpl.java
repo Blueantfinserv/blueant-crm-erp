@@ -1,5 +1,8 @@
 package com.blueant_crm_erp.meeting.service.impl;
 
+import com.blueant_crm_erp.exception.common.ResourceNotFoundException;
+import com.blueant_crm_erp.meeting.dto.request.MeetingVerificationRequest;
+import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.entity.MeetingVerification;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
@@ -7,12 +10,12 @@ import com.blueant_crm_erp.meeting.mapper.MeetingMapper;
 import com.blueant_crm_erp.meeting.repository.MeetingRepository;
 import com.blueant_crm_erp.meeting.repository.MeetingVerificationRepository;
 import com.blueant_crm_erp.meeting.service.ProcessCoordinatorService;
-import com.blueant_crm_erp.meeting.dto.request.MeetingVerificationRequest;
-import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,18 +37,34 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         log.info("Verifying meeting: {} by Sales Coordinator: {}", meetingCode, currentUserEmail);
         
         Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid meeting code"));
+                .orElseThrow(() -> new ResourceNotFoundException("Meeting not found with code: " + meetingCode));
 
-        if (meeting.getMeetingStatus() == MeetingStatus.CANCELLED) {
-            throw new IllegalArgumentException("Cancelled meetings cannot be verified.");
+        // Validate coordinator has permission
+        boolean hasPermission = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("MEETING_VERIFY") ||
+                        auth.getAuthority().equals("ROLE_ADMIN") ||
+                        auth.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        if (!hasPermission) {
+            throw new AccessDeniedException("User does not have verification permission.");
+        }
+
+        if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED) {
+            throw new IllegalArgumentException("Meeting must be completed.");
+        }
+
+        if (meeting.getMeetingConducted() != com.blueant_crm_erp.meeting.enums.MeetingConductStatus.CONDUCTED) {
+            throw new IllegalArgumentException("Meeting must be conducted.");
+        }
+
+        MeetingVerification verification = meetingVerificationRepository.findByMeetingId(meeting.getId())
+                .orElseThrow(() -> new IllegalArgumentException("No verification record found for this meeting."));
+
+        if (verification.getVerificationStatus() != VerificationStatus.PENDING) {
+            throw new IllegalArgumentException("Meeting verification status must be PENDING.");
         }
 
         // Validate coordinator questions
         validateCoordinatorData(request);
-
-        // Fetch or create verification entity
-        MeetingVerification verification = meetingVerificationRepository.findByMeetingId(meeting.getId())
-                .orElseGet(() -> MeetingVerification.builder().meeting(meeting).build());
 
         verification.setVerificationStatus(VerificationStatus.VERIFIED);
         verification.setVerifiedBy(currentUserEmail);
@@ -92,19 +111,35 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         log.info("Rejecting meeting verification: {} by Sales Coordinator: {}", meetingCode, currentUserEmail);
         
         Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid meeting code"));
+                .orElseThrow(() -> new ResourceNotFoundException("Meeting not found with code: " + meetingCode));
 
-        if (meeting.getMeetingStatus() == MeetingStatus.CANCELLED) {
-            throw new IllegalArgumentException("Cancelled meetings cannot be rejected.");
+        // Validate coordinator has permission
+        boolean hasPermission = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("MEETING_VERIFY") ||
+                        auth.getAuthority().equals("ROLE_ADMIN") ||
+                        auth.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        if (!hasPermission) {
+            throw new AccessDeniedException("User does not have verification permission.");
+        }
+
+        if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED) {
+            throw new IllegalArgumentException("Meeting must be completed.");
+        }
+
+        if (meeting.getMeetingConducted() != com.blueant_crm_erp.meeting.enums.MeetingConductStatus.CONDUCTED) {
+            throw new IllegalArgumentException("Meeting must be conducted.");
         }
 
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("Rejection reason is required.");
         }
 
-        // Fetch or create verification entity
         MeetingVerification verification = meetingVerificationRepository.findByMeetingId(meeting.getId())
-                .orElseGet(() -> MeetingVerification.builder().meeting(meeting).build());
+                .orElseThrow(() -> new IllegalArgumentException("No verification record found for this meeting."));
+
+        if (verification.getVerificationStatus() != VerificationStatus.PENDING) {
+            throw new IllegalArgumentException("Meeting verification status must be PENDING.");
+        }
 
         verification.setVerificationStatus(VerificationStatus.REJECTED);
         verification.setVerifiedBy(currentUserEmail);

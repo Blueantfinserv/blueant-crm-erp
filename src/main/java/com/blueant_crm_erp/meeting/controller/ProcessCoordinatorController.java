@@ -19,7 +19,7 @@ public class ProcessCoordinatorController {
     private final ProcessCoordinatorService processCoordinatorService;
 
     @PostMapping("/{meetingCode}/verify")
-    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MEETING_VERIFY') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<MeetingResponse> verifyMeeting(
             @PathVariable String meetingCode,
             @Valid @RequestBody MeetingVerificationRequest request) {
@@ -28,7 +28,7 @@ public class ProcessCoordinatorController {
     }
 
     @PostMapping("/{meetingCode}/reject")
-    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MEETING_VERIFY') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<MeetingResponse> rejectMeeting(
             @PathVariable String meetingCode,
             @RequestParam String reason) {

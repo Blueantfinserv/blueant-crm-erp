@@ -28,9 +28,12 @@ import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.blueant_crm_erp.meeting.dto.request.UpdateMeetingRequest;
+import com.blueant_crm_erp.meeting.dto.request.MeetingWorkflowRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -124,7 +127,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_UPDATE"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testSalesCoordinatorAccessAndVerificationFlow() throws Exception {
         // 1. Create a lead first
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -146,15 +149,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
         MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
 
         // Conduct/Complete it first to make verificationStatus = PENDING
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("aloneWith", "SELF");
-        payload.put("leadStatus", "CLIENT_NOT_INTERESTED");
-        payload.put("remarks", "Client is not interested at this stage.");
-
-        mockMvc.perform(post("/v1/meetings/" + meetingResponse.getMeetingCode() + "/workflow-update")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk());
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Client is not interested at this stage.")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
 
         // Verify state is now PENDING
         MeetingVerification initialVer = meetingVerificationRepository.findByMeetingMeetingCode(meetingResponse.getMeetingCode())
@@ -220,7 +220,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_UPDATE"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testSalesCoordinatorRejectionFlow() throws Exception {
         // 1. Create a lead first
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -242,15 +242,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
         MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
 
         // Conduct/Complete the meeting
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("aloneWith", "SELF");
-        payload.put("leadStatus", "CLIENT_NOT_INTERESTED");
-        payload.put("remarks", "Rejected meeting candidate");
-
-        mockMvc.perform(post("/v1/meetings/" + meetingResponse.getMeetingCode() + "/workflow-update")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk());
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Rejected meeting candidate")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
 
         // 3. Test successful rejection by Sales Coordinator
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/reject")
@@ -300,11 +297,98 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_UPDATE"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testGetAllMeetingsFiltering() throws Exception {
         // Perform search request with verificationStatus parameter
         mockMvc.perform(get("/v1/meetings")
                 .param("verificationStatus", "PENDING"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testSalesCoordinatorForbiddenEndpoints() throws Exception {
+        // Sales Coordinator attempts to create a meeting
+        CreateMeetingRequest createRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.randomUUID())
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Need verification test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isForbidden());
+
+        // Sales Coordinator attempts to update a meeting
+        UpdateMeetingRequest updateRequest = UpdateMeetingRequest.builder()
+                .meetingCode("MEET001")
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingLocation("Delhi")
+                .build();
+        mockMvc.perform(put("/v1/meetings/MEET001")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isForbidden());
+
+        // Sales Coordinator attempts workflow update
+        Map<String, Object> workflowPayload = new HashMap<>();
+        workflowPayload.put("aloneWith", "SELF");
+        workflowPayload.put("leadStatus", "WORK_IN_PROGRESS");
+        workflowPayload.put("remarks", "Test");
+        mockMvc.perform(post("/v1/meetings/MEET001/workflow-update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(workflowPayload)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testSalesCoordinatorDefenseInDepthValidations() throws Exception {
+        // 1. Validate invalid meeting code returns 404
+        MeetingVerificationRequest validRequest = MeetingVerificationRequest.builder()
+                .remarks("Verification test")
+                .aloneWith("SELF")
+                .clientAge(30)
+                .maritalStatus("SINGLE")
+                .profession("EMPLOYEE")
+                .email("test@test.com")
+                .companyName("None")
+                .anyChildren(false)
+                .previousInvestment(false)
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/verification/INVALID-CODE/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isNotFound());
+
+        // 2. Schedule a meeting but do NOT conduct it
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Validation Defense Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Defense validation test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // Attempting to verify scheduled meeting should return 400 Bad Request
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(validRequest)))
+                .andExpect(status().isBadRequest());
     }
 }

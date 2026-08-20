@@ -7,6 +7,8 @@ import com.blueant_crm_erp.meeting.dto.response.MeetingDropdownResponse;
 import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.meeting.dto.response.MeetingSummaryResponse;
 import com.blueant_crm_erp.meeting.entity.Meeting;
+import com.blueant_crm_erp.meeting.dto.response.MeetingVerificationResponse;
+import com.blueant_crm_erp.meeting.entity.MeetingVerification;
 import org.mapstruct.*;
 import org.springframework.util.StringUtils;
 
@@ -39,6 +41,7 @@ public interface MeetingMapper {
     @Mapping(target = "clientParticipants", expression = "java(stringToStringList(meeting.getClientParticipants()))")
     @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
     @Mapping(source = "meetingRemarks", target = "remarks")
+    @Mapping(source = "verification.verificationStatus", target = "verificationStatus")
     MeetingResponse toResponse(Meeting meeting);
 
     /**
@@ -56,6 +59,8 @@ public interface MeetingMapper {
     @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
     @Mapping(source = "meetingRemarks", target = "remarks")
     MeetingDetailResponse toDetailResponse(Meeting meeting);
+
+    MeetingVerificationResponse toVerificationResponse(MeetingVerification entity);
 
     default String getMeetingLocation(Meeting meeting) {
         if (meeting == null) {
@@ -78,6 +83,7 @@ public interface MeetingMapper {
     @Mapping(source = "lead.clientName", target = "clientName")
     @Mapping(source = "assignedEmployee.firstName", target = "assignedEmployeeName")
     @Mapping(target = "location", expression = "java(getMeetingLocation(meeting))")
+    @Mapping(source = "verification.verificationStatus", target = "verificationStatus")
     MeetingSummaryResponse toSummaryResponse(Meeting meeting);
 
     /**

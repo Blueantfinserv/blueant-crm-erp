@@ -139,6 +139,9 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
             meeting.setPosition("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPosition());
         }
 
+        // Reset verification status to false upon any update submission
+        meeting.setVerifiedByProcessCoordinator(false);
+
         meetingRepository.save(meeting);
 
         return savedUpdate;

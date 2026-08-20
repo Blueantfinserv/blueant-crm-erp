@@ -208,4 +208,7 @@ public class Meeting extends BaseVersionEntity {
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private Status status = Status.ACTIVE;
+
+    @OneToOne(mappedBy = "meeting", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private MeetingVerification verification;
 }

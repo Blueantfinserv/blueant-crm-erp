@@ -74,4 +74,5 @@ public class MeetingSummaryResponse {
     private java.time.LocalDateTime createdAt;
     private java.time.LocalDateTime updatedAt;
 
+    private com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus;
 }

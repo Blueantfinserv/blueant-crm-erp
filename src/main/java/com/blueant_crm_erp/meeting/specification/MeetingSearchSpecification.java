@@ -17,10 +17,20 @@ public final class MeetingSearchSpecification {
     }
 
     public static Specification<Meeting> build(MeetingSearchRequest request) {
-        return build(request != null ? request.getKeyword() : null, null, "completed", null);
+        if (request == null) {
+            return build(null, null, "completed", null, null, null, null);
+        }
+        return build(request.getKeyword(), null, "completed", null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName());
     }
 
     public static Specification<Meeting> build(String keyword, String dateFilter, String statusFilter, Integer sequenceFilter) {
+        return build(keyword, dateFilter, statusFilter, sequenceFilter, null, null, null);
+    }
+
+    public static Specification<Meeting> build(String keyword, String dateFilter, String statusFilter, Integer sequenceFilter,
+                                               com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus,
+                                               Long salesPersonId,
+                                               String salesPersonName) {
         Specification<Meeting> spec = Specification.where(null);
 
         // 1. Status Filter (Queue Rules)
@@ -86,6 +96,30 @@ public final class MeetingSearchSpecification {
                     cb.like(root.get("assignedEmployee").get("lastName"), likeKeyword)
             );
             spec = spec.and(keywordSpec);
+        }
+
+        // 5. Verification Status Filter
+        if (verificationStatus != null) {
+            Specification<Meeting> verificationSpec = (root, query, cb) -> 
+                cb.equal(root.join("verification").get("verificationStatus"), verificationStatus);
+            spec = spec.and(verificationSpec);
+        }
+
+        // 6. Sales Person ID Filter
+        if (salesPersonId != null) {
+            Specification<Meeting> salesPersonSpec = (root, query, cb) -> 
+                cb.equal(root.get("assignedEmployee").get("id"), salesPersonId);
+            spec = spec.and(salesPersonSpec);
+        }
+
+        // 7. Sales Person Name Filter
+        if (salesPersonName != null && !salesPersonName.isBlank()) {
+            String likeName = "%" + salesPersonName.trim() + "%";
+            Specification<Meeting> nameSpec = (root, query, cb) -> cb.or(
+                cb.like(root.get("assignedEmployee").get("firstName"), likeName),
+                cb.like(root.get("assignedEmployee").get("lastName"), likeName)
+            );
+            spec = spec.and(nameSpec);
         }
 
         return spec;

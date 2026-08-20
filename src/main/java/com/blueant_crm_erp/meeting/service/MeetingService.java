@@ -27,7 +27,9 @@ public interface MeetingService {
 
     PageResponse<MeetingSummaryResponse> searchMeetings(MeetingSearchRequest request, Pageable pageable);
 
-    List<MeetingResponse> getAllMeetings(String search, String date, String status, Integer sequence);
+    List<MeetingResponse> getAllMeetings(String search, String date, String status, Integer sequence,
+                                         com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus,
+                                         Long salesPersonId, String salesPersonName);
 
     List<MeetingDropdownResponse> getMeetingDropdown();
 

@@ -2,6 +2,8 @@ package com.blueant_crm_erp.meeting.controller;
 
 import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.service.ProcessCoordinatorService;
+import com.blueant_crm_erp.meeting.dto.request.MeetingVerificationRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,16 +19,16 @@ public class ProcessCoordinatorController {
     private final ProcessCoordinatorService processCoordinatorService;
 
     @PostMapping("/{meetingCode}/verify")
-    @PreAuthorize("hasRole('PROCESS_COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasRole('ADMIN')")
     public ResponseEntity<Meeting> verifyMeeting(
             @PathVariable String meetingCode,
-            @RequestParam String remarks) {
+            @Valid @RequestBody MeetingVerificationRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return ResponseEntity.ok(processCoordinatorService.verifyMeeting(meetingCode, remarks, auth.getName()));
+        return ResponseEntity.ok(processCoordinatorService.verifyMeeting(meetingCode, request, auth.getName()));
     }
 
     @PostMapping("/{meetingCode}/reject")
-    @PreAuthorize("hasRole('PROCESS_COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasRole('ADMIN')")
     public ResponseEntity<Meeting> rejectMeeting(
             @PathVariable String meetingCode,
             @RequestParam String reason) {

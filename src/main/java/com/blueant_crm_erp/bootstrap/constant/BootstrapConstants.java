@@ -82,6 +82,8 @@ public final class BootstrapConstants {
 
     public static final String ROLE_EMPLOYEE = "EMPLOYEE";
 
+    public static final String ROLE_SALES_COORDINATOR = "SALES_COORDINATOR";
+
     // =========================================================================
     // Default Department Codes
     // =========================================================================
@@ -176,7 +178,7 @@ public final class BootstrapConstants {
 
     public static final int DEFAULT_TEAM_COUNT = 10;
 
-    public static final int DEFAULT_ROLE_COUNT = 7;
+    public static final int DEFAULT_ROLE_COUNT = 8;
 
     public static final int DEFAULT_PERMISSION_COUNT = 100;
 

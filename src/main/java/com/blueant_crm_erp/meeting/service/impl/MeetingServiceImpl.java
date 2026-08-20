@@ -21,6 +21,8 @@ import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.meeting.mapper.MeetingMapper;
 import com.blueant_crm_erp.meeting.repository.MeetingRepository;
+import com.blueant_crm_erp.meeting.repository.MeetingVerificationRepository;
+import com.blueant_crm_erp.meeting.entity.MeetingVerification;
 import com.blueant_crm_erp.meeting.service.MeetingService;
 import com.blueant_crm_erp.meeting.service.MeetingWorkflowService;
 import com.blueant_crm_erp.meeting.specification.MeetingSearchSpecification;
@@ -60,6 +62,7 @@ public class MeetingServiceImpl implements MeetingService {
     private final ApplicationEventPublisher eventPublisher;
     private final @Lazy LeadService leadService;
     private final @Lazy MeetingWorkflowService meetingWorkflowService;
+    private final MeetingVerificationRepository meetingVerificationRepository;
 
     @Override
     public MeetingResponse createMeeting(CreateMeetingRequest request, String currentUserEmail) {
@@ -114,6 +117,12 @@ public class MeetingServiceImpl implements MeetingService {
 
         Meeting savedMeeting = meetingRepository.save(meeting);
 
+        MeetingVerification verification = MeetingVerification.builder()
+                .meeting(savedMeeting)
+                .verificationStatus(com.blueant_crm_erp.servicerequest.enums.VerificationStatus.PENDING)
+                .build();
+        meetingVerificationRepository.save(verification);
+
         // Update Lead status/stage to MEETING_SCHEDULED / INTRO_MEETING_SCHEDULED for the first meeting
         if (nextMeetingNumber == 1) {
             UpdateLeadStatusRequest statusReq = UpdateLeadStatusRequest.builder()
@@ -153,6 +162,12 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.setStatus(Status.ACTIVE);
 
         Meeting savedMeeting = meetingRepository.save(meeting);
+
+        MeetingVerification verification = MeetingVerification.builder()
+                .meeting(savedMeeting)
+                .verificationStatus(com.blueant_crm_erp.servicerequest.enums.VerificationStatus.PENDING)
+                .build();
+        meetingVerificationRepository.save(verification);
         
         eventPublisher.publishEvent(new MeetingWorkflowEvent(this, savedMeeting, "SCHEDULED", null, "Initial Meeting auto-created on demand", "SYSTEM"));
         return savedMeeting;
@@ -246,9 +261,13 @@ public class MeetingServiceImpl implements MeetingService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<MeetingResponse> getAllMeetings(String search, String date, String status, Integer sequence) {
-        log.info("Fetching meetings queue with filters - search: {}, date: {}, status: {}, sequence: {}", search, date, status, sequence);
-        org.springframework.data.jpa.domain.Specification<Meeting> spec = MeetingSearchSpecification.build(search, date, status, sequence);
+    public List<MeetingResponse> getAllMeetings(String search, String date, String status, Integer sequence,
+                                                 com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus,
+                                                 Long salesPersonId, String salesPersonName) {
+        log.info("Fetching meetings queue with filters - search: {}, date: {}, status: {}, sequence: {}, verificationStatus: {}, salesPersonId: {}, salesPersonName: {}",
+                 search, date, status, sequence, verificationStatus, salesPersonId, salesPersonName);
+        org.springframework.data.jpa.domain.Specification<Meeting> spec = MeetingSearchSpecification.build(
+                search, date, status, sequence, verificationStatus, salesPersonId, salesPersonName);
         List<Meeting> meetings = meetingRepository.findAll(spec, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.ASC, "meetingDate", "meetingTime"));
         return meetingMapper.toResponseList(meetings);
     }

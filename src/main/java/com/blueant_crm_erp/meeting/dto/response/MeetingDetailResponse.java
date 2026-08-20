@@ -153,4 +153,5 @@ public class MeetingDetailResponse {
     private Double locationAccuracy;
     private String googleMapsUrl;
 
+    private MeetingVerificationResponse verification;
 }

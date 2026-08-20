@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
+import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -66,8 +67,11 @@ public class MeetingController {
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String date,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Integer sequence) {
-        return ApiResponse.success(meetingService.getAllMeetings(search, date, status, sequence));
+            @RequestParam(required = false) Integer sequence,
+            @RequestParam(required = false) VerificationStatus verificationStatus,
+            @RequestParam(required = false) Long salesPersonId,
+            @RequestParam(required = false) String salesPersonName) {
+        return ApiResponse.success(meetingService.getAllMeetings(search, date, status, sequence, verificationStatus, salesPersonId, salesPersonName));
     }
 
     @PostMapping("/search")

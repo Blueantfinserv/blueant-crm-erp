@@ -20,6 +20,7 @@ import com.blueant_crm_erp.meeting.event.MeetingCompletedEvent;
 import com.blueant_crm_erp.meeting.event.MeetingUpdatedEvent;
 import com.blueant_crm_erp.meeting.mapper.MeetingMapper;
 import com.blueant_crm_erp.meeting.repository.MeetingRepository;
+import com.blueant_crm_erp.meeting.repository.MeetingVerificationRepository;
 import com.blueant_crm_erp.meeting.service.FollowUpService;
 import com.blueant_crm_erp.meeting.service.MeetingUpdateService;
 import com.blueant_crm_erp.meeting.service.MeetingWorkflowService;
@@ -49,6 +50,7 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
     private final FollowUpService followUpService;
     private final @Lazy LeadService leadService;
     private final ApplicationEventPublisher eventPublisher;
+    private final MeetingVerificationRepository meetingVerificationRepository;
 
     @Override
     public MeetingResponse processWorkflow(String meetingCode, MeetingWorkflowRequest request, String currentUserEmail) {
@@ -71,6 +73,12 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
 
         // ── Step 2: Persist Immutable Audit Record ───────────────────────────
         MeetingUpdate savedUpdate = meetingUpdateService.persistUpdate(meeting, request, currentUserEmail);
+
+        // Reset verification status to PENDING on workflow update
+        com.blueant_crm_erp.meeting.entity.MeetingVerification verification = meetingVerificationRepository.findByMeetingId(meeting.getId())
+                .orElseGet(() -> com.blueant_crm_erp.meeting.entity.MeetingVerification.builder().meeting(meeting).build());
+        verification.setVerificationStatus(com.blueant_crm_erp.servicerequest.enums.VerificationStatus.PENDING);
+        meetingVerificationRepository.save(verification);
 
         // ── Step 3: Publish MeetingCompleted + MeetingUpdated Events ────────
         eventPublisher.publishEvent(new MeetingCompletedEvent(this, meeting, previousStatus,

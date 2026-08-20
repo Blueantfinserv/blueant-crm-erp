@@ -23,4 +23,7 @@ public class MeetingSearchRequest {
     @Size(max = 100, message = "Search keyword cannot exceed 100 characters.")
     private String keyword;
 
+    private com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus;
+    private Long salesPersonId;
+    private String salesPersonName;
 }

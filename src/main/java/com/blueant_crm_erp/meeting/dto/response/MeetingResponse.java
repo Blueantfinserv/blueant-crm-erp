@@ -89,4 +89,6 @@ public class MeetingResponse {
     private java.time.LocalDateTime locationCapturedAt;
     private Double locationAccuracy;
     private String googleMapsUrl;
+
+    private com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus;
 }

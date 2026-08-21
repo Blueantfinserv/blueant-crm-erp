@@ -285,15 +285,17 @@ public class AuthServiceImpl implements AuthService {
 
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
+                String dbEmail = user.getEmail() != null ? user.getEmail().trim() : null;
+                String dbMobile = user.getMobileNumber() != null ? user.getMobileNumber().trim() : null;
 
                 if (user.isActive() &&
-                        user.getEmail().equalsIgnoreCase(request.getEmail().trim()) &&
-                        user.getMobileNumber().equals(request.getMobileNumber().trim())) {
+                        request.getEmail().trim().equalsIgnoreCase(dbEmail) &&
+                        request.getMobileNumber().trim().equals(dbMobile)) {
 
                     // 4. Check if there's already an active, valid OTP in the DB
                     List<PasswordResetToken> activeTokens = passwordResetTokenRepository.findByUserAndUsedFalse(user);
                     boolean hasActiveToken = activeTokens.stream()
-                            .anyMatch(t -> t.getExpiresAt().isAfter(LocalDateTime.now()));
+                            .anyMatch(t -> t.getExpiresAt() != null && t.getExpiresAt().isAfter(LocalDateTime.now()));
 
                     if (hasActiveToken) {
                         log.info("Active valid OTP already exists for employee: {}. Suppressing new OTP creation.", employeeCode);

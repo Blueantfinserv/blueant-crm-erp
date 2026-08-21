@@ -140,13 +140,13 @@ spring:
       repositories:
         enabled: false
 
-      url: ${SPRING_DATA_REDIS_URL:${REDIS_URL:${REDISURL:}}}
+      url: ${SPRING_DATA_REDIS_URL:${SPRING_REDIS_URL:${REDIS_URL:${REDISURL:}}}}
 
-      host: ${SPRING_DATA_REDIS_HOST:${REDISHOST:localhost}}
+      host: ${SPRING_DATA_REDIS_HOST:${SPRING_REDIS_HOST:${REDIS_HOST:${REDISHOST:localhost}}}}
 
-      port: ${SPRING_DATA_REDIS_PORT:${REDISPORT:6379}}
+      port: ${SPRING_DATA_REDIS_PORT:${SPRING_REDIS_PORT:${REDIS_PORT:${REDISPORT:6379}}}}
 
-      password: ${SPRING_DATA_REDIS_PASSWORD:${REDISPASSWORD:}}
+      password: ${SPRING_DATA_REDIS_PASSWORD:${SPRING_REDIS_PASSWORD:${REDIS_PASSWORD:${REDISPASSWORD:}}}}
 
       timeout: 2s
 

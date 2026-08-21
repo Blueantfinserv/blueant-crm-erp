@@ -16,10 +16,20 @@ public class AppProperties {
     private String supportEmail;
     private String frontendUrl;
     private Cors cors = new Cors();
+    private PasswordReset passwordReset = new PasswordReset();
 
     @Data
     public static class Cors {
         private List<String> allowedOrigins;
+    }
+
+    @Data
+    public static class PasswordReset {
+        private int tokenExpiryMinutes = 15;
+        private String frontendResetUrl = "https://blueantcrm.com/reset-password";
+        private int resendCooldownSeconds = 60;
+        private int maxRequestsPerHour = 5;
+        private int ipMaxRequestsPerHour = 20;
     }
 
     public List<String> getCorsAllowedOrigins() {

@@ -224,6 +224,9 @@ app:
   password-reset:
     token-expiry-minutes: 15
     frontend-reset-url: ${FRONTEND_RESET_PASSWORD_URL:https://blueantcrm.com/reset-password}
+    resend-cooldown-seconds: 60
+    max-requests-per-hour: 5
+    ip-max-requests-per-hour: 20
 
   cors:
     allowed-origins:

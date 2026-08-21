@@ -770,6 +770,29 @@ public class AuthPasswordResetTest {
                 .andExpect(status().isTooManyRequests());
     }
 
+    @Test
+    public void testForgotPassword_RedisUnavailable_Throws503() throws Exception {
+        ForgotPasswordRequest request = ForgotPasswordRequest.builder()
+                .employeeCode(testUser.getEmployeeCode())
+                .email(testUser.getEmail())
+                .mobileNumber(testUser.getMobileNumber())
+                .build();
+
+        // Stub RedisTemplate to throw a Connection Failure Exception when incrementing IP key
+        org.mockito.Mockito.when(redisTemplate.opsForValue()).thenAnswer(invocation -> {
+            throw new org.springframework.data.redis.RedisConnectionFailureException("Unable to connect to Redis server");
+        });
+
+        // The request should return HTTP 503 (Service Unavailable)
+        mockMvc.perform(post("/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.errorCode").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.errorType").value("CACHE"))
+                .andExpect(jsonPath("$.message").value("Service is temporarily unavailable. Please try again later."));
+    }
+
     private String hashToken(String token) {
         try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");

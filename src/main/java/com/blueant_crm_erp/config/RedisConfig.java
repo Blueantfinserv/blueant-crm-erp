@@ -23,19 +23,52 @@ import java.util.Map;
 @EnableCaching
 public class RedisConfig {
 
+    @Value("${spring.data.redis.url:}")
+    private String redisUrl;
+
     @Value("${spring.data.redis.host}")
     private String redisHost;
 
     @Value("${spring.data.redis.port}")
     private int redisPort;
 
+    @Value("${spring.data.redis.password:}")
+    private String redisPassword;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RedisConfig.class);
+
     /**
      * Redis connection using Lettuce (non-blocking, thread-safe)
      */
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
-        RedisStandaloneConfiguration config =
-                new RedisStandaloneConfiguration(redisHost, redisPort);
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+
+        if (redisUrl != null && !redisUrl.trim().isEmpty()) {
+            log.info("Configuring LettuceConnectionFactory using Redis URL from environment");
+            try {
+                java.net.URI uri = new java.net.URI(redisUrl);
+                config.setHostName(uri.getHost());
+                config.setPort(uri.getPort() >= 0 ? uri.getPort() : 6379);
+                String userInfo = uri.getUserInfo();
+                if (userInfo != null) {
+                    int colon = userInfo.indexOf(':');
+                    String pwd = colon >= 0 ? userInfo.substring(colon + 1) : userInfo;
+                    config.setPassword(org.springframework.data.redis.connection.RedisPassword.of(pwd));
+                }
+            } catch (Exception e) {
+                log.error("Failed to parse Redis URL: {}", redisUrl, e);
+                throw new IllegalArgumentException("Invalid Redis URL: " + redisUrl, e);
+            }
+        } else {
+            log.info("Configuring LettuceConnectionFactory using individual host and port configurations");
+            config.setHostName(redisHost);
+            config.setPort(redisPort);
+            if (redisPassword != null && !redisPassword.trim().isEmpty()) {
+                config.setPassword(org.springframework.data.redis.connection.RedisPassword.of(redisPassword));
+            }
+        }
+
         return new LettuceConnectionFactory(config);
     }
 

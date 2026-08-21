@@ -21,6 +21,7 @@ import com.blueant_crm_erp.exception.auth.InvalidTokenException;
 import com.blueant_crm_erp.exception.auth.RefreshTokenExpiredException;
 import com.blueant_crm_erp.exception.auth.UnauthorizedException;
 import com.blueant_crm_erp.exception.common.RateLimitExceededException;
+import com.blueant_crm_erp.exception.common.RedisUnavailableException;
 import com.blueant_crm_erp.user.entity.User;
 import com.blueant_crm_erp.user.repository.UserRepository;
 import com.blueant_crm_erp.util.network.IpUtil;
@@ -250,108 +251,119 @@ public class AuthServiceImpl implements AuthService {
         int maxRequestsPerHour = resetProps.getMaxRequestsPerHour();
         int ipMaxRequestsPerHour = resetProps.getIpMaxRequestsPerHour();
 
-        // 1. IP-level rate limiting
         String ipKey = "rate-limit:forgot-password:ip:" + clientIp;
-        Long ipCount = redisTemplate.opsForValue().increment(ipKey);
-        if (ipCount != null && ipCount == 1) {
-            redisTemplate.expire(ipKey, Duration.ofHours(1));
-        }
-        if (ipCount != null && ipCount > ipMaxRequestsPerHour) {
-            log.warn("IP-level rate limit exceeded for IP: {}. Requests this hour: {}", clientIp, ipCount);
-            throw new RateLimitExceededException("Too many requests from this IP. Please try again later.");
-        }
-
-        // 2. Account-level rate limiting
         String accountKey = "rate-limit:forgot-password:account:" + employeeCode.toLowerCase();
-        Long accountCount = redisTemplate.opsForValue().increment(accountKey);
-        if (accountCount != null && accountCount == 1) {
-            redisTemplate.expire(accountKey, Duration.ofHours(1));
-        }
-        if (accountCount != null && accountCount > maxRequestsPerHour) {
-            log.warn("Account-level rate limit exceeded for employee: {}. Requests this hour: {}", employeeCode, accountCount);
-            throw new RateLimitExceededException("Too many requests for this account. Please try again later.");
-        }
-
-        // 3. Prevent concurrency issues (distributed lock)
         String lockKey = "lock:forgot-password:user:" + employeeCode.toLowerCase();
-        Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(10));
-        if (!Boolean.TRUE.equals(lockAcquired)) {
-            log.warn("Concurrent forgot password request processing for user: {}. Suppressing request.", employeeCode);
-            return;
-        }
 
         try {
-            Optional<User> userOpt = userRepository.findByEmployeeCodeIgnoreCaseAndDeletedFalse(employeeCode);
-
-            if (userOpt.isPresent()) {
-                User user = userOpt.get();
-                String dbEmail = user.getEmail() != null ? user.getEmail().trim() : null;
-                String dbMobile = user.getMobileNumber() != null ? user.getMobileNumber().trim() : null;
-
-                if (user.isActive() &&
-                        request.getEmail().trim().equalsIgnoreCase(dbEmail) &&
-                        request.getMobileNumber().trim().equals(dbMobile)) {
-
-                    // 4. Check if there's already an active, valid OTP in the DB
-                    List<PasswordResetToken> activeTokens = passwordResetTokenRepository.findByUserAndUsedFalse(user);
-                    boolean hasActiveToken = activeTokens.stream()
-                            .anyMatch(t -> t.getExpiresAt() != null && t.getExpiresAt().isAfter(LocalDateTime.now()));
-
-                    if (hasActiveToken) {
-                        log.info("Active valid OTP already exists for employee: {}. Suppressing new OTP creation.", employeeCode);
-                        return;
-                    }
-
-                    // 5. Check if user is within resend cooldown
-                    String cooldownKey = "lock:forgot-password:cooldown:" + employeeCode.toLowerCase();
-                    Boolean hasCooldown = redisTemplate.hasKey(cooldownKey);
-                    if (Boolean.TRUE.equals(hasCooldown)) {
-                        log.info("Request for employee: {} is within resend cooldown. Suppressing request.", employeeCode);
-                        return;
-                    }
-
-                    // Generate a 6-digit secure random OTP
-                    java.security.SecureRandom secureRandom = new java.security.SecureRandom();
-                    int otpVal = 100000 + secureRandom.nextInt(900000);
-                    String rawToken = String.valueOf(otpVal);
-
-                    // Compute SHA-256 hash and save
-                    String tokenHash = hashToken(rawToken);
-                    PasswordResetToken resetToken = PasswordResetToken.builder()
-                            .user(user)
-                            .tokenHash(tokenHash)
-                            .expiresAt(LocalDateTime.now().plusMinutes(expiryMinutes))
-                            .used(false)
-                            .createdAt(LocalDateTime.now())
-                            .build();
-                    passwordResetTokenRepository.save(resetToken);
-
-                    // Set cooldown in Redis
-                    redisTemplate.opsForValue().set(cooldownKey, "1", Duration.ofSeconds(cooldownSeconds));
-
-                    // Send reset instructions via email
-                    String resetUrl = resetProps.getFrontendResetUrl() + "?token=" + rawToken + "&employeeCode=" + user.getEmployeeCode();
-                    String emailText = "Hello " + user.getFullName() + ",\n\n"
-                            + "We received a request to reset your password for your BlueAnt CRM ERP account.\n"
-                            + "Please use the following 6-digit One Time Password (OTP) to reset your password:\n\n"
-                            + "OTP: " + rawToken + "\n\n"
-                            + "Alternatively, you can complete the reset process using this link:\n"
-                            + resetUrl + "\n\n"
-                            + "This OTP is valid for " + expiryMinutes + " minutes.\n"
-                            + "If you did not request a password reset, please ignore this email.\n\n"
-                            + "Best regards,\n"
-                            + "BlueAnt CRM ERP Team";
-
-                    eventPublisher.publishEvent(new NotificationEvent(this, user.getEmail(), "Password Reset Request", emailText, "EMAIL"));
-                    log.info("Sending password reset email for employee: {} to configured recipient", user.getEmployeeCode());
-                } else {
-                    log.warn("Password reset request inputs did not match user info for: {}", employeeCode);
-                }
-            } else {
-                log.warn("Password reset requested for non-existing user: {}", employeeCode);
+            // 1. IP-level rate limiting
+            Long ipCount = redisTemplate.opsForValue().increment(ipKey);
+            if (ipCount != null && ipCount == 1) {
+                redisTemplate.expire(ipKey, Duration.ofHours(1));
             }
-        } finally {
-            redisTemplate.delete(lockKey);
+            if (ipCount != null && ipCount > ipMaxRequestsPerHour) {
+                log.warn("IP-level rate limit exceeded for IP: {}. Requests this hour: {}", clientIp, ipCount);
+                throw new RateLimitExceededException("Too many requests from this IP. Please try again later.");
+            }
+
+            // 2. Account-level rate limiting
+            Long accountCount = redisTemplate.opsForValue().increment(accountKey);
+            if (accountCount != null && accountCount == 1) {
+                redisTemplate.expire(accountKey, Duration.ofHours(1));
+            }
+            if (accountCount != null && accountCount > maxRequestsPerHour) {
+                log.warn("Account-level rate limit exceeded for employee: {}. Requests this hour: {}", employeeCode, accountCount);
+                throw new RateLimitExceededException("Too many requests for this account. Please try again later.");
+            }
+
+            // 3. Prevent concurrency issues (distributed lock)
+            Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(10));
+            if (!Boolean.TRUE.equals(lockAcquired)) {
+                log.warn("Concurrent forgot password request processing for user: {}. Suppressing request.", employeeCode);
+                return;
+            }
+
+            try {
+                Optional<User> userOpt = userRepository.findByEmployeeCodeIgnoreCaseAndDeletedFalse(employeeCode);
+
+                if (userOpt.isPresent()) {
+                    User user = userOpt.get();
+                    String dbEmail = user.getEmail() != null ? user.getEmail().trim() : null;
+                    String dbMobile = user.getMobileNumber() != null ? user.getMobileNumber().trim() : null;
+
+                    if (user.isActive() &&
+                            request.getEmail().trim().equalsIgnoreCase(dbEmail) &&
+                            request.getMobileNumber().trim().equals(dbMobile)) {
+
+                        // 4. Check if there's already an active, valid OTP in the DB
+                        List<PasswordResetToken> activeTokens = passwordResetTokenRepository.findByUserAndUsedFalse(user);
+                        boolean hasActiveToken = activeTokens.stream()
+                                .anyMatch(t -> t.getExpiresAt() != null && t.getExpiresAt().isAfter(LocalDateTime.now()));
+
+                        if (hasActiveToken) {
+                            log.info("Active valid OTP already exists for employee: {}. Suppressing new OTP creation.", employeeCode);
+                            return;
+                        }
+
+                        // 5. Check if user is within resend cooldown
+                        String cooldownKey = "lock:forgot-password:cooldown:" + employeeCode.toLowerCase();
+                        Boolean hasCooldown = redisTemplate.hasKey(cooldownKey);
+                        if (Boolean.TRUE.equals(hasCooldown)) {
+                            log.info("Request for employee: {} is within resend cooldown. Suppressing request.", employeeCode);
+                            return;
+                        }
+
+                        // Generate a 6-digit secure random OTP
+                        java.security.SecureRandom secureRandom = new java.security.SecureRandom();
+                        int otpVal = 100000 + secureRandom.nextInt(900000);
+                        String rawToken = String.valueOf(otpVal);
+
+                        // Compute SHA-256 hash and save
+                        String tokenHash = hashToken(rawToken);
+                        PasswordResetToken resetToken = PasswordResetToken.builder()
+                                .user(user)
+                                .tokenHash(tokenHash)
+                                .expiresAt(LocalDateTime.now().plusMinutes(expiryMinutes))
+                                .used(false)
+                                .createdAt(LocalDateTime.now())
+                                .build();
+                        passwordResetTokenRepository.save(resetToken);
+
+                        // Set cooldown in Redis
+                        redisTemplate.opsForValue().set(cooldownKey, "1", Duration.ofSeconds(cooldownSeconds));
+
+                        // Send reset instructions via email
+                        String resetUrl = resetProps.getFrontendResetUrl() + "?token=" + rawToken + "&employeeCode=" + user.getEmployeeCode();
+                        String emailText = "Hello " + user.getFullName() + ",\n\n"
+                                + "We received a request to reset your password for your BlueAnt CRM ERP account.\n"
+                                + "Please use the following 6-digit One Time Password (OTP) to reset your password:\n\n"
+                                + "OTP: " + rawToken + "\n\n"
+                                + "Alternatively, you can complete the reset process using this link:\n"
+                                + resetUrl + "\n\n"
+                                + "This OTP is valid for " + expiryMinutes + " minutes.\n"
+                                + "If you did not request a password reset, please ignore this email.\n\n"
+                                + "Best regards,\n"
+                                + "BlueAnt CRM ERP Team";
+
+                        eventPublisher.publishEvent(new NotificationEvent(this, user.getEmail(), "Password Reset Request", emailText, "EMAIL"));
+                        log.info("Sending password reset email for employee: {} to configured recipient", user.getEmployeeCode());
+                    } else {
+                        log.warn("Password reset request inputs did not match user info for: {}", employeeCode);
+                    }
+                } else {
+                    log.warn("Password reset requested for non-existing user: {}", employeeCode);
+                }
+            } finally {
+                // 6. Release the lock safely
+                try {
+                    redisTemplate.delete(lockKey);
+                } catch (Exception e) {
+                    log.error("Failed to release lock for key: {} from Redis", lockKey, e);
+                }
+            }
+        } catch (org.springframework.dao.DataAccessException e) {
+            log.error("Redis is unavailable during forgot password request processing for: {}", employeeCode, e);
+            throw new RedisUnavailableException("Service is temporarily unavailable. Please try again later.", e);
         }
     }
 

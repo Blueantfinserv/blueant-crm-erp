@@ -34,7 +34,6 @@ import java.util.List;
 public class AuthController {
 
     private final AuthService authService;
-    private final org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
 
     @PostMapping("/login")
     @Operation(summary = "Login to the system", description = "Authenticates user and returns JWT tokens")
@@ -142,42 +141,5 @@ public class AuthController {
         return ResponseEntity.ok(new SuccessResponse<>(
                 200, "Logged out from all devices", "/auth/logout-all-devices"
         ));
-    }
-
-    @GetMapping("/redis-status")
-    @Operation(summary = "Get Redis Status", description = "Diagnostic endpoint to check Redis connection parameters and status")
-    public ResponseEntity<?> getRedisStatus() {
-        java.util.Map<String, Object> status = new java.util.HashMap<>();
-        try {
-            status.put("spring.data.redis.url-configured", System.getenv("REDIS_URL") != null || System.getenv("REDISURL") != null);
-            status.put("env.REDIS_HOST", System.getenv("REDIS_HOST"));
-            status.put("env.REDISHOST", System.getenv("REDISHOST"));
-            status.put("env.REDIS_PORT", System.getenv("REDIS_PORT"));
-            status.put("env.REDISPORT", System.getenv("REDISPORT"));
-
-            // Get connection details from factory (without password)
-            if (redisConnectionFactory instanceof org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory) {
-                org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory lettuceFactory =
-                        (org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory) redisConnectionFactory;
-                status.put("factory.hostName", lettuceFactory.getHostName());
-                status.put("factory.port", lettuceFactory.getPort());
-                status.put("factory.useSsl", lettuceFactory.isUseSsl());
-            }
-
-            // Attempt to ping Redis
-            long start = System.currentTimeMillis();
-            org.springframework.data.redis.connection.RedisConnection conn = redisConnectionFactory.getConnection();
-            String pingResult = conn.ping();
-            long elapsed = System.currentTimeMillis() - start;
-            status.put("ping.status", "SUCCESS");
-            status.put("ping.result", pingResult);
-            status.put("ping.elapsedMs", elapsed);
-            conn.close();
-        } catch (Exception e) {
-            status.put("ping.status", "FAILED");
-            status.put("ping.error", e.getMessage());
-            status.put("ping.errorClass", e.getClass().getName());
-        }
-        return ResponseEntity.ok(status);
     }
 }

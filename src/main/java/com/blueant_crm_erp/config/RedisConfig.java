@@ -87,7 +87,6 @@ public class RedisConfig {
             org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration clientConfig =
                     org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration.builder()
                             .useSsl()
-                            .disablePeerVerification()
                             .build();
             return new LettuceConnectionFactory(config, clientConfig);
         } else {

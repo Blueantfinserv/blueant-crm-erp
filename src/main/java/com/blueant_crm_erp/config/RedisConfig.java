@@ -48,8 +48,18 @@ public class RedisConfig {
         if (redisUrl != null && !redisUrl.trim().isEmpty()) {
             log.info("Configuring LettuceConnectionFactory using Redis URL from environment");
             try {
-                java.net.URI uri = new java.net.URI(redisUrl);
-                config.setHostName(uri.getHost());
+                String cleanedUrl = redisUrl.trim();
+                if (!cleanedUrl.startsWith("redis://") && !cleanedUrl.startsWith("rediss://")) {
+                    cleanedUrl = "redis://" + cleanedUrl;
+                }
+                java.net.URI uri = new java.net.URI(cleanedUrl);
+                String host = uri.getHost();
+                if (host != null) {
+                    config.setHostName(host);
+                } else {
+                    log.warn("Parsed host from URL is null, falling back to: {}", redisHost);
+                    config.setHostName(redisHost);
+                }
                 config.setPort(uri.getPort() >= 0 ? uri.getPort() : 6379);
                 String userInfo = uri.getUserInfo();
                 if (userInfo != null) {
@@ -57,7 +67,7 @@ public class RedisConfig {
                     String pwd = colon >= 0 ? userInfo.substring(colon + 1) : userInfo;
                     config.setPassword(org.springframework.data.redis.connection.RedisPassword.of(pwd));
                 }
-                if (redisUrl.startsWith("rediss://")) {
+                if (cleanedUrl.startsWith("rediss://")) {
                     useSsl = true;
                 }
             } catch (Exception e) {

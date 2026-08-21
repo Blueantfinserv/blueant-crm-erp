@@ -43,6 +43,7 @@ public class RedisConfig {
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        boolean useSsl = false;
 
         if (redisUrl != null && !redisUrl.trim().isEmpty()) {
             log.info("Configuring LettuceConnectionFactory using Redis URL from environment");
@@ -55,6 +56,9 @@ public class RedisConfig {
                     int colon = userInfo.indexOf(':');
                     String pwd = colon >= 0 ? userInfo.substring(colon + 1) : userInfo;
                     config.setPassword(org.springframework.data.redis.connection.RedisPassword.of(pwd));
+                }
+                if (redisUrl.startsWith("rediss://")) {
+                    useSsl = true;
                 }
             } catch (Exception e) {
                 log.error("Failed to parse Redis URL: {}", redisUrl, e);
@@ -69,7 +73,15 @@ public class RedisConfig {
             }
         }
 
-        return new LettuceConnectionFactory(config);
+        if (useSsl) {
+            org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration clientConfig =
+                    org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration.builder()
+                            .useSsl()
+                            .build();
+            return new LettuceConnectionFactory(config, clientConfig);
+        } else {
+            return new LettuceConnectionFactory(config);
+        }
     }
 
     /**

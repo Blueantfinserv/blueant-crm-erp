@@ -21,7 +21,6 @@ public class UpdateMeetingRequest {
     private String meetingCode;
 
     @NotNull(message = "Meeting date is required.")
-    @FutureOrPresent(message = "Meeting date cannot be in the past.")
     private LocalDate meetingDate;
 
     private LocalTime meetingTime;

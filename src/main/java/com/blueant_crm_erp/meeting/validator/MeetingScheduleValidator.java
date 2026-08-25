@@ -28,10 +28,11 @@ public class MeetingScheduleValidator {
             return;
         }
 
-        LocalDateTime meetingDateTime = LocalDateTime.of(meetingDate, meetingTime);
-
-        if (meetingDateTime.isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Meeting cannot be scheduled in the past.");
+        if (request.getMeetingStatus() != com.blueant_crm_erp.meeting.enums.MeetingStatus.COMPLETED) {
+            LocalDateTime meetingDateTime = LocalDateTime.of(meetingDate, meetingTime);
+            if (meetingDateTime.isBefore(LocalDateTime.now())) {
+                throw new IllegalArgumentException("Meeting cannot be scheduled in the past.");
+            }
         }
 
         // Future business validations:

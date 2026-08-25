@@ -113,6 +113,12 @@ public class MeetingScheduleServiceImpl implements MeetingScheduleService {
             throw new IllegalArgumentException(MeetingConstants.INVALID_MEETING_STATUS);
         }
 
+        java.time.LocalTime time = request.getMeetingTime() != null ? request.getMeetingTime() : java.time.LocalTime.MIDNIGHT;
+        java.time.LocalDateTime rescheduleDateTime = java.time.LocalDateTime.of(request.getMeetingDate(), time);
+        if (rescheduleDateTime.isBefore(java.time.LocalDateTime.now())) {
+            throw new IllegalArgumentException("Meeting date cannot be in the past.");
+        }
+
         meeting.setMeetingDate(request.getMeetingDate());
         meeting.setMeetingTime(request.getMeetingTime());
         meeting.setMeetingLocation(request.getMeetingLocation());

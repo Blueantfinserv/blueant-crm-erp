@@ -33,7 +33,13 @@ public class MeetingValidator {
             throw new IllegalArgumentException("Meeting date is required.");
         }
 
-
+        if (request.getMeetingStatus() != com.blueant_crm_erp.meeting.enums.MeetingStatus.COMPLETED) {
+            java.time.LocalTime time = request.getMeetingTime() != null ? request.getMeetingTime() : java.time.LocalTime.MIDNIGHT;
+            java.time.LocalDateTime meetingDateTime = java.time.LocalDateTime.of(request.getMeetingDate(), time);
+            if (meetingDateTime.isBefore(java.time.LocalDateTime.now())) {
+                throw new IllegalArgumentException("Meeting date cannot be in the past.");
+            }
+        }
 
         if (!StringUtils.hasText(request.getMeetingLocation())) {
             throw new IllegalArgumentException("Meeting location is required.");
@@ -60,6 +66,16 @@ public class MeetingValidator {
             com.blueant_crm_erp.meeting.enums.MeetingStatus.CANCELLED.equals(meeting.getMeetingStatus())) {
             throw new IllegalArgumentException("Cannot modify a completed or cancelled meeting.");
         }
+
+        if (meeting.getMeetingStatus() == com.blueant_crm_erp.meeting.enums.MeetingStatus.SCHEDULED) {
+            if (request.getMeetingDate() != null) {
+                java.time.LocalTime time = request.getMeetingTime() != null ? request.getMeetingTime() : (meeting.getMeetingTime() != null ? meeting.getMeetingTime() : java.time.LocalTime.MIDNIGHT);
+                java.time.LocalDateTime newDateTime = java.time.LocalDateTime.of(request.getMeetingDate(), time);
+                if (newDateTime.isBefore(java.time.LocalDateTime.now())) {
+                    throw new IllegalArgumentException("Meeting date cannot be in the past.");
+                }
+            }
+        }
     }
 
     public void validateMeeting(Meeting meeting) {
@@ -69,4 +85,4 @@ public class MeetingValidator {
         }
     }
 
-}
+}

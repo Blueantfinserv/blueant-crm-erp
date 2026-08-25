@@ -1,9 +1,11 @@
 package com.blueant_crm_erp.meeting.dto.response;
 
 import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
+import com.blueant_crm_erp.meeting.enums.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Getter
 @Setter
@@ -31,4 +33,11 @@ public class MeetingVerificationResponse {
     private Integer numberOfChildren;
     private Boolean previousInvestment;
 
+    // New questionnaire fields
+    private LocalTime meetingTiming;
+    private AgeGroup ageGroup;
+    private ExistingSip existingSip;
+    private String professionDetail;
+    private BestTimeForMeeting bestTimeForMeeting;
+    private String meetingWith;
 }

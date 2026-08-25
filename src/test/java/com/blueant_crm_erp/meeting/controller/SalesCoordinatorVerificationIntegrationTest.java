@@ -177,13 +177,13 @@ public class SalesCoordinatorVerificationIntegrationTest {
         assertThat(initialVer).isNotNull();
         assertThat(initialVer.getVerificationStatus()).isEqualTo(VerificationStatus.PENDING);
 
-        // 3. Test verification validation failure (aloneWith = SOMEONE but missing personName and position)
+        // 3. Test verification validation failure (missing meetingTiming)
         MeetingVerificationRequest invalidRequest = MeetingVerificationRequest.builder()
                 .remarks("Invalid request test")
-                .aloneWith("SOMEONE")
+                .aloneWith("SELF")
                 .clientAge(30)
                 .maritalStatus("MARRIED")
-                .profession("ENGINEER")
+                .profession("SALARIED_EMPLOYEE")
                 .email("someone@test.com")
                 .companyName("Test Inc")
                 .anyChildren(false)
@@ -207,6 +207,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .anyChildren(true)
                 .numberOfChildren(2)
                 .previousInvestment(true)
+                .meetingTiming(LocalTime.of(15, 30))
                 .build();
 
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
@@ -292,11 +293,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .aloneWith("SELF")
                 .clientAge(30)
                 .maritalStatus("SINGLE")
-                .profession("EMPLOYEE")
+                .profession("SALARIED_EMPLOYEE")
                 .email("unauth@test.com")
                 .companyName("None")
                 .anyChildren(false)
                 .previousInvestment(false)
+                .meetingTiming(LocalTime.of(15, 30))
                 .build();
 
         // Attempting to verify meeting using SALES_PERSON role should return 403 Forbidden
@@ -370,11 +372,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .aloneWith("SELF")
                 .clientAge(30)
                 .maritalStatus("SINGLE")
-                .profession("EMPLOYEE")
+                .profession("SALARIED_EMPLOYEE")
                 .email("test@test.com")
                 .companyName("None")
                 .anyChildren(false)
                 .previousInvestment(false)
+                .meetingTiming(LocalTime.of(15, 30))
                 .build();
 
         mockMvc.perform(post("/v1/meetings/verification/INVALID-CODE/verify")
@@ -468,11 +471,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .aloneWith("SELF")
                 .clientAge(30)
                 .maritalStatus("SINGLE")
-                .profession("EMPLOYEE")
+                .profession("SALARIED_EMPLOYEE")
                 .email("test@test.com")
                 .companyName("None")
                 .anyChildren(false)
                 .previousInvestment(false)
+                .meetingTiming(LocalTime.of(15, 30))
                 .build();
 
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
@@ -537,11 +541,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 "\"aloneWith\": \"SELF\"," +
                 "\"clientAge\": 35," +
                 "\"maritalStatus\": \"SINGLE\"," +
-                "\"profession\": \"EMPLOYEE\"," +
+                "\"profession\": \"SALARIED_EMPLOYEE\"," +
                 "\"email\": \"test@test.com\"," +
                 "\"companyName\": \"None\"," +
                 "\"anyChildren\": false," +
                 "\"previousInvestment\": false," +
+                "\"meetingTiming\": \"15:30:00\"," +
                 "\"meetingTitle\": \"Hacked Title\"," +
                 "\"meetingRemarks\": \"Hacked Remarks\"" +
                 "}";
@@ -792,11 +797,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .aloneWith("SELF")
                 .clientAge(30)
                 .maritalStatus("SINGLE")
-                .profession("EMPLOYEE")
+                .profession("SALARIED_EMPLOYEE")
                 .email("verified@test.com")
                 .companyName("None")
                 .anyChildren(false)
                 .previousInvestment(false)
+                .meetingTiming(LocalTime.of(15, 30))
                 .build();
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -886,11 +892,12 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .aloneWith("SELF")
                 .clientAge(30)
                 .maritalStatus("SINGLE")
-                .profession("EMPLOYEE")
+                .profession("SALARIED_EMPLOYEE")
                 .email("rm2@test.com")
                 .companyName("None")
                 .anyChildren(false)
                 .previousInvestment(false)
+                .meetingTiming(LocalTime.of(15, 30))
                 .build();
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -1039,5 +1046,207 @@ public class SalesCoordinatorVerificationIntegrationTest {
         Meeting meeting = meetingRepository.findByMeetingCode(meetingResponse.getMeetingCode()).orElseThrow();
         assertThat(meeting.getVerification()).isNotNull();
         assertThat(meeting.getVerification().getVerificationStatus()).isEqualTo(VerificationStatus.PENDING);
+    }
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testVerificationWithOnlyMeetingTiming() throws Exception {
+        // 1. Create a lead first
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Only Timing Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        // 2. Schedule a meeting
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Timing test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // Conduct it
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+
+        // 3. Verify with ONLY meetingTiming
+        MeetingVerificationRequest timingOnlyRequest = MeetingVerificationRequest.builder()
+                .meetingTiming(LocalTime.of(15, 30))
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(timingOnlyRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meetingTiming").value("15:30:00"))
+                .andExpect(jsonPath("$.ageGroup").value((Object) null))
+                .andExpect(jsonPath("$.existingSip").value((Object) null))
+                .andExpect(jsonPath("$.profession").value((Object) null))
+                .andExpect(jsonPath("$.professionDetail").value((Object) null))
+                .andExpect(jsonPath("$.bestTimeForMeeting").value((Object) null))
+                .andExpect(jsonPath("$.meetingWith").value((Object) null))
+                .andExpect(jsonPath("$.personName").value((Object) null));
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testVerificationWithAllNewOptionalFields() throws Exception {
+        // 1. Create lead and meeting, then conduct it
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("All Fields Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("All fields test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+
+        // 2. Verify with all fields
+        MeetingVerificationRequest allFieldsRequest = MeetingVerificationRequest.builder()
+                .meetingTiming(LocalTime.of(11, 45))
+                .ageGroup("AGE_25_35")
+                .existingSip("YES")
+                .profession("BUSINESS_OWNER")
+                .professionDetail("Textile Business")
+                .bestTimeForMeeting("EVENING")
+                .meetingWith("SOMEONE_ELSE")
+                .personName("Rahul Sharma")
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(allFieldsRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meetingTiming").value("11:45:00"))
+                .andExpect(jsonPath("$.ageGroup").value("AGE_25_35"))
+                .andExpect(jsonPath("$.existingSip").value("YES"))
+                .andExpect(jsonPath("$.profession").value("BUSINESS_OWNER"))
+                .andExpect(jsonPath("$.professionDetail").value("Textile Business"))
+                .andExpect(jsonPath("$.bestTimeForMeeting").value("EVENING"))
+                .andExpect(jsonPath("$.meetingWith").value("SOMEONE_ELSE"))
+                .andExpect(jsonPath("$.personName").value("Rahul Sharma"));
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testVerificationMissingTimingFailure() throws Exception {
+        // Verification payload without meetingTiming should return 400 Bad Request
+        MeetingVerificationRequest request = MeetingVerificationRequest.builder()
+                .ageGroup("AGE_25_35")
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/verification/MEET000001/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testVerificationWithInvalidEnumFailure() throws Exception {
+        // 1. Create a lead first
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Invalid Enum Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        // 2. Schedule a meeting
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Invalid enum test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // Conduct it
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+
+        // 3. Verify with invalid ageGroup value
+        MeetingVerificationRequest request = MeetingVerificationRequest.builder()
+                .meetingTiming(LocalTime.of(10, 0))
+                .ageGroup("INVALID_AGE_GROUP")
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testVerificationWithMeetingWithSelfNormalizesPersonNameToNull() throws Exception {
+        // 1. Create lead and meeting, then conduct it
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Normalize Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Normalize test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+
+        // 2. Verify with meetingWith = SELF and personName = "Amit"
+        // Since meetingWith = SELF, personName should be normalized to NULL
+        MeetingVerificationRequest request = MeetingVerificationRequest.builder()
+                .meetingTiming(LocalTime.of(12, 0))
+                .meetingWith("SELF")
+                .personName("Amit")
+                .build();
+
+        mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meetingWith").value("SELF"))
+                .andExpect(jsonPath("$.personName").value((Object) null));
     }
 }

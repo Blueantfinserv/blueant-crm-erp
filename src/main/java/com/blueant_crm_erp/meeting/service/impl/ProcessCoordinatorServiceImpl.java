@@ -5,7 +5,7 @@ import com.blueant_crm_erp.meeting.dto.request.MeetingVerificationRequest;
 import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
 import com.blueant_crm_erp.meeting.entity.Meeting;
 import com.blueant_crm_erp.meeting.entity.MeetingVerification;
-import com.blueant_crm_erp.meeting.enums.MeetingStatus;
+import com.blueant_crm_erp.meeting.enums.*;
 import com.blueant_crm_erp.meeting.mapper.MeetingMapper;
 import com.blueant_crm_erp.meeting.repository.MeetingRepository;
 import com.blueant_crm_erp.meeting.repository.MeetingVerificationRepository;
@@ -71,20 +71,55 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         verification.setVerifiedAt(LocalDateTime.now());
         verification.setRejectionReason(null);
 
-        // Map coordinator answers
-        verification.setAloneWith(request.getAloneWith());
-        if ("SOMEONE".equalsIgnoreCase(request.getAloneWith())) {
-            verification.setPersonName(request.getPersonName());
-            verification.setPosition(request.getPosition());
+        // Map and normalize coordinator answers
+        verification.setMeetingTiming(request.getMeetingTiming());
+        verification.setAgeGroup(parseEnum(AgeGroup.class, request.getAgeGroup(), "ageGroup"));
+        verification.setExistingSip(parseEnum(ExistingSip.class, request.getExistingSip(), "existingSip"));
+        verification.setProfessionDetail(normalizeString(request.getProfessionDetail(), 255, "professionDetail"));
+        verification.setBestTimeForMeeting(parseEnum(BestTimeForMeeting.class, request.getBestTimeForMeeting(), "bestTimeForMeeting"));
+
+        Profession parsedProfession = parseEnum(Profession.class, request.getProfession(), "profession");
+        verification.setProfession(parsedProfession != null ? parsedProfession.name() : null);
+
+        // Map meetingWith / aloneWith logic
+        String aloneWithValue = null;
+        MeetingWith meetingWithEnum = parseEnum(MeetingWith.class, request.getMeetingWith(), "meetingWith");
+        if (meetingWithEnum != null) {
+            if (meetingWithEnum == MeetingWith.SELF) {
+                aloneWithValue = "SELF";
+            } else if (meetingWithEnum == MeetingWith.SOMEONE_ELSE) {
+                aloneWithValue = "SOMEONE";
+            }
         } else {
-            verification.setPersonName(null);
-            verification.setPosition(null);
+            // Fallback to legacy aloneWith
+            String legacyAloneWith = normalizeString(request.getAloneWith(), 20, "aloneWith");
+            if (legacyAloneWith != null) {
+                if ("SELF".equalsIgnoreCase(legacyAloneWith)) {
+                    aloneWithValue = "SELF";
+                } else if ("SOMEONE".equalsIgnoreCase(legacyAloneWith)) {
+                    aloneWithValue = "SOMEONE";
+                } else {
+                    throw new IllegalArgumentException("aloneWith must be SELF or SOMEONE");
+                }
+            }
         }
+
+        String verifiedPersonName = null;
+        String verifiedPosition = null;
+        if ("SOMEONE".equals(aloneWithValue)) {
+            verifiedPersonName = normalizeString(request.getPersonName(), 100, "personName");
+            verifiedPosition = normalizeString(request.getPosition(), 100, "position");
+        }
+
+        verification.setAloneWith(aloneWithValue);
+        verification.setPersonName(verifiedPersonName);
+        verification.setPosition(verifiedPosition);
+
+        // Map rest of optional/legacy fields
         verification.setClientAge(request.getClientAge());
-        verification.setMaritalStatus(request.getMaritalStatus());
-        verification.setProfession(request.getProfession());
-        verification.setEmail(request.getEmail());
-        verification.setCompanyName(request.getCompanyName());
+        verification.setMaritalStatus(normalizeString(request.getMaritalStatus(), 50, "maritalStatus"));
+        verification.setEmail(normalizeString(request.getEmail(), 150, "email"));
+        verification.setCompanyName(normalizeString(request.getCompanyName(), 150, "companyName"));
         verification.setAnyChildren(request.getAnyChildren());
         if (Boolean.TRUE.equals(request.getAnyChildren())) {
             verification.setNumberOfChildren(request.getNumberOfChildren());
@@ -163,18 +198,42 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         if (request == null) {
             throw new IllegalArgumentException("Verification request cannot be null.");
         }
-        if ("SOMEONE".equalsIgnoreCase(request.getAloneWith())) {
-            if (request.getPersonName() == null || request.getPersonName().isBlank()) {
-                throw new IllegalArgumentException("Person name is required if aloneWith is SOMEONE");
-            }
-            if (request.getPosition() == null || request.getPosition().isBlank()) {
-                throw new IllegalArgumentException("Position is required if aloneWith is SOMEONE");
-            }
+        if (request.getMeetingTiming() == null) {
+            throw new IllegalArgumentException("Meeting timing is required.");
         }
         if (Boolean.TRUE.equals(request.getAnyChildren())) {
             if (request.getNumberOfChildren() == null || request.getNumberOfChildren() <= 0) {
                 throw new IllegalArgumentException("Number of children must be greater than 0 if anyChildren is true");
             }
         }
+    }
+
+    private <E extends Enum<E>> E parseEnum(Class<E> enumClass, String value, String fieldName) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(enumClass, trimmed.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid value for " + fieldName + ": " + trimmed);
+        }
+    }
+
+    private String normalizeString(String input, int maxLength, String fieldName) {
+        if (input == null) {
+            return null;
+        }
+        String trimmed = input.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " cannot exceed " + maxLength + " characters.");
+        }
+        return trimmed;
     }
 }

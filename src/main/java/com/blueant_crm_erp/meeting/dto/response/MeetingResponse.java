@@ -1,10 +1,7 @@
 package com.blueant_crm_erp.meeting.dto.response;
 
 import com.blueant_crm_erp.common.enums.Status;
-import com.blueant_crm_erp.meeting.enums.MeetingMode;
-import com.blueant_crm_erp.meeting.enums.MeetingStatus;
-import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
-import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
+import com.blueant_crm_erp.meeting.enums.*;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -91,4 +88,13 @@ public class MeetingResponse {
     private String googleMapsUrl;
 
     private com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus;
+
+    // New questionnaire fields
+    private LocalTime meetingTiming;
+    private AgeGroup ageGroup;
+    private ExistingSip existingSip;
+    private String profession;
+    private String professionDetail;
+    private BestTimeForMeeting bestTimeForMeeting;
+    private String meetingWith;
 }

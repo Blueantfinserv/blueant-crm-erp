@@ -42,6 +42,16 @@ public interface MeetingMapper {
     @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
     @Mapping(source = "meetingRemarks", target = "remarks")
     @Mapping(source = "verification.verificationStatus", target = "verificationStatus")
+    @Mapping(source = "verification.meetingTiming", target = "meetingTiming")
+    @Mapping(source = "verification.ageGroup", target = "ageGroup")
+    @Mapping(source = "verification.existingSip", target = "existingSip")
+    @Mapping(source = "verification.profession", target = "profession")
+    @Mapping(source = "verification.professionDetail", target = "professionDetail")
+    @Mapping(source = "verification.bestTimeForMeeting", target = "bestTimeForMeeting")
+    @Mapping(target = "aloneWith", expression = "java(getAloneWith(meeting))")
+    @Mapping(target = "meetingWith", expression = "java(getMeetingWith(meeting))")
+    @Mapping(target = "personName", expression = "java(getPersonName(meeting))")
+    @Mapping(target = "position", expression = "java(getPosition(meeting))")
     MeetingResponse toResponse(Meeting meeting);
 
     /**
@@ -58,9 +68,74 @@ public interface MeetingMapper {
     @Mapping(target = "clientParticipants", expression = "java(stringToStringList(meeting.getClientParticipants()))")
     @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
     @Mapping(source = "meetingRemarks", target = "remarks")
+    @Mapping(source = "verification.meetingTiming", target = "meetingTiming")
+    @Mapping(source = "verification.ageGroup", target = "ageGroup")
+    @Mapping(source = "verification.existingSip", target = "existingSip")
+    @Mapping(source = "verification.profession", target = "profession")
+    @Mapping(source = "verification.professionDetail", target = "professionDetail")
+    @Mapping(source = "verification.bestTimeForMeeting", target = "bestTimeForMeeting")
+    @Mapping(target = "aloneWith", expression = "java(getAloneWith(meeting))")
+    @Mapping(target = "meetingWith", expression = "java(getMeetingWith(meeting))")
+    @Mapping(target = "personName", expression = "java(getPersonName(meeting))")
+    @Mapping(target = "position", expression = "java(getPosition(meeting))")
     MeetingDetailResponse toDetailResponse(Meeting meeting);
 
+    @Mapping(source = "aloneWith", target = "meetingWith", qualifiedByName = "mapAloneWithToMeetingWith")
     MeetingVerificationResponse toVerificationResponse(MeetingVerification entity);
+
+    @Named("mapAloneWithToMeetingWith")
+    default String mapAloneWithToMeetingWith(String aloneWith) {
+        if (aloneWith == null) {
+            return null;
+        }
+        if ("SOMEONE".equalsIgnoreCase(aloneWith)) {
+            return "SOMEONE_ELSE";
+        }
+        return aloneWith.toUpperCase();
+    }
+
+    default String getAloneWith(Meeting meeting) {
+        if (meeting == null) {
+            return null;
+        }
+        if (meeting.getVerification() != null && meeting.getVerification().getVerificationStatus() == com.blueant_crm_erp.servicerequest.enums.VerificationStatus.VERIFIED) {
+            return meeting.getVerification().getAloneWith();
+        }
+        return meeting.getAloneWith();
+    }
+
+    default String getMeetingWith(Meeting meeting) {
+        if (meeting == null) {
+            return null;
+        }
+        String aw = null;
+        if (meeting.getVerification() != null && meeting.getVerification().getVerificationStatus() == com.blueant_crm_erp.servicerequest.enums.VerificationStatus.VERIFIED) {
+            aw = meeting.getVerification().getAloneWith();
+        } else {
+            aw = meeting.getAloneWith();
+        }
+        return mapAloneWithToMeetingWith(aw);
+    }
+
+    default String getPersonName(Meeting meeting) {
+        if (meeting == null) {
+            return null;
+        }
+        if (meeting.getVerification() != null && meeting.getVerification().getVerificationStatus() == com.blueant_crm_erp.servicerequest.enums.VerificationStatus.VERIFIED) {
+            return meeting.getVerification().getPersonName();
+        }
+        return meeting.getPersonName();
+    }
+
+    default String getPosition(Meeting meeting) {
+        if (meeting == null) {
+            return null;
+        }
+        if (meeting.getVerification() != null && meeting.getVerification().getVerificationStatus() == com.blueant_crm_erp.servicerequest.enums.VerificationStatus.VERIFIED) {
+            return meeting.getVerification().getPosition();
+        }
+        return meeting.getPosition();
+    }
 
     default String getMeetingLocation(Meeting meeting) {
         if (meeting == null) {

@@ -2,11 +2,15 @@ package com.blueant_crm_erp.meeting.entity;
 
 import com.blueant_crm_erp.common.base.BaseVersionEntity;
 import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
+import com.blueant_crm_erp.meeting.enums.AgeGroup;
+import com.blueant_crm_erp.meeting.enums.ExistingSip;
+import com.blueant_crm_erp.meeting.enums.BestTimeForMeeting;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "meeting_verifications")
@@ -67,4 +71,22 @@ public class MeetingVerification extends BaseVersionEntity {
 
     @Column(name = "previous_investment")
     private Boolean previousInvestment;
+
+    @Column(name = "meeting_timing")
+    private LocalTime meetingTiming;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "age_group", length = 50)
+    private AgeGroup ageGroup;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "existing_sip", length = 50)
+    private ExistingSip existingSip;
+
+    @Column(name = "profession_detail", length = 255)
+    private String professionDetail;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "best_time_for_meeting", length = 50)
+    private BestTimeForMeeting bestTimeForMeeting;
 }

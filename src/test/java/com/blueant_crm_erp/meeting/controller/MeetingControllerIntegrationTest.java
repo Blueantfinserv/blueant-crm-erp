@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
@@ -220,7 +221,7 @@ public class MeetingControllerIntegrationTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("leadId", leadResponse.getUniqueLeadId());
         payload.put("meetingMode", "PHYSICAL");
-        payload.put("meetingDate", java.time.LocalDate.now().toString());
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(1).toString()); // Tomorrow to avoid time-of-day flakiness
         payload.put("meetingTime", "14:00:00");
         payload.put("meetingLocation", "Noida Office");
         payload.put("nextMeetingDate", java.time.LocalDate.now().plusDays(2).toString()); // nextMeetingDate in future is valid
@@ -309,5 +310,254 @@ public class MeetingControllerIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(reschedulePayload)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
+    public void testUpdateMeeting_PastMeetingDateCompletedSuccess() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Update Past Completed Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("leadId", leadResponse.getUniqueLeadId());
+        payload.put("meetingMode", "PHYSICAL");
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        payload.put("meetingTime", "10:00:00");
+        payload.put("meetingLocation", "Noida Office");
+        payload.put("meetingRemarks", "Future scheduled meeting");
+        payload.put("meetingStatus", "SCHEDULED");
+
+        String responseStr = mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String meetingCode = objectMapper.readTree(responseStr).path("data").path("meetingCode").asText();
+
+        Map<String, Object> updatePayload = new HashMap<>();
+        updatePayload.put("meetingCode", meetingCode);
+        updatePayload.put("meetingMode", "PHYSICAL");
+        updatePayload.put("meetingDate", java.time.LocalDate.now().minusDays(2).toString()); // Past date -> MUST PASS because COMPLETED
+        updatePayload.put("meetingTime", "10:00:00");
+        updatePayload.put("meetingLocation", "Noida Office");
+        updatePayload.put("meetingRemarks", "Recording actual past meeting");
+        updatePayload.put("meetingStatus", "COMPLETED");
+
+        mockMvc.perform(put("/v1/meetings/" + meetingCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updatePayload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.meetingStatus").value("COMPLETED"));
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
+    public void testUpdateMeeting_PastMeetingDateScheduledFailure() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Update Past Scheduled Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("leadId", leadResponse.getUniqueLeadId());
+        payload.put("meetingMode", "PHYSICAL");
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        payload.put("meetingTime", "10:00:00");
+        payload.put("meetingLocation", "Noida Office");
+        payload.put("meetingRemarks", "Future scheduled meeting");
+        payload.put("meetingStatus", "SCHEDULED");
+
+        String responseStr = mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String meetingCode = objectMapper.readTree(responseStr).path("data").path("meetingCode").asText();
+
+        Map<String, Object> updatePayload = new HashMap<>();
+        updatePayload.put("meetingCode", meetingCode);
+        updatePayload.put("meetingMode", "PHYSICAL");
+        updatePayload.put("meetingDate", java.time.LocalDate.now().minusDays(2).toString()); // Past date
+        updatePayload.put("meetingTime", "10:00:00");
+        updatePayload.put("meetingLocation", "Noida Office");
+        updatePayload.put("meetingStatus", "SCHEDULED"); // Still SCHEDULED -> MUST FAIL
+
+        mockMvc.perform(put("/v1/meetings/" + meetingCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updatePayload)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
+    public void testUpdateMeeting_TodayMeetingDateCompletedSuccess() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Update Today Completed Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("leadId", leadResponse.getUniqueLeadId());
+        payload.put("meetingMode", "PHYSICAL");
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        payload.put("meetingTime", "10:00:00");
+        payload.put("meetingLocation", "Noida Office");
+        payload.put("meetingRemarks", "Future scheduled meeting");
+        payload.put("meetingStatus", "SCHEDULED");
+
+        String responseStr = mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String meetingCode = objectMapper.readTree(responseStr).path("data").path("meetingCode").asText();
+
+        Map<String, Object> updatePayload = new HashMap<>();
+        updatePayload.put("meetingCode", meetingCode);
+        updatePayload.put("meetingMode", "PHYSICAL");
+        updatePayload.put("meetingDate", java.time.LocalDate.now().toString()); // Today
+        updatePayload.put("meetingTime", "10:00:00");
+        updatePayload.put("meetingLocation", "Noida Office");
+        updatePayload.put("meetingStatus", "COMPLETED");
+
+        mockMvc.perform(put("/v1/meetings/" + meetingCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updatePayload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.meetingStatus").value("COMPLETED"));
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
+    public void testUpdateMeeting_TodayMeetingDateScheduledSuccess() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Update Today Scheduled Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("leadId", leadResponse.getUniqueLeadId());
+        payload.put("meetingMode", "PHYSICAL");
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        payload.put("meetingTime", "10:00:00");
+        payload.put("meetingLocation", "Noida Office");
+        payload.put("meetingRemarks", "Future scheduled meeting");
+        payload.put("meetingStatus", "SCHEDULED");
+
+        String responseStr = mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String meetingCode = objectMapper.readTree(responseStr).path("data").path("meetingCode").asText();
+
+        Map<String, Object> updatePayload = new HashMap<>();
+        updatePayload.put("meetingCode", meetingCode);
+        updatePayload.put("meetingMode", "PHYSICAL");
+        updatePayload.put("meetingDate", java.time.LocalDate.now().toString()); // Today
+        updatePayload.put("meetingTime", "23:59:59"); // Future time of today to pass validation
+        updatePayload.put("meetingLocation", "Noida Office");
+        updatePayload.put("meetingStatus", "SCHEDULED");
+
+        mockMvc.perform(put("/v1/meetings/" + meetingCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updatePayload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
+    public void testUpdateMeeting_PastNextMeetingDateFailure() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Update Past Next Date Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("leadId", leadResponse.getUniqueLeadId());
+        payload.put("meetingMode", "PHYSICAL");
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        payload.put("meetingTime", "10:00:00");
+        payload.put("meetingLocation", "Noida Office");
+        payload.put("meetingRemarks", "Future scheduled meeting");
+        payload.put("meetingStatus", "SCHEDULED");
+
+        String responseStr = mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String meetingCode = objectMapper.readTree(responseStr).path("data").path("meetingCode").asText();
+
+        Map<String, Object> updatePayload = new HashMap<>();
+        updatePayload.put("meetingCode", meetingCode);
+        updatePayload.put("meetingMode", "PHYSICAL");
+        updatePayload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        updatePayload.put("meetingTime", "10:00:00");
+        updatePayload.put("meetingLocation", "Noida Office");
+        updatePayload.put("nextMeetingDate", java.time.LocalDate.now().minusDays(1).toString()); // Past next date -> MUST FAIL
+        updatePayload.put("meetingStatus", "SCHEDULED");
+
+        mockMvc.perform(put("/v1/meetings/" + meetingCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updatePayload)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
+    public void testUpdateMeeting_FutureNextMeetingDateSuccess() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Update Future Next Date Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("leadId", leadResponse.getUniqueLeadId());
+        payload.put("meetingMode", "PHYSICAL");
+        payload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        payload.put("meetingTime", "10:00:00");
+        payload.put("meetingLocation", "Noida Office");
+        payload.put("meetingRemarks", "Future scheduled meeting");
+        payload.put("meetingStatus", "SCHEDULED");
+
+        String responseStr = mockMvc.perform(post("/v1/meetings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String meetingCode = objectMapper.readTree(responseStr).path("data").path("meetingCode").asText();
+
+        Map<String, Object> updatePayload = new HashMap<>();
+        updatePayload.put("meetingCode", meetingCode);
+        updatePayload.put("meetingMode", "PHYSICAL");
+        updatePayload.put("meetingDate", java.time.LocalDate.now().plusDays(2).toString());
+        updatePayload.put("meetingTime", "10:00:00");
+        updatePayload.put("meetingLocation", "Noida Office");
+        updatePayload.put("nextMeetingDate", java.time.LocalDate.now().plusDays(3).toString()); // Future next date -> MUST PASS
+        updatePayload.put("meetingStatus", "SCHEDULED");
+
+        mockMvc.perform(put("/v1/meetings/" + meetingCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updatePayload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 }

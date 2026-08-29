@@ -68,7 +68,7 @@ public class MeetingValidator {
         }
 
         if (meeting.getMeetingStatus() == com.blueant_crm_erp.meeting.enums.MeetingStatus.SCHEDULED) {
-            if (request.getMeetingDate() != null) {
+            if (request.getMeetingDate() != null && request.getMeetingStatus() != com.blueant_crm_erp.meeting.enums.MeetingStatus.COMPLETED) {
                 java.time.LocalTime time = request.getMeetingTime() != null ? request.getMeetingTime() : (meeting.getMeetingTime() != null ? meeting.getMeetingTime() : java.time.LocalTime.MIDNIGHT);
                 java.time.LocalDateTime newDateTime = java.time.LocalDateTime.of(request.getMeetingDate(), time);
                 if (newDateTime.isBefore(java.time.LocalDateTime.now())) {

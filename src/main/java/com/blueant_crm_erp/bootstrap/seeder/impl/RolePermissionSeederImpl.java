@@ -84,6 +84,10 @@ public class RolePermissionSeederImpl implements BootstrapSeeder {
 
                 if (role.getCode().equals(BootstrapConstants.ROLE_SUPER_ADMIN)) {
                     shouldMap = true;
+                } else if (role.getCode().equals(BootstrapConstants.ROLE_ADMIN)) {
+                    if (p.getCode().equals("PHYSICAL_LEAD_ASSIGN") || p.getCode().contains("_READ")) {
+                        shouldMap = true;
+                    }
                 } else if (role.getCode().equals(BootstrapConstants.ROLE_SALES_COORDINATOR)) {
                     if (p.getCode().equals("MEETING_READ") || p.getCode().equals("MEETING_VERIFY") ||
                         p.getCode().equals("PHYSICAL_LEAD_ASSIGN") || p.getCode().equals("LEAD_CREATE") ||

@@ -555,11 +555,106 @@ public class PhysicalLeadAssignmentIntegrationTest {
     }
 
     @Test
+    @WithMockUser(authorities = {"ROLE_SALES_COORDINATOR", "PHYSICAL_LEAD_ASSIGN"})
+    void salesCoordinatorWithPhysicalLeadAssignPermissionAllowedToCreate() throws Exception {
+        String mobile = "951" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                .clientName("Coordinator Perm Allowed Client")
+                .mobileNumber(mobile)
+                .speciality("Cardiologist")
+                .location("Delhi")
+                .clinicAddress("Appollo")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"ROLE_SALES_COORDINATOR"})
+    void salesCoordinatorWithoutPhysicalLeadAssignForbiddenToCallLeadsAssignEndpoint() throws Exception {
+        String mobile = "957" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                .clientName("Coordinator Without Perm Attempt")
+                .mobileNumber(mobile)
+                .speciality("Cardiologist")
+                .location("Delhi")
+                .clinicAddress("Appollo")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"ROLE_ADMIN", "PHYSICAL_LEAD_ASSIGN"})
+    void adminWithPhysicalLeadAssignAllowedToCreate() throws Exception {
+        String mobile = "952" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                .clientName("Admin Allowed Client")
+                .mobileNumber(mobile)
+                .speciality("Cardiologist")
+                .location("Delhi")
+                .clinicAddress("Appollo")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"ROLE_SUPER_ADMIN"})
+    void superAdminRoleAllowedToCreate() throws Exception {
+        String mobile = "953" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                .clientName("Super Admin Allowed Client")
+                .mobileNumber(mobile)
+                .speciality("Cardiologist")
+                .location("Delhi")
+                .clinicAddress("Appollo")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @WithMockUser(authorities = {"ROLE_SALES_PERSON"})
-    void unauthorizedUserCannotCallLeadsAssignEndpoint() throws Exception {
+    void salesPersonForbiddenToCallLeadsAssignEndpoint() throws Exception {
         String mobile = "955" + String.format("%07d", (int)(Math.random() * 10000000));
         CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
-                .clientName("Unauthorized Attempt")
+                .clientName("Unauthorized Sales Person Attempt")
+                .mobileNumber(mobile)
+                .speciality("General")
+                .location("Delhi")
+                .clinicAddress("Address")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"ROLE_USER"})
+    void normalUserForbiddenToCallLeadsAssignEndpoint() throws Exception {
+        String mobile = "956" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                .clientName("Unauthorized Normal User Attempt")
                 .mobileNumber(mobile)
                 .speciality("General")
                 .location("Delhi")

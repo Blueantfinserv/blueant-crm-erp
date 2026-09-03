@@ -66,6 +66,7 @@ public class PermissionSeederImpl implements BootstrapSeeder {
             permissions.add(buildPermission(module + "_DELETE", "Delete " + module, module));
         }
         permissions.add(buildPermission("MEETING_VERIFY", "Verify Meeting", "MEETING"));
+        permissions.add(buildPermission("PHYSICAL_LEAD_ASSIGN", "Assign Physical Lead", "LEAD"));
 
         List<Permission> permissionsToSave = new ArrayList<>();
 

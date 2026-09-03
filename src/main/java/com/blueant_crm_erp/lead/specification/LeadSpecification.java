@@ -57,6 +57,10 @@ public class LeadSpecification {
                 predicates.add(criteriaBuilder.equal(root.get("leadSource"), request.getLeadSource()));
             }
 
+            if (request.getAssignedUserId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("assignedSalesPerson").get("id"), request.getAssignedUserId()));
+            }
+
             if (request.getFromDate() != null && request.getToDate() != null) {
                 predicates.add(criteriaBuilder.between(root.get("createdAt"), request.getFromDate().atStartOfDay(), request.getToDate().plusDays(1).atStartOfDay()));
             }

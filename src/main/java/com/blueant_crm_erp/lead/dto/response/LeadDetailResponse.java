@@ -50,6 +50,9 @@ public class LeadDetailResponse {
     private String email;
     private String location;
     private String companyName;
+    private String speciality;
+    private String clinicAddress;
+    private Boolean isPhysicalLead;
 
     /**
      * Lead Information
@@ -70,6 +73,13 @@ public class LeadDetailResponse {
 
     private Long leaderId;
     private String leaderName;
+
+    private String assignedByEmployeeCode;
+    private String assignedByEmployeeName;
+    private LocalDateTime assignedAt;
+    private String assignmentSource;
+    private Boolean assignedByCoordinator;
+    private String assignmentLabel;
 
     /**
      * Follow-up Information

@@ -42,6 +42,7 @@ public class LeadServiceImpl implements LeadService {
     private final com.blueant_crm_erp.meeting.repository.MeetingRepository meetingRepository;
     private final com.blueant_crm_erp.meeting.mapper.MeetingMapper meetingMapper;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final com.blueant_crm_erp.lead.service.LeadCodeGeneratorService leadCodeGeneratorService;
 
     @Override
     public LeadResponse createLead(CreateLeadRequest request, String currentUserEmail) {
@@ -57,7 +58,7 @@ public class LeadServiceImpl implements LeadService {
 
         Lead lead = Lead.builder()
                 // --- Auto-generated system fields ---
-                .leadCode(generateLeadCode())
+                .leadCode(leadCodeGeneratorService.generateNextLeadCode())
                 .uniqueLeadId(UUID.randomUUID().toString())
                 // --- Client information from request ---
                 .clientName(request.getClientName())
@@ -323,10 +324,5 @@ public class LeadServiceImpl implements LeadService {
     private Lead getLeadByUniqueLeadId(String uniqueLeadId) {
         return leadRepository.findByUniqueLeadId(uniqueLeadId)
                 .orElseThrow(() -> new LeadNotFoundException(uniqueLeadId));
-    }
-
-    private String generateLeadCode() {
-        long count = leadRepository.count() + 1;
-        return LeadConstants.LEAD_CODE_PREFIX + String.format("%0" + LeadConstants.LEAD_CODE_PADDING + "d", count);
     }
 }

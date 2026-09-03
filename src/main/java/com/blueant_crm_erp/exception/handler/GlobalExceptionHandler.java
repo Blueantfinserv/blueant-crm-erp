@@ -90,6 +90,37 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex, HttpServletRequest request) {
+        log.error("Data integrity violation error: {}", ex.getMessage(), ex);
+        String causeMsg = ex.getRootCause() != null ? ex.getRootCause().getMessage() : ex.getMessage();
+        boolean isDuplicate = causeMsg != null && (
+                causeMsg.toLowerCase().contains("duplicate") ||
+                causeMsg.toLowerCase().contains("uk_") ||
+                causeMsg.toLowerCase().contains("unique")
+        );
+
+        if (isDuplicate) {
+            ApiError apiError = errorResponseBuilder.build(
+                    HttpStatus.BAD_REQUEST,
+                    ErrorCode.DUPLICATE_RESOURCE,
+                    ErrorType.BUSINESS,
+                    "Duplicate entry or unique constraint violation: " + causeMsg,
+                    request
+            );
+            return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+        } else {
+            ApiError apiError = errorResponseBuilder.build(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    ErrorCode.INTERNAL_SERVER_ERROR,
+                    ErrorType.SYSTEM,
+                    "Database integrity failure: " + causeMsg,
+                    request
+            );
+            return new ResponseEntity<>(apiError, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);

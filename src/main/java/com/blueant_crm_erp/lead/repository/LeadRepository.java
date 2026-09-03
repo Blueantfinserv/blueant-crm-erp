@@ -4,6 +4,8 @@ import com.blueant_crm_erp.lead.entity.Lead;
 import com.blueant_crm_erp.lead.enums.DuplicateLeadStatus;
 import com.blueant_crm_erp.lead.enums.LeadStage;
 import com.blueant_crm_erp.lead.enums.LeadStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -29,6 +31,8 @@ public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificat
     boolean existsByMobileNumber(String mobileNumber);
 
     List<Lead> findAllByLeadStatus(LeadStatus leadStatus);
+
+    Page<Lead> findByIsPhysicalLeadTrueAndAssignedSalesPersonIsNull(Pageable pageable);
 
     long countByLeadStatus(LeadStatus leadStatus);
 

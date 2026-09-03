@@ -89,7 +89,15 @@ public class Lead extends BaseVersionEntity {
     @Column(name = "location", length = 255)
     private String location;
 
+    @Column(name = "speciality", length = 150)
+    private String speciality;
 
+    @Column(name = "clinic_address", length = 255)
+    private String clinicAddress;
+
+    @Builder.Default
+    @Column(name = "is_physical_lead", nullable = false)
+    private Boolean isPhysicalLead = false;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "profession", length = 50)
@@ -137,6 +145,16 @@ public class Lead extends BaseVersionEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_leader_id", foreignKey = @ForeignKey(name = "fk_lead_leader"))
     private User assignedLeader;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_by_user_id", foreignKey = @ForeignKey(name = "fk_lead_assigned_by"))
+    private User assignedBy;
+
+    @Column(name = "assigned_at")
+    private LocalDateTime assignedAt;
+
+    @Column(name = "assignment_source", length = 50)
+    private String assignmentSource;
 
 
     // ========================================================================

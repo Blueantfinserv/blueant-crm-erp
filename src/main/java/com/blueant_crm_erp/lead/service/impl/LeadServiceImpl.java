@@ -21,8 +21,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import com.blueant_crm_erp.auth.security.CustomUserDetails;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -275,15 +280,135 @@ public class LeadServiceImpl implements LeadService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<LeadResponse> searchLeads(LeadSearchRequest request, Pageable pageable) {
-        Page<Lead> page = leadRepository.findAll(LeadSpecification.searchByKeyword(request.getKeyword()), pageable);
+        LeadFilterRequest effectiveFilter = extractEffectiveFilter(request);
+        enforceSalesPersonOwnership(effectiveFilter);
+
+        org.springframework.data.jpa.domain.Specification<Lead> spec =
+                LeadSpecification.searchAndFilter(request != null ? request.getKeyword() : null, effectiveFilter);
+        Pageable effectivePageable = resolvePageable(request, pageable);
+
+        Page<Lead> page = leadRepository.findAll(spec, effectivePageable);
         return PageResponse.of(page.map(leadMapper::toResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<LeadResponse> filterLeads(LeadFilterRequest request, Pageable pageable) {
+        enforceSalesPersonOwnership(request);
         Page<Lead> page = leadRepository.findAll(LeadSpecification.filterByCriteria(request), pageable);
         return PageResponse.of(page.map(leadMapper::toResponse));
+    }
+
+    private LeadFilterRequest extractEffectiveFilter(LeadSearchRequest request) {
+        if (request == null) {
+            return null;
+        }
+        LeadFilterRequest filter = request.getFilter();
+        if (filter == null) {
+            filter = request;
+        } else {
+            if (filter.getAssignmentSource() == null) filter.setAssignmentSource(request.getAssignmentSource());
+            if (filter.getAssignedByCoordinator() == null) filter.setAssignedByCoordinator(request.getAssignedByCoordinator());
+            if (filter.getIsPhysicalLead() == null) filter.setIsPhysicalLead(request.getIsPhysicalLead());
+            if (filter.getAssignedFromDate() == null) filter.setAssignedFromDate(request.getAssignedFromDate());
+            if (filter.getAssignedToDate() == null) filter.setAssignedToDate(request.getAssignedToDate());
+            if (filter.getAssignedUserId() == null) filter.setAssignedUserId(request.getAssignedUserId());
+            if (filter.getLeadStatus() == null) filter.setLeadStatus(request.getLeadStatus());
+            if (filter.getFromDate() == null) filter.setFromDate(request.getFromDate());
+            if (filter.getToDate() == null) filter.setToDate(request.getToDate());
+            if (filter.getClientName() == null) filter.setClientName(request.getClientName());
+            if (filter.getMobileNumber() == null) filter.setMobileNumber(request.getMobileNumber());
+            if (filter.getLeadCode() == null) filter.setLeadCode(request.getLeadCode());
+            if (filter.getLeadStage() == null) filter.setLeadStage(request.getLeadStage());
+            if (filter.getLeadPriority() == null) filter.setLeadPriority(request.getLeadPriority());
+            if (filter.getLeadSource() == null) filter.setLeadSource(request.getLeadSource());
+            if (filter.getDuplicateLeadStatus() == null) filter.setDuplicateLeadStatus(request.getDuplicateLeadStatus());
+            if (filter.getLeaderId() == null) filter.setLeaderId(request.getLeaderId());
+        }
+        return filter;
+    }
+
+    private void enforceSalesPersonOwnership(LeadFilterRequest filter) {
+        if (filter == null) {
+            return;
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return;
+        }
+
+        boolean hasElevated = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_ADMIN") ||
+                               a.getAuthority().equalsIgnoreCase("ADMIN") ||
+                               a.getAuthority().equalsIgnoreCase("ROLE_SUPER_ADMIN") ||
+                               a.getAuthority().equalsIgnoreCase("SUPER_ADMIN") ||
+                               a.getAuthority().equalsIgnoreCase("ROLE_SALES_COORDINATOR") ||
+                               a.getAuthority().equalsIgnoreCase("SALES_COORDINATOR") ||
+                               a.getAuthority().equalsIgnoreCase("PHYSICAL_LEAD_ASSIGN") ||
+                               a.getAuthority().equalsIgnoreCase("ROLE_BUSINESS_HEAD") ||
+                               a.getAuthority().equalsIgnoreCase("BUSINESS_HEAD") ||
+                               a.getAuthority().equalsIgnoreCase("ROLE_SALES_MANAGER") ||
+                               a.getAuthority().equalsIgnoreCase("SALES_MANAGER") ||
+                               a.getAuthority().equalsIgnoreCase("ROLE_TEAM_LEADER") ||
+                               a.getAuthority().equalsIgnoreCase("TEAM_LEADER"));
+
+        if (auth.getPrincipal() instanceof CustomUserDetails cud) {
+            if (cud.getRoleCode() != null) {
+                String roleCode = cud.getRoleCode().toUpperCase();
+                if (roleCode.equals("ADMIN") || roleCode.equals("SUPER_ADMIN") ||
+                    roleCode.equals("SALES_COORDINATOR") || roleCode.equals("BUSINESS_HEAD") ||
+                    roleCode.equals("SALES_MANAGER") || roleCode.equals("TEAM_LEADER")) {
+                    hasElevated = true;
+                }
+            }
+        }
+
+        if (hasElevated) {
+            return;
+        }
+
+        Long currentUserId = null;
+        if (auth.getPrincipal() instanceof CustomUserDetails cud) {
+            currentUserId = cud.getUserId();
+        } else if (auth.getPrincipal() instanceof User u) {
+            currentUserId = u.getId();
+        } else {
+            String identifier = auth.getName();
+            if (StringUtils.hasText(identifier)) {
+                User u = userRepository.findByEmployeeCodeIgnoreCaseOrEmailIgnoreCaseOrMobileNumberAndDeletedFalse(
+                        identifier, identifier, identifier).orElse(null);
+                if (u != null) {
+                    currentUserId = u.getId();
+                }
+            }
+        }
+
+        if (currentUserId != null) {
+            if (filter.getAssignedUserId() != null && !filter.getAssignedUserId().equals(currentUserId)) {
+                log.warn("Access denied: Authenticated Sales Person [{}] attempted to access leads assigned to user [{}]",
+                        currentUserId, filter.getAssignedUserId());
+                throw new AccessDeniedException("Access denied: You cannot view leads assigned to another user.");
+            }
+            filter.setAssignedUserId(currentUserId);
+        } else {
+            throw new AccessDeniedException("Access denied: Authenticated user could not be resolved.");
+        }
+    }
+
+    private Pageable resolvePageable(LeadSearchRequest request, Pageable pageable) {
+        if (pageable != null && pageable.isPaged()) {
+            if (pageable.getSort().isSorted() || pageable.getPageSize() != 20) {
+                return pageable;
+            }
+        }
+        if (request != null && request.getPage() != null && request.getSize() != null && request.getSize() > 0) {
+            String sortBy = StringUtils.hasText(request.getSortBy()) ? request.getSortBy() : "createdAt";
+            org.springframework.data.domain.Sort.Direction direction =
+                    "ASC".equalsIgnoreCase(request.getSortDirection()) ? org.springframework.data.domain.Sort.Direction.ASC : org.springframework.data.domain.Sort.Direction.DESC;
+            return org.springframework.data.domain.PageRequest.of(request.getPage(), request.getSize(), org.springframework.data.domain.Sort.by(direction, sortBy));
+        }
+        return pageable != null ? pageable : org.springframework.data.domain.PageRequest.of(0, 10, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
     }
 
     @Override

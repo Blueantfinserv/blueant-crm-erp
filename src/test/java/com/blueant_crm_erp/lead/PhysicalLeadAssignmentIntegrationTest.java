@@ -667,4 +667,359 @@ public class PhysicalLeadAssignmentIntegrationTest {
                 .content(objectMapper.writeValueAsString(createReq)))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void salesPersonCanRetrieveOwnAssignedLeadsViaSearch() throws Exception {
+        String mobile = "977" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                .clientName("SP1 Assigned Lead")
+                .mobileNumber(mobile)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Ring Road")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+
+        String responseJson = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_UPDATE"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String leadCode = objectMapper.readTree(responseJson).get("data").get("leadCode").asText();
+
+        String searchBody = """
+                {
+                    "leadStatus": "ASSIGNED",
+                    "assignmentSource": "SALES_COORDINATOR",
+                    "assignedByCoordinator": true,
+                    "isPhysicalLead": true
+                }
+                """;
+
+        mockMvc.perform(post("/v1/leads/search")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        activeSalesPerson1.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_EMPLOYEE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[?(@.leadCode == '" + leadCode + "')]").exists())
+                .andExpect(jsonPath("$.data.content[0].assignedUserId").value(activeSalesPerson1.getId()));
+    }
+
+    @Test
+    void salesPersonCannotRetrieveOtherSalesPersonLeadsBySendingAssignedUserId() throws Exception {
+        String searchBody = """
+                {
+                    "assignedUserId": %d,
+                    "leadStatus": "ASSIGNED"
+                }
+                """.formatted(activeSalesPerson2.getId());
+
+        mockMvc.perform(post("/v1/leads/search")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        activeSalesPerson1.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_EMPLOYEE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchBody))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void salesPersonCannotBypassOwnershipByOmittingAssignedUserId() throws Exception {
+        String mobile1 = "971" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req1 = CreatePhysicalLeadRequest.builder()
+                .clientName("SP1 Lead")
+                .mobileNumber(mobile1)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+        String res1 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode1 = objectMapper.readTree(res1).get("data").get("leadCode").asText();
+
+        String mobile2 = "972" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req2 = CreatePhysicalLeadRequest.builder()
+                .clientName("SP2 Lead")
+                .mobileNumber(mobile2)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson2.getEmployeeCode())
+                .build();
+        String res2 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req2)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode2 = objectMapper.readTree(res2).get("data").get("leadCode").asText();
+
+        String emptySearchBody = "{}";
+
+        mockMvc.perform(post("/v1/leads/search")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        activeSalesPerson1.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_EMPLOYEE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(emptySearchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[?(@.leadCode == '" + leadCode1 + "')]").exists())
+                .andExpect(jsonPath("$.data.content[?(@.leadCode == '" + leadCode2 + "')]").doesNotExist());
+    }
+
+    @Test
+    void salesPersonReceivesOnlyTheirOwnLeadsWithPhysicalLeadFilters() throws Exception {
+        String today = java.time.LocalDate.now().toString();
+
+        String mobile1 = "973" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req1 = CreatePhysicalLeadRequest.builder()
+                .clientName("Physical Lead SP1")
+                .mobileNumber(mobile1)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+        String res1 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode1 = objectMapper.readTree(res1).get("data").get("leadCode").asText();
+
+        String mobile2 = "974" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req2 = CreatePhysicalLeadRequest.builder()
+                .clientName("Physical Lead SP2")
+                .mobileNumber(mobile2)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson2.getEmployeeCode())
+                .build();
+        String res2 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req2)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode2 = objectMapper.readTree(res2).get("data").get("leadCode").asText();
+
+        String searchBody = """
+                {
+                    "leadStatus": "ASSIGNED",
+                    "assignmentSource": "SALES_COORDINATOR",
+                    "assignedByCoordinator": true,
+                    "isPhysicalLead": true,
+                    "assignedFromDate": "%s",
+                    "assignedToDate": "%s"
+                }
+                """.formatted(today, today);
+
+        mockMvc.perform(post("/v1/leads/search")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        activeSalesPerson1.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_EMPLOYEE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[?(@.leadCode == '" + leadCode1 + "')]").exists())
+                .andExpect(jsonPath("$.data.content[?(@.leadCode == '" + leadCode2 + "')]").doesNotExist());
+    }
+
+    @Test
+    void adminCanSearchAndFilterAcrossSalesPersons() throws Exception {
+        String mobile1 = "975" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req1 = CreatePhysicalLeadRequest.builder()
+                .clientName("Admin Test Lead SP1")
+                .mobileNumber(mobile1)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+        String res1 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode1 = objectMapper.readTree(res1).get("data").get("leadCode").asText();
+
+        String mobile2 = "976" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req2 = CreatePhysicalLeadRequest.builder()
+                .clientName("Admin Test Lead SP2")
+                .mobileNumber(mobile2)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson2.getEmployeeCode())
+                .build();
+        String res2 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req2)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode2 = objectMapper.readTree(res2).get("data").get("leadCode").asText();
+
+        String filterBySP2 = """
+                {
+                    "assignedUserId": %d,
+                    "leadStatus": "ASSIGNED"
+                }
+                """.formatted(activeSalesPerson2.getId());
+
+        mockMvc.perform(post("/v1/leads/search")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        "adminUser").authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(filterBySP2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[?(@.leadCode == '" + leadCode2 + "')]").exists())
+                .andExpect(jsonPath("$.data.content[?(@.leadCode == '" + leadCode1 + "')]").doesNotExist());
+    }
+
+    @Test
+    void dateRangeFilteringOnAssignedAtWorksAccurately() throws Exception {
+        java.time.LocalDate targetDate = java.time.LocalDate.of(2026, 9, 7);
+
+        // Lead 1: Target Date Lead
+        String mobile1 = "961" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req1 = CreatePhysicalLeadRequest.builder()
+                .clientName("Target Date Lead")
+                .mobileNumber(mobile1)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+        String res1 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode1 = objectMapper.readTree(res1).get("data").get("leadCode").asText();
+        Lead lead1 = leadRepository.findByLeadCode(leadCode1).orElseThrow();
+        lead1.setAssignedAt(targetDate.atTime(14, 30, 0));
+        leadRepository.save(lead1);
+
+        // Lead 2: Yesterday Lead
+        String mobile2 = "962" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req2 = CreatePhysicalLeadRequest.builder()
+                .clientName("Yesterday Lead")
+                .mobileNumber(mobile2)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+        String res2 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req2)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode2 = objectMapper.readTree(res2).get("data").get("leadCode").asText();
+        Lead lead2 = leadRepository.findByLeadCode(leadCode2).orElseThrow();
+        lead2.setAssignedAt(targetDate.minusDays(1).atTime(23, 59, 59));
+        leadRepository.save(lead2);
+
+        // Lead 3: Tomorrow Lead
+        String mobile3 = "963" + String.format("%07d", (int)(Math.random() * 10000000));
+        CreatePhysicalLeadRequest req3 = CreatePhysicalLeadRequest.builder()
+                .clientName("Tomorrow Lead")
+                .mobileNumber(mobile3)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Main Clinic, Delhi")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .build();
+        String res3 = mockMvc.perform(post("/v1/Leads_assign")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        salesCoordinator.getEmployeeCode()).authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_SALES_COORDINATOR")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req3)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String leadCode3 = objectMapper.readTree(res3).get("data").get("leadCode").asText();
+        Lead lead3 = leadRepository.findByLeadCode(leadCode3).orElseThrow();
+        lead3.setAssignedAt(targetDate.plusDays(1).atTime(0, 0, 0));
+        leadRepository.save(lead3);
+
+        String dateSearchBody = """
+                {
+                    "assignedFromDate": "2026-09-07",
+                    "assignedToDate": "2026-09-07"
+                }
+                """;
+
+        mockMvc.perform(post("/v1/leads/search")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(
+                        "adminUser").authorities(
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("LEAD_READ"),
+                        new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(dateSearchBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[?(@.clientName == 'Target Date Lead')]").exists())
+                .andExpect(jsonPath("$.data.content[?(@.clientName == 'Yesterday Lead')]").doesNotExist())
+                .andExpect(jsonPath("$.data.content[?(@.clientName == 'Tomorrow Lead')]").doesNotExist());
+    }
 }

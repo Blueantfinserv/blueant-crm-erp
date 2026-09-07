@@ -6,9 +6,9 @@ import com.blueant_crm_erp.lead.enums.LeadSource;
 import com.blueant_crm_erp.lead.enums.LeadStage;
 import com.blueant_crm_erp.lead.enums.LeadStatus;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
 
@@ -27,7 +27,7 @@ import java.time.LocalDate;
  */
 
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 public class LeadFilterRequest {
@@ -88,5 +88,28 @@ public class LeadFilterRequest {
     private LocalDate fromDate;
 
     private LocalDate toDate;
+
+    /**
+     * Assignment Source
+     * e.g. SALES_COORDINATOR, SYSTEM, MANUAL
+     */
+    private String assignmentSource;
+
+    /**
+     * Assigned by Sales Coordinator flag
+     */
+    private Boolean assignedByCoordinator;
+
+    /**
+     * Physical Lead flag
+     */
+    private Boolean isPhysicalLead;
+
+    /**
+     * Assigned Date Range (filters by Lead.assignedAt)
+     */
+    private LocalDate assignedFromDate;
+
+    private LocalDate assignedToDate;
 
 }

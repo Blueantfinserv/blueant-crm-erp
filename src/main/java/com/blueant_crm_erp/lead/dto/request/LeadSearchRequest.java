@@ -3,7 +3,10 @@ package com.blueant_crm_erp.lead.dto.request;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 /**
  * ============================================================================
@@ -20,10 +23,12 @@ import lombok.NoArgsConstructor;
  * ============================================================================
  */
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LeadSearchRequest {
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+public class LeadSearchRequest extends LeadFilterRequest {
 
     /**
      * Global Search Keyword

@@ -126,5 +126,13 @@ public class MeetingWorkflowRequest {
 
     @Schema(description = "Optional override for meeting location", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String meetingLocation;
+
+    @Size(max = 500, message = "Meeting photo URL cannot exceed 500 characters.")
+    @Schema(description = "Uploaded meeting photo URL/reference", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    private String meetingPhoto;
+
+    @Size(max = 500, message = "Visiting card URL cannot exceed 500 characters.")
+    @Schema(description = "Uploaded visiting card / document photo URL/reference", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    private String visitingCard;
 }
 

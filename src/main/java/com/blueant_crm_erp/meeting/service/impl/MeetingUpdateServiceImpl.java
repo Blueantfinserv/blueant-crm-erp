@@ -139,6 +139,14 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
             meeting.setPosition("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPosition());
         }
 
+        // Persist photo / visiting card documents if provided
+        if (request.getMeetingPhoto() != null) {
+            meeting.setMeetingPhoto(request.getMeetingPhoto());
+        }
+        if (request.getVisitingCard() != null) {
+            meeting.setVisitingCard(request.getVisitingCard());
+        }
+
         // Reset verification status to false upon any update submission
         meeting.setVerifiedByProcessCoordinator(false);
 

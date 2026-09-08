@@ -11,6 +11,7 @@ import com.blueant_crm_erp.exception.lead.LeadTerminalStateException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Set;
 
@@ -69,6 +70,25 @@ public class MeetingWorkflowValidator {
             if (request.getNextPlanDate().isBefore(LocalDate.now())) {
                 throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
             }
+        }
+
+        // Validate GPS coordinates and accuracy if provided
+        if (request.getLatitude() != null || request.getLongitude() != null) {
+            if (request.getLatitude() == null || request.getLongitude() == null) {
+                throw new IllegalArgumentException("Both latitude and longitude must be provided together.");
+            }
+            if (request.getLatitude().compareTo(BigDecimal.valueOf(-90)) < 0 ||
+                request.getLatitude().compareTo(BigDecimal.valueOf(90)) > 0) {
+                throw new IllegalArgumentException("Latitude must be between -90 and +90 degrees.");
+            }
+            if (request.getLongitude().compareTo(BigDecimal.valueOf(-180)) < 0 ||
+                request.getLongitude().compareTo(BigDecimal.valueOf(180)) > 0) {
+                throw new IllegalArgumentException("Longitude must be between -180 and +180 degrees.");
+            }
+        }
+
+        if (request.getAccuracy() != null && request.getAccuracy() < 0) {
+            throw new IllegalArgumentException("Location accuracy must not be negative.");
         }
     }
 

@@ -60,9 +60,6 @@ public class UpdateMeetingRequest {
     private String attachment;
 
     @Size(max = 500)
-    private String meetingPhoto;
-
-    @Size(max = 500)
     private String visitingCard;
 
     @FutureOrPresent(message = "Next meeting date cannot be in the past.")

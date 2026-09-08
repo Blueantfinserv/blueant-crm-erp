@@ -139,10 +139,7 @@ public class MeetingUpdateServiceImpl implements MeetingUpdateService {
             meeting.setPosition("SELF".equalsIgnoreCase(request.getAloneWith()) ? null : request.getPosition());
         }
 
-        // Persist photo / visiting card documents if provided
-        if (request.getMeetingPhoto() != null) {
-            meeting.setMeetingPhoto(request.getMeetingPhoto());
-        }
+        // Persist visiting card document if provided
         if (request.getVisitingCard() != null) {
             meeting.setVisitingCard(request.getVisitingCard());
         }

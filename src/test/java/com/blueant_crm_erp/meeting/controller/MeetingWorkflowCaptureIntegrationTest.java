@@ -52,6 +52,9 @@ public class MeetingWorkflowCaptureIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.blueant_crm_erp.meeting.repository.MeetingUpdateRepository meetingUpdateRepository;
+
     private static long phoneSuffix = 9811000001L;
 
     private Lead createTestLead(String clientName) {
@@ -79,7 +82,6 @@ public class MeetingWorkflowCaptureIntegrationTest {
         payload.put("longitude", 77.3910);
         payload.put("accuracy", 12.5);
         payload.put("visitingCard", "/api/v1/documents/101/download");
-        payload.put("meetingPhoto", "/api/v1/documents/102/download");
 
         mockMvc.perform(post("/v1/meetings/NEW_" + lead.getUniqueLeadId() + "/workflow-update")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -98,7 +100,18 @@ public class MeetingWorkflowCaptureIntegrationTest {
         assertNotNull(meeting.getGoogleMapsUrl());
         assertTrue(meeting.getGoogleMapsUrl().contains("28.5355"));
         assertEquals("/api/v1/documents/101/download", meeting.getVisitingCard());
-        assertEquals("/api/v1/documents/102/download", meeting.getMeetingPhoto());
+
+        // Verify audit history record in MeetingUpdate
+        var updates = meetingUpdateRepository.findByMeetingIdOrderByUpdateNumberAsc(meeting.getId());
+        assertFalse(updates.isEmpty());
+        var latestUpdate = updates.get(updates.size() - 1);
+        assertNotNull(latestUpdate.getLatitude());
+        assertEquals(0, latestUpdate.getLatitude().compareTo(BigDecimal.valueOf(28.5355)));
+        assertNotNull(latestUpdate.getLongitude());
+        assertEquals(0, latestUpdate.getLongitude().compareTo(BigDecimal.valueOf(77.3910)));
+        assertEquals(12.5, latestUpdate.getLocationAccuracy());
+        assertNotNull(latestUpdate.getLocationCapturedAt());
+        assertNotNull(latestUpdate.getGoogleMapsUrl());
     }
 
     @Test
@@ -182,5 +195,17 @@ public class MeetingWorkflowCaptureIntegrationTest {
 
         mockMvc.perform(multipart("/v1/documents").file(executableFile))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testValidImageUploadSucceeds() throws Exception {
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file", "visiting_card.jpg", "image/jpeg", "fake-jpeg-bytes".getBytes()
+        );
+
+        mockMvc.perform(multipart("/v1/documents").file(imageFile))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.fileName").value("visiting_card.jpg"));
     }
 }

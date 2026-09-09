@@ -20,6 +20,17 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>,
     Optional<Meeting> findByMeetingCode(String meetingCode);
 
     /**
+     * Find by Meeting Code ignoring case
+     */
+    Optional<Meeting> findByMeetingCodeIgnoreCase(String meetingCode);
+
+    /**
+     * Find by Meeting Code with TRIM and Case-Insensitive matching
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT m FROM Meeting m WHERE TRIM(m.meetingCode) = TRIM(:meetingCode) OR UPPER(TRIM(m.meetingCode)) = UPPER(TRIM(:meetingCode))")
+    Optional<Meeting> findByMeetingCodeNormalized(@org.springframework.data.repository.query.Param("meetingCode") String meetingCode);
+
+    /**
      * Check Meeting Code Exists
      */
     boolean existsByMeetingCode(String meetingCode);

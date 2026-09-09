@@ -355,3 +355,18 @@ brevo:
   from-email: ${BREVO_FROM_EMAIL}
   from-name: ${BREVO_FROM_NAME:BlueAnt CRM ERP}
   api-url: ${BREVO_API_URL:https://api.brevo.com/v3}
+
+
+# ==============================================================================
+# Bootstrap Configuration
+# ==============================================================================
+
+bootstrap:
+  enabled: ${BOOTSTRAP_ENABLED:true}
+  secret: ${BOOTSTRAP_SECRET:c489c44569504ba4e0ef007b824a737f597395015e5b61e2b4f535be48f98a2b}
+
+blueant:
+  bootstrap:
+    enabled: ${BOOTSTRAP_ENABLED:true}
+    secret: ${BOOTSTRAP_SECRET:c489c44569504ba4e0ef007b824a737f597395015e5b61e2b4f535be48f98a2b}
+

@@ -36,8 +36,7 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
     public MeetingResponse verifyMeeting(String meetingCode, MeetingVerificationRequest request, String currentUserEmail) {
         log.info("Verifying meeting: {} by Sales Coordinator: {}", meetingCode, currentUserEmail);
         
-        Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Meeting not found with code: " + meetingCode));
+        Meeting meeting = findMeetingByCode(meetingCode);
 
         // Validate coordinator has permission
         boolean hasPermission = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
@@ -128,6 +127,58 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         }
         verification.setPreviousInvestment(request.getPreviousInvestment());
 
+        // --- Populate Complete Verified Meeting Snapshot ---
+        // 1. Meeting Identity
+        verification.setMeetingCode(meeting.getMeetingCode());
+        verification.setMeetingNumber(meeting.getMeetingNumber());
+        verification.setMeetingType(meeting.getMeetingType());
+        verification.setMeetingTitle(meeting.getMeetingTitle());
+
+        // 2. Lead / Client Snapshot
+        com.blueant_crm_erp.lead.entity.Lead lead = meeting.getLead();
+        if (lead != null) {
+            verification.setLeadId(lead.getId());
+            verification.setLeadCode(lead.getLeadCode());
+            verification.setClientName(lead.getClientName());
+            verification.setMobileNumber(lead.getMobileNumber());
+        }
+
+        // 3. Sales Person Snapshot
+        com.blueant_crm_erp.user.entity.User assignedEmployee = meeting.getAssignedEmployee();
+        if (assignedEmployee == null && lead != null) {
+            assignedEmployee = lead.getAssignedSalesPerson();
+        }
+        if (assignedEmployee != null) {
+            verification.setAssignedEmployeeId(assignedEmployee.getId());
+            verification.setEmployeeCode(assignedEmployee.getEmployeeCode());
+            verification.setEmployeeName(assignedEmployee.getFullName());
+        }
+
+        // 4. Meeting Execution Snapshot
+        verification.setMeetingDate(meeting.getMeetingDate());
+        verification.setMeetingTime(meeting.getMeetingTime());
+        verification.setMeetingMode(meeting.getMeetingMode());
+        String location = meeting.getMeetingLocation();
+        if ((location == null || location.isBlank()) && lead != null) {
+            location = lead.getLocation();
+        }
+        verification.setMeetingLocation(location);
+        verification.setMeetingStatus(meeting.getMeetingStatus());
+        verification.setStatus(meeting.getStatus());
+        verification.setMeetingRemarks(meeting.getMeetingRemarks());
+        verification.setNextMeetingDate(meeting.getNextMeetingDate());
+        verification.setNextMeetingTime(meeting.getNextMeetingTime());
+        verification.setMeetingConducted(meeting.getMeetingConducted());
+        verification.setLeadStatus(meeting.getLeadStatus());
+
+        // 5. Captured Meeting GPS & Visiting Card Data
+        verification.setLatitude(meeting.getLatitude());
+        verification.setLongitude(meeting.getLongitude());
+        verification.setLocationAccuracy(meeting.getLocationAccuracy());
+        verification.setLocationCapturedAt(meeting.getLocationCapturedAt());
+        verification.setGoogleMapsUrl(meeting.getGoogleMapsUrl());
+        verification.setVisitingCard(meeting.getVisitingCard());
+
         meetingVerificationRepository.save(verification);
 
         // Keep existing meeting entity fields in sync
@@ -142,11 +193,20 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public com.blueant_crm_erp.meeting.dto.response.MeetingVerificationResponse getVerification(String meetingCode) {
+        log.info("Fetching verification record for meeting code: {}", meetingCode);
+        Meeting meeting = findMeetingByCode(meetingCode);
+        MeetingVerification verification = meetingVerificationRepository.findByMeetingId(meeting.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("No verification record found for meeting: " + meetingCode));
+        return meetingMapper.toVerificationResponse(verification);
+    }
+
+    @Override
     public MeetingResponse rejectMeeting(String meetingCode, String reason, String currentUserEmail) {
         log.info("Rejecting meeting verification: {} by Sales Coordinator: {}", meetingCode, currentUserEmail);
         
-        Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Meeting not found with code: " + meetingCode));
+        Meeting meeting = findMeetingByCode(meetingCode);
 
         // Validate coordinator has permission
         boolean hasPermission = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
@@ -208,6 +268,7 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         }
     }
 
+    @SuppressWarnings("unchecked")
     private <E extends Enum<E>> E parseEnum(Class<E> enumClass, String value, String fieldName) {
         if (value == null) {
             return null;
@@ -215,6 +276,9 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         String trimmed = value.trim();
         if (trimmed.isEmpty()) {
             return null;
+        }
+        if (enumClass == AgeGroup.class && "AGE_35_45".equalsIgnoreCase(trimmed)) {
+            return (E) AgeGroup.AGE_36_45;
         }
         try {
             return Enum.valueOf(enumClass, trimmed.toUpperCase());
@@ -235,5 +299,16 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
             throw new IllegalArgumentException(fieldName + " cannot exceed " + maxLength + " characters.");
         }
         return trimmed;
+    }
+
+    private Meeting findMeetingByCode(String meetingCode) {
+        if (meetingCode == null || meetingCode.isBlank()) {
+            throw new ResourceNotFoundException("Meeting code is required.");
+        }
+        String normalizedCode = meetingCode.trim();
+        return meetingRepository.findByMeetingCode(normalizedCode)
+                .or(() -> meetingRepository.findByMeetingCodeIgnoreCase(normalizedCode))
+                .or(() -> meetingRepository.findByMeetingCodeNormalized(normalizedCode))
+                .orElseThrow(() -> new ResourceNotFoundException("Meeting not found with code: " + meetingCode));
     }
 }

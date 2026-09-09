@@ -24,7 +24,7 @@ public class ProcessCoordinatorController {
             @PathVariable String meetingCode,
             @Valid @RequestBody MeetingVerificationRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return ResponseEntity.ok(processCoordinatorService.verifyMeeting(meetingCode, request, auth.getName()));
+        return ResponseEntity.ok(processCoordinatorService.verifyMeeting(meetingCode != null ? meetingCode.trim() : null, request, auth.getName()));
     }
 
     @PostMapping("/{meetingCode}/reject")
@@ -33,6 +33,13 @@ public class ProcessCoordinatorController {
             @PathVariable String meetingCode,
             @RequestParam String reason) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return ResponseEntity.ok(processCoordinatorService.rejectMeeting(meetingCode, reason, auth.getName()));
+        return ResponseEntity.ok(processCoordinatorService.rejectMeeting(meetingCode != null ? meetingCode.trim() : null, reason, auth.getName()));
+    }
+
+    @GetMapping("/{meetingCode}")
+    @PreAuthorize("hasAnyAuthority('MEETING_READ', 'MEETING_VERIFY') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'SALES_COORDINATOR')")
+    public ResponseEntity<com.blueant_crm_erp.meeting.dto.response.MeetingVerificationResponse> getVerification(
+            @PathVariable String meetingCode) {
+        return ResponseEntity.ok(processCoordinatorService.getVerification(meetingCode != null ? meetingCode.trim() : null));
     }
 }

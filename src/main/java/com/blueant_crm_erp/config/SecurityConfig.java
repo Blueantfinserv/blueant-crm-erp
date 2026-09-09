@@ -79,6 +79,9 @@ public class SecurityConfig {
                                 // Authentication
                                 "/auth/**",
 
+                                // Bootstrap (Dual auth: Super Admin JWT or Secret with empty users table)
+                                "/bootstrap/**",
+
                                 // Swagger
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",

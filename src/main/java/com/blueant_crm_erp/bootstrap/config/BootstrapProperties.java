@@ -31,6 +31,4 @@ public class BootstrapProperties {
     
     private boolean continueOnFailure = false;
     
-    private String secret;
-    
 }

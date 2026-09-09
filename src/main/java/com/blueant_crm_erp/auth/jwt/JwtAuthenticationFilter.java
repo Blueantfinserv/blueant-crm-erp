@@ -59,20 +59,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Health
             "/actuator/health",
-            "/actuator/info",
-
-            // Bootstrap
-            "/api/bootstrap",
-            "/bootstrap"
+            "/actuator/info"
     );
 
     @Override
     protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
-
-        // If Authorization header is provided, do not bypass so SecurityContext can be established
-        if (request.getHeader("Authorization") != null) {
-            return false;
-        }
 
         String path = request.getRequestURI();
 

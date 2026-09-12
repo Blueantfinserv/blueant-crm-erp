@@ -42,6 +42,8 @@ public interface MeetingMapper {
     @Mapping(target = "meetingLocation", expression = "java(getMeetingLocation(meeting))")
     @Mapping(source = "meetingRemarks", target = "remarks")
     @Mapping(source = "verification.verificationStatus", target = "verificationStatus")
+    @Mapping(source = "verification.verifiedBy", target = "verifiedBy")
+    @Mapping(source = "verification.verifiedAt", target = "verifiedAt")
     @Mapping(source = "verification.meetingTiming", target = "meetingTiming")
     @Mapping(source = "verification.ageGroup", target = "ageGroup")
     @Mapping(source = "verification.existingSip", target = "existingSip")

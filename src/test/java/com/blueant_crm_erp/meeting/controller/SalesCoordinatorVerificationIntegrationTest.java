@@ -215,7 +215,9 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meetingCode").value(meetingResponse.getMeetingCode()))
-                .andExpect(jsonPath("$.verificationStatus").value("VERIFIED"));
+                .andExpect(jsonPath("$.verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.verifiedBy").value("coordinator@blueant.com"))
+                .andExpect(jsonPath("$.verifiedAt").isNotEmpty());
 
         // Verify database states
         MeetingVerification verifiedVal = meetingVerificationRepository.findByMeetingMeetingCode(meetingResponse.getMeetingCode())
@@ -1140,6 +1142,9 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(allFieldsRequest)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.verifiedBy").value("coordinator@blueant.com"))
+                .andExpect(jsonPath("$.verifiedAt").isNotEmpty())
                 .andExpect(jsonPath("$.meetingTiming").value("11:45:00"))
                 .andExpect(jsonPath("$.ageGroup").value("AGE_25_35"))
                 .andExpect(jsonPath("$.existingSip").value("YES"))
@@ -1248,5 +1253,90 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meetingWith").value("SELF"))
                 .andExpect(jsonPath("$.personName").value((Object) null));
+    }
+
+    @Test
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    public void testVerificationAuditFieldsVerifiedAndPendingLifecycle() throws Exception {
+        CreateLeadRequest leadRequest = new CreateLeadRequest();
+        leadRequest.setClientName("Verification Audit Client");
+        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
+        LeadResponse leadResponse = leadService.createLead(leadRequest, "EMP000001");
+
+        CreateMeetingRequest meetingRequest = CreateMeetingRequest.builder()
+                .leadId(java.util.UUID.fromString(leadResponse.getUniqueLeadId()))
+                .meetingMode(com.blueant_crm_erp.meeting.enums.MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now().plusDays(1))
+                .meetingTime(LocalTime.of(10, 0))
+                .meetingLocation("Delhi Office")
+                .meetingRemarks("Verification audit fields test")
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .build();
+        MeetingResponse createdMeeting = meetingService.createMeeting(meetingRequest, "EMP000001");
+
+        // 2. Complete meeting workflow (makes meeting COMPLETED and sets verificationStatus to PENDING)
+        MeetingWorkflowRequest workflowRequest = MeetingWorkflowRequest.builder()
+                .aloneWith("SELF")
+                .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
+                .remarks("Conducted successfully")
+                .build();
+        meetingService.processMeetingUpdateWorkflow(createdMeeting.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+
+        // 3. Meeting is now PENDING verification:
+        // Verify that in MeetingResponse, verificationStatus is PENDING and verifiedBy / verifiedAt are null
+        mockMvc.perform(get("/v1/meetings?verificationStatus=PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + createdMeeting.getMeetingCode() + "')].verificationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + createdMeeting.getMeetingCode() + "')].verifiedBy").value((Object) null))
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + createdMeeting.getMeetingCode() + "')].verifiedAt").value((Object) null));
+
+        // 4. Verify the meeting with the exact questionnaire fields
+        MeetingVerificationRequest verifyRequest = MeetingVerificationRequest.builder()
+                .meetingTiming(LocalTime.of(17, 50))
+                .ageGroup("AGE_46_55")
+                .existingSip("YES")
+                .profession("BUSINESS_OWNER")
+                .professionDetail("Premier PEST CONTORL")
+                .bestTimeForMeeting("AFTERNOON")
+                .meetingWith("SELF")
+                .remarks("Verified successfully")
+                .build();
+
+        String responseJson = mockMvc.perform(post("/v1/meetings/verification/" + createdMeeting.getMeetingCode() + "/verify")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(verifyRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.verifiedBy").value("coordinator@blueant.com"))
+                .andExpect(jsonPath("$.verifiedAt").isNotEmpty())
+                .andExpect(jsonPath("$.meetingTiming").value("17:50:00"))
+                .andExpect(jsonPath("$.ageGroup").value("AGE_46_55"))
+                .andExpect(jsonPath("$.existingSip").value("YES"))
+                .andExpect(jsonPath("$.profession").value("BUSINESS_OWNER"))
+                .andExpect(jsonPath("$.professionDetail").value("Premier PEST CONTORL"))
+                .andExpect(jsonPath("$.bestTimeForMeeting").value("AFTERNOON"))
+                .andExpect(jsonPath("$.meetingWith").value("SELF"))
+                .andReturn().getResponse().getContentAsString();
+
+        // 5. Verify source of truth matches meeting_verifications entity
+        MeetingVerification dbVerification = meetingVerificationRepository.findByMeetingMeetingCode(createdMeeting.getMeetingCode())
+                .orElseThrow();
+        assertThat(dbVerification.getVerifiedBy()).isEqualTo("coordinator@blueant.com");
+        assertThat(dbVerification.getVerifiedAt()).isNotNull();
+
+        String expectedVerifiedAtFormatted = dbVerification.getVerifiedAt()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        MeetingResponse verifiedResponse = objectMapper.readValue(responseJson, MeetingResponse.class);
+        assertThat(verifiedResponse.getVerifiedBy()).isEqualTo(dbVerification.getVerifiedBy());
+        assertThat(verifiedResponse.getVerifiedAt().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+                .isEqualTo(expectedVerifiedAtFormatted);
+
+        // 6. Verify GET list API also reflects populated verifiedBy and verifiedAt for the VERIFIED meeting
+        mockMvc.perform(get("/v1/meetings?verificationStatus=VERIFIED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + createdMeeting.getMeetingCode() + "')].verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + createdMeeting.getMeetingCode() + "')].verifiedBy").value("coordinator@blueant.com"))
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + createdMeeting.getMeetingCode() + "')].verifiedAt").value(expectedVerifiedAtFormatted));
     }
 }

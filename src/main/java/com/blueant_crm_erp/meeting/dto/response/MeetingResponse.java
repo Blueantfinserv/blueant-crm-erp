@@ -5,6 +5,7 @@ import com.blueant_crm_erp.meeting.enums.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -88,6 +89,8 @@ public class MeetingResponse {
     private String googleMapsUrl;
 
     private com.blueant_crm_erp.servicerequest.enums.VerificationStatus verificationStatus;
+    private String verifiedBy;
+    private LocalDateTime verifiedAt;
 
     // New questionnaire fields
     private LocalTime meetingTiming;

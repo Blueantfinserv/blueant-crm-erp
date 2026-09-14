@@ -72,6 +72,7 @@ public class LeadResponse {
     private String assignedByEmployeeCode;
     private String assignedByEmployeeName;
     private LocalDateTime assignedAt;
+    private LocalDate assignmentDate;
     private String assignmentSource;
     private Boolean assignedByCoordinator;
     private String assignmentLabel;

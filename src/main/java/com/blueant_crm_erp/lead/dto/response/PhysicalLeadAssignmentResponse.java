@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -42,6 +43,7 @@ public class PhysicalLeadAssignmentResponse {
     private String assignedByEmployeeCode;
     private String assignedByEmployeeName;
     private LocalDateTime assignedAt;
+    private LocalDate assignmentDate;
     private String assignmentSource;
     private Boolean assignedByCoordinator;
     private String assignmentLabel;

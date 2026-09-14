@@ -31,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1021,5 +1022,182 @@ public class PhysicalLeadAssignmentIntegrationTest {
                 .andExpect(jsonPath("$.data.content[?(@.clientName == 'Target Date Lead')]").exists())
                 .andExpect(jsonPath("$.data.content[?(@.clientName == 'Yesterday Lead')]").doesNotExist())
                 .andExpect(jsonPath("$.data.content[?(@.clientName == 'Tomorrow Lead')]").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void salesCoordinatorCanCreatePhysicalLeadWithOptionalAssignmentDate() throws Exception {
+        String mobile = "919" + String.format("%07d", (int)(Math.random() * 10000000));
+        LocalDate plannedDate = LocalDate.of(2026, 9, 20);
+
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("Dr. Deepika maam")
+                .mobileNumber(mobile)
+                .speciality("Cardiologist")
+                .location("green city hospital delta 1")
+                .clinicAddress("greater noida")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .assignmentDate(plannedDate)
+                .build();
+
+        String responseJson = mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.clientName").value("Dr. Deepika maam"))
+                .andExpect(jsonPath("$.data.speciality").value("Cardiologist"))
+                .andExpect(jsonPath("$.data.isPhysicalLead").value(true))
+                .andExpect(jsonPath("$.data.assignedEmployeeCode").value(activeSalesPerson1.getEmployeeCode()))
+                .andExpect(jsonPath("$.data.assignmentDate").value("2026-09-20"))
+                .andReturn().getResponse().getContentAsString();
+
+        String leadCode = objectMapper.readTree(responseJson).get("data").get("leadCode").asText();
+        String uniqueLeadId = objectMapper.readTree(responseJson).get("data").get("uniqueLeadId").asText();
+
+        // Verify database persistence
+        Lead persistedLead = leadRepository.findByLeadCode(leadCode).orElseThrow();
+        assertThat(persistedLead.getAssignmentDate()).isEqualTo(plannedDate);
+        assertThat(persistedLead.getAssignedSalesPerson().getId()).isEqualTo(activeSalesPerson1.getId());
+
+        // Verify GET /v1/leads/{uniqueLeadId} exposes assignmentDate
+        LeadDetailResponse leadDetail = leadService.getLeadDetails(uniqueLeadId);
+        assertThat(leadDetail.getAssignmentDate()).isEqualTo(plannedDate);
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void salesCoordinatorCanCreatePhysicalLeadWithoutAssignmentDateBackwardCompatible() throws Exception {
+        String mobile = "918" + String.format("%07d", (int)(Math.random() * 10000000));
+
+        // Exact request format from production without assignmentDate
+        String requestBody = String.format("""
+                {
+                  "clientName": "Dr. Deepika maam",
+                  "mobileNumber": "%s",
+                  "speciality": "Cardiologist",
+                  "location": "green city hospital delta 1",
+                  "clinicAddress": "greater noida",
+                  "salesPersonEmployeeCode": "%s"
+                }
+                """, mobile, activeSalesPerson1.getEmployeeCode());
+
+        String responseJson = mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.clientName").value("Dr. Deepika maam"))
+                .andExpect(jsonPath("$.data.assignmentDate").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+
+        String leadCode = objectMapper.readTree(responseJson).get("data").get("leadCode").asText();
+        String uniqueLeadId = objectMapper.readTree(responseJson).get("data").get("uniqueLeadId").asText();
+
+        Lead persistedLead = leadRepository.findByLeadCode(leadCode).orElseThrow();
+        assertThat(persistedLead.getAssignmentDate()).isNull();
+
+        LeadDetailResponse leadDetail = leadService.getLeadDetails(uniqueLeadId);
+        assertThat(leadDetail.getAssignmentDate()).isNull();
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void createPhysicalLeadWithMalformedAssignmentDateReturnsBadRequest() throws Exception {
+        String mobile = "917" + String.format("%07d", (int)(Math.random() * 10000000));
+
+        // Malformed date format yyyy/MM/dd instead of yyyy-MM-dd
+        String requestBodySlash = String.format("""
+                {
+                  "clientName": "Dr. Deepika maam",
+                  "mobileNumber": "%s",
+                  "speciality": "Cardiologist",
+                  "location": "green city hospital delta 1",
+                  "clinicAddress": "greater noida",
+                  "salesPersonEmployeeCode": "%s",
+                  "assignmentDate": "2026/09/20"
+                }
+                """, mobile, activeSalesPerson1.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBodySlash))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+        // Invalid calendar date 2026-13-45
+        String requestBodyInvalidDate = String.format("""
+                {
+                  "clientName": "Dr. Deepika maam",
+                  "mobileNumber": "%s",
+                  "speciality": "Cardiologist",
+                  "location": "green city hospital delta 1",
+                  "clinicAddress": "greater noida",
+                  "salesPersonEmployeeCode": "%s",
+                  "assignmentDate": "2026-13-45"
+                }
+                """, mobile, activeSalesPerson1.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBodyInvalidDate))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+
+        // Arbitrary string
+        String requestBodyInvalidString = String.format("""
+                {
+                  "clientName": "Dr. Deepika maam",
+                  "mobileNumber": "%s",
+                  "speciality": "Cardiologist",
+                  "location": "green city hospital delta 1",
+                  "clinicAddress": "greater noida",
+                  "salesPersonEmployeeCode": "%s",
+                  "assignmentDate": "not-a-valid-date"
+                }
+                """, mobile, activeSalesPerson1.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBodyInvalidString))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void assignExistingPhysicalLeadWithOptionalAssignmentDate() throws Exception {
+        // First create an unassigned physical lead
+        Lead unassignedLead = Lead.builder()
+                .leadCode("LD_TEST_UNASSIGNED")
+                .uniqueLeadId("UNASSIGNED_" + UUID.randomUUID())
+                .clientName("Unassigned Client")
+                .mobileNumber("916" + String.format("%07d", (int)(Math.random() * 10000000)))
+                .isPhysicalLead(true)
+                .leadSource(com.blueant_crm_erp.lead.enums.LeadSource.FIELD_VISIT)
+                .leadType(com.blueant_crm_erp.lead.enums.LeadType.MUTUAL_FUND)
+                .priority(com.blueant_crm_erp.lead.enums.LeadPriority.MEDIUM)
+                .duplicateLeadStatus(com.blueant_crm_erp.lead.enums.DuplicateLeadStatus.ORIGINAL)
+                .leadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.NEW)
+                .leadStage(com.blueant_crm_erp.lead.enums.LeadStage.LEAD_CREATED)
+                .build();
+        leadRepository.save(unassignedLead);
+
+        AssignPhysicalLeadRequest assignReq = AssignPhysicalLeadRequest.builder()
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .assignmentReason("Testing optional assignment date on existing lead")
+                .assignmentDate(LocalDate.of(2026, 9, 25))
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign/" + unassignedLead.getLeadCode() + "/assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.assignmentDate").value("2026-09-25"))
+                .andExpect(jsonPath("$.data.assignedEmployeeCode").value(activeSalesPerson1.getEmployeeCode()));
+
+        Lead reloaded = leadRepository.findByLeadCode(unassignedLead.getLeadCode()).orElseThrow();
+        assertThat(reloaded.getAssignmentDate()).isEqualTo(LocalDate.of(2026, 9, 25));
     }
 }

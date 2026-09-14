@@ -9,6 +9,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 /**
  * ============================================================================
  * Create Physical Lead Request
@@ -61,4 +63,10 @@ public class CreatePhysicalLeadRequest {
      */
     @NotBlank(message = "Sales Person employee code is required.")
     private String salesPersonEmployeeCode;
+
+    /**
+     * Planned assignment date for the lead (Optional).
+     * Format: yyyy-MM-dd
+     */
+    private LocalDate assignmentDate;
 }

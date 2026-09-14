@@ -78,6 +78,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 .assignedSalesPerson(assignedSalesPerson)
                 .assignedBy(coordinator)
                 .assignedAt(now)
+                .assignmentDate(request.getAssignmentDate())
                 .assignmentSource("SALES_COORDINATOR")
                 .build();
 
@@ -110,6 +111,9 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
         lead.setIsPhysicalLead(true);
         lead.setLeadStatus(LeadStatus.ASSIGNED);
         lead.setLeadStage(LeadStage.LEAD_ASSIGNED);
+        if (request.getAssignmentDate() != null) {
+            lead.setAssignmentDate(request.getAssignmentDate());
+        }
 
         if (StringUtils.hasText(request.getAssignmentReason())) {
             String updatedRemarks = (lead.getRemarks() != null ? lead.getRemarks() + " | " : "") 
@@ -191,6 +195,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 .assignedByEmployeeCode(coordinator != null ? coordinator.getEmployeeCode() : null)
                 .assignedByEmployeeName(coordinator != null ? coordinator.getFullName() : null)
                 .assignedAt(lead.getAssignedAt())
+                .assignmentDate(lead.getAssignmentDate())
                 .assignmentSource(lead.getAssignmentSource())
                 .assignedByCoordinator(Boolean.TRUE.equals(lead.getIsPhysicalLead()) || "SALES_COORDINATOR".equalsIgnoreCase(lead.getAssignmentSource()) || coordinator != null)
                 .assignmentLabel("Assigned by Sales Coordinator")

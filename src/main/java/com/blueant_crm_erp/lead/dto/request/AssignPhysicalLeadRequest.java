@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 /**
  * ============================================================================
  * Assign Physical Lead Request
@@ -32,4 +34,9 @@ public class AssignPhysicalLeadRequest {
      * Optional assignment remarks/reason.
      */
     private String assignmentReason;
+
+    /**
+     * Optional assignment date.
+     */
+    private LocalDate assignmentDate;
 }

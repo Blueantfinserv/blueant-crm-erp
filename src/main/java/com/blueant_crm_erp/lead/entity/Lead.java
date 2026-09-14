@@ -9,6 +9,7 @@ import lombok.experimental.SuperBuilder;
 
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -152,6 +153,9 @@ public class Lead extends BaseVersionEntity {
 
     @Column(name = "assigned_at")
     private LocalDateTime assignedAt;
+
+    @Column(name = "assignment_date")
+    private LocalDate assignmentDate;
 
     @Column(name = "assignment_source", length = 50)
     private String assignmentSource;

@@ -63,6 +63,7 @@ public class MeetingServiceImpl implements MeetingService {
     private final @Lazy LeadService leadService;
     private final @Lazy MeetingWorkflowService meetingWorkflowService;
     private final MeetingVerificationRepository meetingVerificationRepository;
+    private final com.blueant_crm_erp.meeting.service.MeetingCodeGeneratorService meetingCodeGeneratorService;
 
     @Override
     public MeetingResponse createMeeting(CreateMeetingRequest request, String currentUserEmail) {
@@ -82,8 +83,7 @@ public class MeetingServiceImpl implements MeetingService {
 
         Meeting meeting = meetingMapper.toEntity(request);
         
-        long count = meetingRepository.count() + 1;
-        meeting.setMeetingCode(MeetingCodeGenerator.generate(count));
+        meeting.setMeetingCode(meetingCodeGeneratorService.generateNextMeetingCode());
         
         Optional<Meeting> lastMeeting = meetingRepository.findTopByLeadIdOrderByMeetingNumberDesc(lead.getId());
         int nextMeetingNumber = lastMeeting.map(m -> m.getMeetingNumber() + 1).orElse(MeetingConstants.FIRST_MEETING_NUMBER);
@@ -139,8 +139,7 @@ public class MeetingServiceImpl implements MeetingService {
         log.info("Creating initial meeting for lead ID: {}", lead.getId());
         
         Meeting meeting = new Meeting();
-        long count = meetingRepository.count() + 1;
-        meeting.setMeetingCode(MeetingCodeGenerator.generate(count));
+        meeting.setMeetingCode(meetingCodeGeneratorService.generateNextMeetingCode());
         meeting.setMeetingNumber(1); // Meeting Sequence = 1
         meeting.setMeetingType(com.blueant_crm_erp.meeting.enums.MeetingType.INTRO);
         meeting.setMeetingTitle("Intro Meeting"); // Title as per requirement

@@ -158,6 +158,14 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
                          nextMeeting.getMeetingNumber(), nextMeeting.getMeetingCode());
 
                 return meetingMapper.toResponse(nextMeeting);
+            } else if (nextSequenceExists) {
+                java.util.Optional<Meeting> existingFollowUp = meetingRepository.findByLeadIdAndMeetingNumber(
+                        meeting.getLead().getId(), nextSequence);
+                if (existingFollowUp.isPresent()) {
+                    log.info("[WorkflowOrchestrator] Sequential follow-up meeting #{} already exists for lead {}. Returning existing: {}",
+                             nextSequence, meeting.getLead().getLeadCode(), existingFollowUp.get().getMeetingCode());
+                    return meetingMapper.toResponse(existingFollowUp.get());
+                }
             }
         }
 

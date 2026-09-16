@@ -43,6 +43,7 @@ public class MeetingScheduleServiceImpl implements MeetingScheduleService {
     private final MeetingMapper meetingMapper;
     private final MeetingScheduleValidator meetingScheduleValidator;
     private final @Lazy LeadService leadService;
+    private final com.blueant_crm_erp.meeting.service.MeetingCodeGeneratorService meetingCodeGeneratorService;
 
     @Override
     public MeetingResponse scheduleMeeting(CreateMeetingRequest request, String currentUserEmail) {
@@ -54,8 +55,7 @@ public class MeetingScheduleServiceImpl implements MeetingScheduleService {
 
         Meeting meeting = meetingMapper.toEntity(request);
         
-        long count = meetingRepository.count() + 1;
-        meeting.setMeetingCode(MeetingCodeGenerator.generate(count));
+        meeting.setMeetingCode(meetingCodeGeneratorService.generateNextMeetingCode());
         
         Optional<Meeting> lastMeeting = meetingRepository.findTopByLeadIdOrderByMeetingNumberDesc(lead.getId());
         int nextMeetingNumber = lastMeeting.map(m -> m.getMeetingNumber() + 1).orElse(MeetingConstants.FIRST_MEETING_NUMBER);

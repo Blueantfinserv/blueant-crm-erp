@@ -78,6 +78,17 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>,
                                            Integer meetingNumber);
 
     /**
+     * Find meeting of a Lead by meeting sequence number
+     */
+    Optional<Meeting> findByLeadIdAndMeetingNumber(Long leadId, Integer meetingNumber);
+
+    /**
+     * Find maximum numeric sequence from existing meeting codes
+     */
+    @org.springframework.data.jpa.repository.Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(m.meeting_code, 13) AS UNSIGNED)), 0) FROM meetings m WHERE m.meeting_code LIKE 'BA-MTG-%' AND LENGTH(m.meeting_code) >= 18", nativeQuery = true)
+    Long findMaxMeetingCodeSequence();
+
+    /**
      * Check if Lead has an active meeting by status
      */
     boolean existsByLeadIdAndMeetingStatus(Long leadId, MeetingStatus meetingStatus);

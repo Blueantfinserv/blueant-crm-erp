@@ -35,6 +35,7 @@ import java.time.LocalTime;
 public class FollowUpServiceImpl implements FollowUpService {
 
     private final MeetingRepository meetingRepository;
+    private final com.blueant_crm_erp.meeting.service.MeetingCodeGeneratorService meetingCodeGeneratorService;
 
     @Override
     public Meeting createFollowUp(Meeting currentMeeting, LocalDate nextMeetingDate, LocalTime nextMeetingTime, String remarks, String triggeredBy) {
@@ -56,9 +57,8 @@ public class FollowUpServiceImpl implements FollowUpService {
 
         Meeting nextMeeting = new Meeting();
 
-        // Generate unique meeting code
-        long count = meetingRepository.count() + 1;
-        nextMeeting.setMeetingCode(MeetingCodeGenerator.generate(count));
+        // Generate concurrency-safe unique meeting code
+        nextMeeting.setMeetingCode(meetingCodeGeneratorService.generateNextMeetingCode());
 
         // Sequential meeting number — never skip
         nextMeeting.setMeetingNumber(nextMeetingNumber);

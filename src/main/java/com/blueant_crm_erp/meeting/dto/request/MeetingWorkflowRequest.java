@@ -26,6 +26,7 @@ import java.time.LocalTime;
 public class MeetingWorkflowRequest {
 
     @Schema(description = "Optional override for meeting date", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @com.fasterxml.jackson.annotation.JsonAlias({"date", "meeting_date", "actualMeetingDate"})
     private LocalDate meetingDate;
 
     @Schema(description = "Optional override for meeting time", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
@@ -78,6 +79,7 @@ public class MeetingWorkflowRequest {
     private String leaderName;
 
     @Schema(description = "Next plan / follow-up date", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @com.fasterxml.jackson.annotation.JsonAlias({"nextMeetingDate", "next_meeting_date"})
     private LocalDate nextPlanDate;
 
     @Size(max = 20, message = "PAN number cannot exceed 20 characters.")

@@ -2,6 +2,7 @@ package com.blueant_crm_erp.meeting.dto.request;
 
 import jakarta.validation.constraints.*;
 import lombok.*;
+import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Getter
@@ -40,6 +41,9 @@ public class MeetingVerificationRequest {
     private Integer numberOfChildren;
 
     private Boolean previousInvestment;
+
+    @com.fasterxml.jackson.annotation.JsonAlias({"date", "meeting_date", "actualMeetingDate"})
+    private LocalDate meetingDate;
 
     @NotNull(message = "Meeting timing is required.")
     private LocalTime meetingTiming;

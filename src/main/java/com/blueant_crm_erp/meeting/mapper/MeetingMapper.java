@@ -85,6 +85,88 @@ public interface MeetingMapper {
     @Mapping(source = "aloneWith", target = "meetingWith", qualifiedByName = "mapAloneWithToMeetingWith")
     MeetingVerificationResponse toVerificationResponse(MeetingVerification entity);
 
+    @AfterMapping
+    default void enrichPendingVerificationResponse(MeetingVerification entity, @MappingTarget MeetingVerificationResponse response) {
+        if (entity != null && entity.getMeeting() != null) {
+            Meeting m = entity.getMeeting();
+            if (response.getMeetingDate() == null) {
+                response.setMeetingDate(m.getMeetingDate());
+            }
+            if (response.getMeetingTime() == null) {
+                response.setMeetingTime(m.getMeetingTime());
+            }
+            if (response.getNextMeetingDate() == null) {
+                response.setNextMeetingDate(m.getNextMeetingDate());
+            }
+            if (response.getNextMeetingTime() == null) {
+                response.setNextMeetingTime(m.getNextMeetingTime());
+            }
+            if (response.getMeetingCode() == null) {
+                response.setMeetingCode(m.getMeetingCode());
+            }
+            if (response.getMeetingNumber() == null) {
+                response.setMeetingNumber(m.getMeetingNumber());
+            }
+            if (response.getMeetingType() == null) {
+                response.setMeetingType(m.getMeetingType());
+            }
+            if (response.getMeetingTitle() == null) {
+                response.setMeetingTitle(m.getMeetingTitle());
+            }
+            if (response.getMeetingStatus() == null) {
+                response.setMeetingStatus(m.getMeetingStatus());
+            }
+            if (response.getStatus() == null) {
+                response.setStatus(m.getStatus());
+            }
+            if (response.getMeetingMode() == null) {
+                response.setMeetingMode(m.getMeetingMode());
+            }
+            if (response.getMeetingLocation() == null) {
+                response.setMeetingLocation(getMeetingLocation(m));
+            }
+            if (response.getMeetingRemarks() == null) {
+                response.setMeetingRemarks(m.getMeetingRemarks());
+            }
+            if (response.getMeetingConducted() == null) {
+                response.setMeetingConducted(m.getMeetingConducted());
+            }
+            if (response.getLeadStatus() == null) {
+                response.setLeadStatus(m.getLeadStatus());
+            }
+            if (response.getLatitude() == null) {
+                response.setLatitude(m.getLatitude());
+            }
+            if (response.getLongitude() == null) {
+                response.setLongitude(m.getLongitude());
+            }
+            if (response.getLocationAccuracy() == null) {
+                response.setLocationAccuracy(m.getLocationAccuracy());
+            }
+            if (response.getLocationCapturedAt() == null) {
+                response.setLocationCapturedAt(m.getLocationCapturedAt());
+            }
+            if (response.getGoogleMapsUrl() == null) {
+                response.setGoogleMapsUrl(m.getGoogleMapsUrl());
+            }
+            if (response.getVisitingCard() == null) {
+                response.setVisitingCard(m.getVisitingCard());
+            }
+            if (m.getLead() != null) {
+                if (response.getLeadId() == null) response.setLeadId(m.getLead().getId());
+                if (response.getLeadCode() == null) response.setLeadCode(m.getLead().getLeadCode());
+                if (response.getClientName() == null) response.setClientName(m.getLead().getClientName());
+                if (response.getMobileNumber() == null) response.setMobileNumber(m.getLead().getMobileNumber());
+            }
+            com.blueant_crm_erp.user.entity.User emp = m.getAssignedEmployee() != null ? m.getAssignedEmployee() : (m.getLead() != null ? m.getLead().getAssignedSalesPerson() : null);
+            if (emp != null) {
+                if (response.getAssignedEmployeeId() == null) response.setAssignedEmployeeId(emp.getId());
+                if (response.getEmployeeCode() == null) response.setEmployeeCode(emp.getEmployeeCode());
+                if (response.getEmployeeName() == null) response.setEmployeeName(emp.getFullName());
+            }
+        }
+    }
+
     @Named("mapAloneWithToMeetingWith")
     default String mapAloneWithToMeetingWith(String aloneWith) {
         if (aloneWith == null) {

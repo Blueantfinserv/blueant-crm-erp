@@ -155,7 +155,8 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         }
 
         // 4. Meeting Execution Snapshot
-        verification.setMeetingDate(meeting.getMeetingDate());
+        java.time.LocalDate verifiedMeetingDate = request.getMeetingDate() != null ? request.getMeetingDate() : meeting.getMeetingDate();
+        verification.setMeetingDate(verifiedMeetingDate);
         verification.setMeetingTime(meeting.getMeetingTime());
         verification.setMeetingMode(meeting.getMeetingMode());
         String location = meeting.getMeetingLocation();
@@ -182,6 +183,7 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         meetingVerificationRepository.save(verification);
 
         // Keep existing meeting entity fields in sync
+        meeting.setMeetingDate(verifiedMeetingDate);
         meeting.setVerifiedByProcessCoordinator(true);
         meeting.setMeetingVerificationDate(LocalDateTime.now());
         meeting.setVerificationRemarks(request.getRemarks());

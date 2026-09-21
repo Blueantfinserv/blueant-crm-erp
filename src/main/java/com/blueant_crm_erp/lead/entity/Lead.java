@@ -101,6 +101,10 @@ public class Lead extends BaseVersionEntity {
     private Boolean isPhysicalLead = false;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "best_time_to_meet", length = 30)
+    private BestTimeToMeet bestTimeToMeet;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "profession", length = 50)
     private Profession profession;
 

@@ -68,6 +68,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 .location(request.getLocation())
                 .clinicAddress(request.getClinicAddress())
                 .remarks(request.getRemarks())
+                .bestTimeToMeet(request.getBestTimeToMeet())
                 .isPhysicalLead(true)
                 .leadSource(LeadSource.FIELD_VISIT)
                 .leadType(LeadType.MUTUAL_FUND)
@@ -113,6 +114,9 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
         lead.setLeadStage(LeadStage.LEAD_ASSIGNED);
         if (request.getAssignmentDate() != null) {
             lead.setAssignmentDate(request.getAssignmentDate());
+        }
+        if (request.getBestTimeToMeet() != null) {
+            lead.setBestTimeToMeet(request.getBestTimeToMeet());
         }
 
         if (StringUtils.hasText(request.getAssignmentReason())) {
@@ -189,6 +193,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 .location(lead.getLocation())
                 .clinicAddress(lead.getClinicAddress())
                 .isPhysicalLead(Boolean.TRUE.equals(lead.getIsPhysicalLead()))
+                .bestTimeToMeet(lead.getBestTimeToMeet())
                 .assignedUserId(salesPerson != null ? salesPerson.getId() : null)
                 .assignedEmployeeCode(salesPerson != null ? salesPerson.getEmployeeCode() : null)
                 .assignedEmployeeName(salesPerson != null ? salesPerson.getFullName() : null)

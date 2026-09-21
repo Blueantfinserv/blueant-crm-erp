@@ -1,5 +1,6 @@
 package com.blueant_crm_erp.lead.dto.request;
 
+import com.blueant_crm_erp.lead.enums.BestTimeToMeet;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -39,4 +40,9 @@ public class AssignPhysicalLeadRequest {
      * Optional assignment date.
      */
     private LocalDate assignmentDate;
+
+    /**
+     * Optional best time to meet update.
+     */
+    private BestTimeToMeet bestTimeToMeet;
 }

@@ -2,6 +2,7 @@ package com.blueant_crm_erp.lead;
 
 import com.blueant_crm_erp.common.enums.Gender;
 import com.blueant_crm_erp.common.enums.Status;
+import com.blueant_crm_erp.lead.enums.BestTimeToMeet;
 import com.blueant_crm_erp.lead.dto.request.AssignPhysicalLeadRequest;
 import com.blueant_crm_erp.lead.dto.request.CreatePhysicalLeadRequest;
 import com.blueant_crm_erp.lead.dto.response.LeadDetailResponse;
@@ -1199,5 +1200,143 @@ public class PhysicalLeadAssignmentIntegrationTest {
 
         Lead reloaded = leadRepository.findByLeadCode(unassignedLead.getLeadCode()).orElseThrow();
         assertThat(reloaded.getAssignmentDate()).isEqualTo(LocalDate.of(2026, 9, 25));
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void createPhysicalLead_withEachOfFourValidBestTimeToMeet_persistsAndReturnsCorrectly() throws Exception {
+        BestTimeToMeet[] options = BestTimeToMeet.values();
+        for (BestTimeToMeet option : options) {
+            String mobile = "94" + String.format("%08d", (int)(Math.random() * 100000000));
+            CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                    .clientName("Doctor with Time " + option.name())
+                    .mobileNumber(mobile)
+                    .speciality("Cardiologist")
+                    .location("Sector 62, Noida")
+                    .clinicAddress("Apollo Clinic, Sector 62")
+                    .remarks("Testing Best Time To Meet: " + option.getDisplayName())
+                    .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                    .bestTimeToMeet(option)
+                    .build();
+
+            String responseJson = mockMvc.perform(post("/v1/Leads_assign")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(createReq)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.bestTimeToMeet").value(option.name()))
+                    .andExpect(jsonPath("$.data.clientName").value("Doctor with Time " + option.name()))
+                    .andReturn().getResponse().getContentAsString();
+
+            String leadCode = objectMapper.readTree(responseJson).get("data").get("leadCode").asText();
+            String uniqueLeadId = objectMapper.readTree(responseJson).get("data").get("uniqueLeadId").asText();
+
+            // Verify via LeadDetailResponse (used by Sales Person view)
+            LeadDetailResponse leadDetail = leadService.getLeadDetails(uniqueLeadId);
+            assertThat(leadDetail.getBestTimeToMeet()).isEqualTo(option);
+            assertThat(leadDetail.getIsPhysicalLead()).isTrue();
+
+            // Verify via Lead entity in DB
+            Lead entity = leadRepository.findByLeadCode(leadCode).orElseThrow();
+            assertThat(entity.getBestTimeToMeet()).isEqualTo(option);
+        }
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void createPhysicalLead_withoutBestTimeToMeet_remainsNullAndBackwardCompatible() throws Exception {
+        String mobile = "95" + String.format("%08d", (int)(Math.random() * 100000000));
+        CreatePhysicalLeadRequest createReq = CreatePhysicalLeadRequest.builder()
+                .clientName("Doctor without Time Preference")
+                .mobileNumber(mobile)
+                .speciality("Pediatrician")
+                .location("Connaught Place, Delhi")
+                .clinicAddress("Block B, CP")
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .bestTimeToMeet(null)
+                .build();
+
+        String responseJson = mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.bestTimeToMeet").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        String uniqueLeadId = objectMapper.readTree(responseJson).get("data").get("uniqueLeadId").asText();
+        String leadCode = objectMapper.readTree(responseJson).get("data").get("leadCode").asText();
+
+        LeadDetailResponse leadDetail = leadService.getLeadDetails(uniqueLeadId);
+        assertThat(leadDetail.getBestTimeToMeet()).isNull();
+
+        Lead entity = leadRepository.findByLeadCode(leadCode).orElseThrow();
+        assertThat(entity.getBestTimeToMeet()).isNull();
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void createPhysicalLead_withInvalidBestTimeToMeet_isRejectedWith400() throws Exception {
+        String mobile = "96" + String.format("%08d", (int)(Math.random() * 100000000));
+        String rawJson = """
+                {
+                    "clientName": "Doctor Invalid Time",
+                    "mobileNumber": "%s",
+                    "speciality": "General",
+                    "location": "Gurugram",
+                    "clinicAddress": "Cyber City",
+                    "salesPersonEmployeeCode": "%s",
+                    "bestTimeToMeet": "INVALID_TIME_SLOT"
+                }
+                """.formatted(mobile, activeSalesPerson1.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(rawJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    @WithMockUser(authorities = {"PHYSICAL_LEAD_ASSIGN", "ROLE_SALES_COORDINATOR"})
+    void assignPhysicalLead_withBestTimeToMeet_updatesFieldCorrectly() throws Exception {
+        String mobile = "97" + String.format("%08d", (int)(Math.random() * 100000000));
+        Lead unassignedLead = Lead.builder()
+                .leadCode("PL-" + UUID.randomUUID().toString().substring(0, 8))
+                .uniqueLeadId(UUID.randomUUID().toString())
+                .clientName("Unassigned Doctor")
+                .mobileNumber(mobile)
+                .speciality("Dermatologist")
+                .location("Indirapuram, Ghaziabad")
+                .clinicAddress("Habitat Centre")
+                .isPhysicalLead(true)
+                .leadSource(com.blueant_crm_erp.lead.enums.LeadSource.FIELD_VISIT)
+                .leadType(com.blueant_crm_erp.lead.enums.LeadType.MUTUAL_FUND)
+                .priority(com.blueant_crm_erp.lead.enums.LeadPriority.MEDIUM)
+                .duplicateLeadStatus(com.blueant_crm_erp.lead.enums.DuplicateLeadStatus.ORIGINAL)
+                .leadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.NEW)
+                .leadStage(com.blueant_crm_erp.lead.enums.LeadStage.LEAD_CREATED)
+                .build();
+        leadRepository.save(unassignedLead);
+
+        AssignPhysicalLeadRequest assignReq = AssignPhysicalLeadRequest.builder()
+                .salesPersonEmployeeCode(activeSalesPerson1.getEmployeeCode())
+                .assignmentReason("Assigning with best time to meet")
+                .bestTimeToMeet(BestTimeToMeet.THREE_TO_SIX)
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign/" + unassignedLead.getLeadCode() + "/assign")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.bestTimeToMeet").value("THREE_TO_SIX"))
+                .andExpect(jsonPath("$.data.assignedEmployeeCode").value(activeSalesPerson1.getEmployeeCode()));
+
+        Lead reloaded = leadRepository.findByLeadCode(unassignedLead.getLeadCode()).orElseThrow();
+        assertThat(reloaded.getBestTimeToMeet()).isEqualTo(BestTimeToMeet.THREE_TO_SIX);
+
+        LeadDetailResponse leadDetail = leadService.getLeadDetails(unassignedLead.getUniqueLeadId());
+        assertThat(leadDetail.getBestTimeToMeet()).isEqualTo(BestTimeToMeet.THREE_TO_SIX);
     }
 }

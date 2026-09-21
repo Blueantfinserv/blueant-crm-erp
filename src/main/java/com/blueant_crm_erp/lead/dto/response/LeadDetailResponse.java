@@ -1,5 +1,6 @@
 package com.blueant_crm_erp.lead.dto.response;
 
+import com.blueant_crm_erp.lead.enums.BestTimeToMeet;
 import com.blueant_crm_erp.lead.enums.DuplicateLeadStatus;
 import com.blueant_crm_erp.lead.enums.LeadPriority;
 import com.blueant_crm_erp.lead.enums.LeadSource;
@@ -53,6 +54,7 @@ public class LeadDetailResponse {
     private String speciality;
     private String clinicAddress;
     private Boolean isPhysicalLead;
+    private BestTimeToMeet bestTimeToMeet;
 
     /**
      * Lead Information

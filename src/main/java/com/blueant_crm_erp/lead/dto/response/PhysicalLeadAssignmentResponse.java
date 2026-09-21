@@ -1,5 +1,6 @@
 package com.blueant_crm_erp.lead.dto.response;
 
+import com.blueant_crm_erp.lead.enums.BestTimeToMeet;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,6 +34,7 @@ public class PhysicalLeadAssignmentResponse {
     private String location;
     private String clinicAddress;
     private Boolean isPhysicalLead;
+    private BestTimeToMeet bestTimeToMeet;
 
     // Assigned Sales Person details
     private Long assignedUserId;

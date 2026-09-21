@@ -1,5 +1,6 @@
 package com.blueant_crm_erp.lead.dto.request;
 
+import com.blueant_crm_erp.lead.enums.BestTimeToMeet;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -69,4 +70,9 @@ public class CreatePhysicalLeadRequest {
      * Format: yyyy-MM-dd
      */
     private LocalDate assignmentDate;
+
+    /**
+     * Client preferred meeting time window (Optional).
+     */
+    private BestTimeToMeet bestTimeToMeet;
 }

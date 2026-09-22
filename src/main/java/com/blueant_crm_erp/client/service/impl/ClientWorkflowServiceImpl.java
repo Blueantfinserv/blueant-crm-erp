@@ -40,6 +40,9 @@ public class ClientWorkflowServiceImpl implements ClientWorkflowService {
                 .mobileNumber(lead.getMobileNumber())
                 .email(lead.getEmail())
                 .panNumber(panNumber)
+                .salesPerson(lead.getAssignedSalesPerson())
+                .clientSince(java.time.LocalDate.now())
+                .nextFollowupDate(java.time.LocalDate.now().plusMonths(3))
                 .build();
 
         Client savedClient = clientRepository.save(client);

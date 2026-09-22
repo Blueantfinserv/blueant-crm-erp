@@ -418,7 +418,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
         // 1. Sales Executive creates a lead
         CreateLeadRequest leadRequest = new CreateLeadRequest();
         leadRequest.setClientName("Sales Exec Client");
-        leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
+        leadRequest.setMobileNumber("9" + String.valueOf(System.currentTimeMillis()).substring(4, 13));
         leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
         leadRequest.setLocation("Delhi");
 

@@ -28,4 +28,8 @@ public class ClientResponse {
     private LocalDate clientSince;
     private Long relationshipManagerId;
     private Long crmOwnerId;
+    private Long salesPersonId;
+    private String salesPersonCode;
+    private String salesPersonName;
+    private LocalDate nextFollowupDate;
 }

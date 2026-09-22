@@ -13,6 +13,10 @@ public interface ClientMapper {
     @Mapping(target = "leadId", source = "lead.id")
     @Mapping(target = "relationshipManagerId", source = "relationshipManager.id")
     @Mapping(target = "crmOwnerId", source = "crmOwner.id")
+    @Mapping(target = "salesPersonId", source = "salesPerson.id")
+    @Mapping(target = "salesPersonCode", source = "salesPerson.employeeCode")
+    @Mapping(target = "salesPersonName", expression = "java(entity.getSalesPerson() != null ? entity.getSalesPerson().getFullName() : null)")
+    @Mapping(target = "nextFollowupDate", source = "nextFollowupDate")
     ClientResponse toResponse(Client entity);
 
     List<ClientResponse> toResponseList(List<Client> entities);

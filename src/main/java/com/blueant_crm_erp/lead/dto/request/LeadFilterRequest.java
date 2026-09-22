@@ -112,4 +112,10 @@ public class LeadFilterRequest {
 
     private LocalDate assignedToDate;
 
+    /**
+     * When true, only returns active pipeline work for sales person
+     * (excludes ALREADY_CLIENT, REMOVED, NOT_INTERESTED, LOST, CONVERTED)
+     */
+    private Boolean activeWorkOnly;
+
 }

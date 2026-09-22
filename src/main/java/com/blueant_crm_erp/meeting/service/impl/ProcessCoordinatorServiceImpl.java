@@ -31,6 +31,7 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
     private final MeetingVerificationRepository meetingVerificationRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final MeetingMapper meetingMapper;
+    private final com.blueant_crm_erp.lead.repository.LeadRepository leadRepository;
 
     @Override
     public MeetingResponse verifyMeeting(String meetingCode, MeetingVerificationRequest request, String currentUserEmail) {
@@ -191,7 +192,65 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         meeting.setVerification(verification);
         
         Meeting savedMeeting = meetingRepository.save(meeting);
+        handlePostVerificationDecision(savedMeeting, currentUserEmail);
         return meetingMapper.toResponse(savedMeeting);
+    }
+
+    private void handlePostVerificationDecision(Meeting meeting, String currentUserEmail) {
+        if (meeting.getLead() == null) {
+            return;
+        }
+
+        com.blueant_crm_erp.lead.entity.Lead lead = meeting.getLead();
+        MeetingLeadStatus outcome = meeting.getLeadStatus();
+        if (outcome == null) {
+            return;
+        }
+
+        switch (outcome) {
+            case WORK_IN_PROGRESS -> {
+                // CASE A — LEAD STATUS = WORK_IN_PROGRESS
+                // Continuous cycle: remains WIP, stage FOLLOW_UP. WIP MUST NOT go to CRM.
+                lead.setLeadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.WORK_IN_PROGRESS);
+                lead.setLeadStage(com.blueant_crm_erp.lead.enums.LeadStage.FOLLOW_UP);
+                leadRepository.save(lead);
+                log.info("[PostPcVerification] Lead {} confirmed WORK_IN_PROGRESS (Stage: FOLLOW_UP) after PC verification.",
+                        lead.getLeadCode());
+            }
+            case CONVERTED_CLIENT -> {
+                // CASE B — LEAD STATUS = CONVERTED_CLIENT
+                // Transition to CRM_HANDOVER / CRM entry queue. Eligible for CRM ONLY AFTER PC verification.
+                lead.setLeadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.CONVERTED);
+                lead.setLeadStage(com.blueant_crm_erp.lead.enums.LeadStage.CRM_HANDOVER);
+                leadRepository.save(lead);
+                log.info("[PostPcVerification] Lead {} transitioned to CONVERTED / CRM_HANDOVER after PC verification. Now eligible for CRM.",
+                        lead.getLeadCode());
+            }
+            case ALREADY_CLIENT -> {
+                // CASE C — OTHER STATUS: Excluded from active work; records kept intact.
+                lead.setLeadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.ALREADY_CLIENT);
+                lead.setLeadStage(com.blueant_crm_erp.lead.enums.LeadStage.COMPLETED);
+                leadRepository.save(lead);
+                log.info("[PostPcVerification] Lead {} marked ALREADY_CLIENT. Excluded from Sales Person active work.",
+                        lead.getLeadCode());
+            }
+            case CLIENT_REMOVED -> {
+                // CASE C — OTHER STATUS: Excluded from active work; records kept intact.
+                lead.setLeadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.REMOVED);
+                lead.setLeadStage(com.blueant_crm_erp.lead.enums.LeadStage.COMPLETED);
+                leadRepository.save(lead);
+                log.info("[PostPcVerification] Lead {} marked REMOVED. Excluded from Sales Person active work.",
+                        lead.getLeadCode());
+            }
+            case CLIENT_NOT_INTERESTED -> {
+                // CASE C — OTHER STATUS: Excluded from active work; records kept intact.
+                lead.setLeadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.NOT_INTERESTED);
+                lead.setLeadStage(com.blueant_crm_erp.lead.enums.LeadStage.COMPLETED);
+                leadRepository.save(lead);
+                log.info("[PostPcVerification] Lead {} marked NOT_INTERESTED. Excluded from Sales Person active work.",
+                        lead.getLeadCode());
+            }
+        }
     }
 
     @Override

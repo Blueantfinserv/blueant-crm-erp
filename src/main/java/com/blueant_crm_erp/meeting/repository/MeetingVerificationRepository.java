@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface MeetingVerificationRepository extends JpaRepository<MeetingVerification, Long> {
     Optional<MeetingVerification> findByMeetingMeetingCode(String meetingCode);
     Optional<MeetingVerification> findByMeetingId(Long meetingId);
+    Optional<MeetingVerification> findTopByMeetingLeadIdAndVerificationStatusOrderByMeetingMeetingNumberDesc(Long leadId, com.blueant_crm_erp.servicerequest.enums.VerificationStatus status);
+    boolean existsByMeetingLeadIdAndVerificationStatus(Long leadId, com.blueant_crm_erp.servicerequest.enums.VerificationStatus status);
 }

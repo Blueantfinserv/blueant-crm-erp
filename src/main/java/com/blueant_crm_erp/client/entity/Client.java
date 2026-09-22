@@ -62,4 +62,11 @@ public class Client extends BaseVersionEntity {
     @JoinColumn(name = "crm_owner_id", foreignKey = @ForeignKey(name = "fk_client_crm_owner"))
     private com.blueant_crm_erp.user.entity.User crmOwner;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sales_person_id", foreignKey = @ForeignKey(name = "fk_client_sales_person"))
+    private com.blueant_crm_erp.user.entity.User salesPerson;
+
+    @Column(name = "next_followup_date")
+    private java.time.LocalDate nextFollowupDate;
+
 }

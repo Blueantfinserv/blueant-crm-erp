@@ -52,6 +52,15 @@ public class LeadSpecification {
 
             if (request.getLeadStatus() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("leadStatus"), request.getLeadStatus()));
+            } else if (Boolean.TRUE.equals(request.getActiveWorkOnly())) {
+                predicates.add(criteriaBuilder.not(root.get("leadStatus").in(
+                        com.blueant_crm_erp.lead.enums.LeadStatus.ALREADY_CLIENT,
+                        com.blueant_crm_erp.lead.enums.LeadStatus.REMOVED,
+                        com.blueant_crm_erp.lead.enums.LeadStatus.NOT_INTERESTED,
+                        com.blueant_crm_erp.lead.enums.LeadStatus.LOST,
+                        com.blueant_crm_erp.lead.enums.LeadStatus.CONVERTED,
+                        com.blueant_crm_erp.lead.enums.LeadStatus.DUPLICATE
+                )));
             }
 
             if (request.getLeadStage() != null) {

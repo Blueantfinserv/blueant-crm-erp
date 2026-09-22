@@ -58,7 +58,7 @@ public class RoleSeederImpl implements BootstrapSeeder {
             buildRole("Team Leader", BootstrapConstants.ROLE_TEAM_LEADER, 5, true, false),
             buildRole("Relationship Manager", BootstrapConstants.ROLE_RELATIONSHIP_MANAGER, 6, true, false),
             buildRole("Employee", BootstrapConstants.ROLE_EMPLOYEE, 7, true, true),
-            buildRole("Sales Coordinator", BootstrapConstants.ROLE_SALES_COORDINATOR, 8, true, false)
+            buildRole("PC Coordinator", BootstrapConstants.ROLE_PC_COORDINATOR, 8, true, false)
         );
 
         List<Role> rolesToSave = new ArrayList<>();

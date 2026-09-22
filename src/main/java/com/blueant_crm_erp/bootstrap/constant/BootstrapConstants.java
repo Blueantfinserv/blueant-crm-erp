@@ -82,6 +82,8 @@ public final class BootstrapConstants {
 
     public static final String ROLE_EMPLOYEE = "EMPLOYEE";
 
+    public static final String ROLE_PC_COORDINATOR = "PC_COORDINATOR";
+
     public static final String ROLE_SALES_COORDINATOR = "SALES_COORDINATOR";
 
     // =========================================================================

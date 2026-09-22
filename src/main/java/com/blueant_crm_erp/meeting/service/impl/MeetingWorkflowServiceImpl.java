@@ -69,6 +69,7 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
             boolean hasElevated = auth.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") ||
                                    a.getAuthority().equals("ROLE_SUPER_ADMIN") ||
+                                   a.getAuthority().equals("ROLE_PC_COORDINATOR") ||
                                    a.getAuthority().equals("ROLE_SALES_COORDINATOR"));
             if (!hasElevated) {
                 String empCode = auth.getName();

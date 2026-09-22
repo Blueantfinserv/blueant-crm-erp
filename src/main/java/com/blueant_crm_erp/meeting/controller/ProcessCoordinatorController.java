@@ -37,7 +37,7 @@ public class ProcessCoordinatorController {
     }
 
     @GetMapping("/{meetingCode}")
-    @PreAuthorize("hasAnyAuthority('MEETING_READ', 'MEETING_VERIFY') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'SALES_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('MEETING_READ', 'MEETING_VERIFY') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'PC_COORDINATOR', 'SALES_COORDINATOR')")
     public ResponseEntity<com.blueant_crm_erp.meeting.dto.response.MeetingVerificationResponse> getVerification(
             @PathVariable String meetingCode) {
         return ResponseEntity.ok(processCoordinatorService.getVerification(meetingCode != null ? meetingCode.trim() : null));

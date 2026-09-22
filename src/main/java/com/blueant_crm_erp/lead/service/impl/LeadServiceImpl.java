@@ -343,6 +343,8 @@ public class LeadServiceImpl implements LeadService {
                                a.getAuthority().equalsIgnoreCase("ADMIN") ||
                                a.getAuthority().equalsIgnoreCase("ROLE_SUPER_ADMIN") ||
                                a.getAuthority().equalsIgnoreCase("SUPER_ADMIN") ||
+                                a.getAuthority().equalsIgnoreCase("ROLE_PC_COORDINATOR") ||
+                               a.getAuthority().equalsIgnoreCase("PC_COORDINATOR") ||
                                a.getAuthority().equalsIgnoreCase("ROLE_SALES_COORDINATOR") ||
                                a.getAuthority().equalsIgnoreCase("SALES_COORDINATOR") ||
                                a.getAuthority().equalsIgnoreCase("PHYSICAL_LEAD_ASSIGN") ||
@@ -357,8 +359,9 @@ public class LeadServiceImpl implements LeadService {
             if (cud.getRoleCode() != null) {
                 String roleCode = cud.getRoleCode().toUpperCase();
                 if (roleCode.equals("ADMIN") || roleCode.equals("SUPER_ADMIN") ||
-                    roleCode.equals("SALES_COORDINATOR") || roleCode.equals("BUSINESS_HEAD") ||
-                    roleCode.equals("SALES_MANAGER") || roleCode.equals("TEAM_LEADER")) {
+                    roleCode.equals("PC_COORDINATOR") || roleCode.equals("SALES_COORDINATOR") ||
+                    roleCode.equals("BUSINESS_HEAD") || roleCode.equals("SALES_MANAGER") ||
+                    roleCode.equals("TEAM_LEADER")) {
                     hasElevated = true;
                 }
             }

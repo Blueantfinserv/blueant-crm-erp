@@ -32,5 +32,6 @@ public class CrmLeadQueueResponse {
     // Statuses
     private String leadStatus;
     private String leadStage;
+    private String crmOnboardingStatus;
     private String crmVerificationStatus;
 }

@@ -31,5 +31,8 @@ public class ClientResponse {
     private Long salesPersonId;
     private String salesPersonCode;
     private String salesPersonName;
+    private Long createdBySalesPersonId;
+    private String createdBySalesPersonCode;
+    private String createdBySalesPersonName;
     private LocalDate nextFollowupDate;
 }

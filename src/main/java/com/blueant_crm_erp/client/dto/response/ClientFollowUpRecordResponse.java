@@ -3,29 +3,28 @@ package com.blueant_crm_erp.client.dto.response;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ClientFollowUpResponse {
+public class ClientFollowUpRecordResponse {
 
+    private Long id;
     private Long clientId;
     private String clientCode;
     private String clientName;
-    private String mobileNumber;
-    private String email;
 
     private Long salesPersonId;
     private String salesPersonCode;
     private String salesPersonName;
 
-    private Long createdBySalesPersonId;
-    private String createdBySalesPersonCode;
-    private String createdBySalesPersonName;
-
-    private LocalDate clientSince;
+    private LocalDate followupDate;
+    private String remarks;
     private LocalDate nextFollowupDate;
-    private Long daysUntilFollowUp;
+
+    private LocalDateTime createdAt;
+    private String createdBy;
 }

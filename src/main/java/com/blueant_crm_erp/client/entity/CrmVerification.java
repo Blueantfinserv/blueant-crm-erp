@@ -31,6 +31,10 @@ public class CrmVerification extends BaseVersionEntity {
     @JoinColumn(name = "client_id", foreignKey = @ForeignKey(name = "fk_crm_verification_client"))
     private Client client;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "crm_onboarding_id", foreignKey = @ForeignKey(name = "fk_crm_verif_onboarding"))
+    private CrmOnboarding crmOnboarding;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false, length = 50)
     private VerificationStatus verificationStatus;

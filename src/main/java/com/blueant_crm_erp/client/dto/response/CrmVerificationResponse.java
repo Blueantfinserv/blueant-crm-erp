@@ -35,6 +35,8 @@ public class CrmVerificationResponse {
     // Sales Person Continuity
     private String salesPersonCode;
     private String salesPersonName;
+    private String createdBySalesPersonCode;
+    private String createdBySalesPersonName;
 
     // Scheduled Follow-Up (~3 Months)
     private LocalDate nextFollowupDate;

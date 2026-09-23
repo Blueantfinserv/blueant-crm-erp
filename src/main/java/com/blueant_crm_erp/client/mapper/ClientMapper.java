@@ -16,6 +16,9 @@ public interface ClientMapper {
     @Mapping(target = "salesPersonId", source = "salesPerson.id")
     @Mapping(target = "salesPersonCode", source = "salesPerson.employeeCode")
     @Mapping(target = "salesPersonName", expression = "java(entity.getSalesPerson() != null ? entity.getSalesPerson().getFullName() : null)")
+    @Mapping(target = "createdBySalesPersonId", source = "createdBySalesPerson.id")
+    @Mapping(target = "createdBySalesPersonCode", source = "createdBySalesPerson.employeeCode")
+    @Mapping(target = "createdBySalesPersonName", expression = "java(entity.getCreatedBySalesPerson() != null ? entity.getCreatedBySalesPerson().getFullName() : null)")
     @Mapping(target = "nextFollowupDate", source = "nextFollowupDate")
     ClientResponse toResponse(Client entity);
 

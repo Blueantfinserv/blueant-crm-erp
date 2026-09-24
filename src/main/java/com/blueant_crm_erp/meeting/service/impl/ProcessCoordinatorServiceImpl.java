@@ -48,12 +48,9 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
             throw new AccessDeniedException("User does not have verification permission.");
         }
 
-        if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED) {
-            throw new IllegalArgumentException("Meeting must be completed.");
-        }
-
-        if (meeting.getMeetingConducted() != com.blueant_crm_erp.meeting.enums.MeetingConductStatus.CONDUCTED) {
-            throw new IllegalArgumentException("Meeting must be conducted.");
+        if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED &&
+            meeting.getMeetingStatus() != MeetingStatus.NOT_CONDUCTED) {
+            throw new IllegalArgumentException("Meeting must be completed or not conducted.");
         }
 
         MeetingVerification verification = meetingVerificationRepository.findByMeetingId(meeting.getId())
@@ -64,7 +61,7 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         }
 
         // Validate coordinator questions
-        validateCoordinatorData(request);
+        validateCoordinatorData(meeting, request);
 
         verification.setVerificationStatus(VerificationStatus.VERIFIED);
         verification.setVerifiedBy(currentUserEmail);
@@ -202,6 +199,16 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         }
 
         com.blueant_crm_erp.lead.entity.Lead lead = meeting.getLead();
+
+        if (meeting.getMeetingConducted() == com.blueant_crm_erp.meeting.enums.MeetingConductStatus.NOT_CONDUCTED) {
+            lead.setLeadStatus(com.blueant_crm_erp.lead.enums.LeadStatus.WORK_IN_PROGRESS);
+            lead.setLeadStage(com.blueant_crm_erp.lead.enums.LeadStage.FOLLOW_UP);
+            leadRepository.save(lead);
+            log.info("[PostPcVerification] Lead {} confirmed WORK_IN_PROGRESS (Stage: FOLLOW_UP) after NOT_CONDUCTED visit verification.",
+                    lead.getLeadCode());
+            return;
+        }
+
         MeetingLeadStatus outcome = meeting.getLeadStatus();
         if (outcome == null) {
             return;
@@ -278,12 +285,9 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
             throw new AccessDeniedException("User does not have verification permission.");
         }
 
-        if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED) {
-            throw new IllegalArgumentException("Meeting must be completed.");
-        }
-
-        if (meeting.getMeetingConducted() != com.blueant_crm_erp.meeting.enums.MeetingConductStatus.CONDUCTED) {
-            throw new IllegalArgumentException("Meeting must be conducted.");
+        if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED &&
+            meeting.getMeetingStatus() != MeetingStatus.NOT_CONDUCTED) {
+            throw new IllegalArgumentException("Meeting must be completed or not conducted.");
         }
 
         if (reason == null || reason.isBlank()) {
@@ -315,12 +319,14 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
         return meetingMapper.toResponse(savedMeeting);
     }
 
-    private void validateCoordinatorData(MeetingVerificationRequest request) {
+    private void validateCoordinatorData(Meeting meeting, MeetingVerificationRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Verification request cannot be null.");
         }
-        if (request.getMeetingTiming() == null) {
-            throw new IllegalArgumentException("Meeting timing is required.");
+        if (meeting.getMeetingConducted() == com.blueant_crm_erp.meeting.enums.MeetingConductStatus.CONDUCTED) {
+            if (request.getMeetingTiming() == null) {
+                throw new IllegalArgumentException("Meeting timing is required.");
+            }
         }
         if (Boolean.TRUE.equals(request.getAnyChildren())) {
             if (request.getNumberOfChildren() == null || request.getNumberOfChildren() <= 0) {

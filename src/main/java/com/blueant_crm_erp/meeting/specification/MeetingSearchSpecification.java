@@ -41,6 +41,11 @@ public final class MeetingSearchSpecification {
                 cb.equal(root.get("meetingStatus"), MeetingStatus.COMPLETED),
                 cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
             );
+        } else if ("not_conducted".equalsIgnoreCase(statusFilter)) {
+            statusSpec = (root, query, cb) -> cb.and(
+                cb.equal(root.get("meetingStatus"), MeetingStatus.NOT_CONDUCTED),
+                cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
+            );
         } else if ("all".equalsIgnoreCase(statusFilter)) {
             // Exclude cancelled
             statusSpec = (root, query, cb) -> cb.notEqual(root.get("meetingStatus"), MeetingStatus.CANCELLED);

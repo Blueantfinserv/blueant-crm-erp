@@ -41,6 +41,11 @@ public class MeetingWorkflowValidator {
             throw new IllegalArgumentException("Workflow request cannot be null.");
         }
 
+        if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
+            validateNotConducted(request);
+            return;
+        }
+
         if (request.getMeetingConducted() != null && request.getMeetingConducted() != MeetingConductStatus.CONDUCTED) {
             throw new IllegalArgumentException("Meeting Workflow Update only supports conducted meetings.");
         }
@@ -92,6 +97,43 @@ public class MeetingWorkflowValidator {
         }
     }
 
+    private void validateNotConducted(MeetingWorkflowRequest request) {
+        // Remarks / reason is mandatory
+        String remarks = (request.getRemarks() != null && !request.getRemarks().isBlank())
+                ? request.getRemarks()
+                : request.getReason();
+        if (remarks == null || remarks.trim().isEmpty()) {
+            throw new IllegalArgumentException("Remarks/reason is mandatory when meeting is not conducted.");
+        }
+
+        // Next plan date is mandatory
+        if (request.getNextPlanDate() == null) {
+            throw new IllegalArgumentException("Next plan date is mandatory when meeting is not conducted.");
+        }
+        if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
+        }
+
+        // Location coordinates and accuracy are mandatory for attempted visit verification
+        if (request.getLatitude() == null || request.getLongitude() == null) {
+            throw new IllegalArgumentException("Location coordinates (latitude and longitude) are mandatory when meeting is not conducted.");
+        }
+        if (request.getLatitude().compareTo(BigDecimal.valueOf(-90)) < 0 ||
+            request.getLatitude().compareTo(BigDecimal.valueOf(90)) > 0) {
+            throw new IllegalArgumentException("Latitude must be between -90 and +90 degrees.");
+        }
+        if (request.getLongitude().compareTo(BigDecimal.valueOf(-180)) < 0 ||
+            request.getLongitude().compareTo(BigDecimal.valueOf(180)) > 0) {
+            throw new IllegalArgumentException("Longitude must be between -180 and +180 degrees.");
+        }
+        if (request.getAccuracy() == null) {
+            throw new IllegalArgumentException("Location accuracy is mandatory when meeting is not conducted.");
+        }
+        if (request.getAccuracy() < 0) {
+            throw new IllegalArgumentException("Location accuracy must not be negative.");
+        }
+    }
+
     /**
      * Validates the current state of the meeting entity.
      * Prevents updates to meetings already completed or cancelled.
@@ -126,6 +168,9 @@ public class MeetingWorkflowValidator {
      * Validates the transition itself between the current meeting state and request parameters.
      */
     public void validateWorkflowTransition(Meeting meeting, MeetingWorkflowRequest request) {
+        if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
+            return;
+        }
         if (request.getNextPlanDate() != null && request.getLeadStatus() == MeetingLeadStatus.WORK_IN_PROGRESS) {
             if (meeting.getMeetingNumber() >= 10) {
                 throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");

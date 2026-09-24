@@ -271,7 +271,8 @@ public class LeadServiceImpl implements LeadService {
                 .ifPresent(meeting -> response.setCurrentActiveMeeting(meetingMapper.toSummaryResponse(meeting)));
 
         // Populate Meeting History
-        java.util.List<com.blueant_crm_erp.meeting.entity.Meeting> history = meetingRepository.findByLeadIdAndMeetingStatusOrderByMeetingNumberAsc(lead.getId(), com.blueant_crm_erp.meeting.enums.MeetingStatus.COMPLETED);
+        java.util.List<com.blueant_crm_erp.meeting.entity.Meeting> history = meetingRepository.findByLeadIdAndMeetingStatusInOrderByMeetingNumberAsc(
+                lead.getId(), java.util.List.of(com.blueant_crm_erp.meeting.enums.MeetingStatus.COMPLETED, com.blueant_crm_erp.meeting.enums.MeetingStatus.NOT_CONDUCTED));
         response.setMeetingHistory(meetingMapper.toSummaryResponseList(history));
 
         return response;

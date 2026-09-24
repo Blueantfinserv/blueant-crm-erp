@@ -44,7 +44,7 @@ public class MeetingWorkflowRequest {
 
     @Size(max = 1000, message = "Remarks cannot exceed 1000 characters.")
     @Schema(description = "Workflow/outcome remark/status information", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
-    @com.fasterxml.jackson.annotation.JsonAlias({"meetingRemarks"})
+    @com.fasterxml.jackson.annotation.JsonAlias({"meetingRemarks", "reason"})
     private String remarks;
 
     @Size(max = 50, message = "Completed stage cannot exceed 50 characters.")
@@ -132,5 +132,13 @@ public class MeetingWorkflowRequest {
     @Size(max = 500, message = "Visiting card URL cannot exceed 500 characters.")
     @Schema(description = "Uploaded visiting card / document photo URL/reference", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String visitingCard;
+
+    public String getMeetingRemarks() {
+        return (remarks != null && !remarks.isBlank()) ? remarks : reason;
+    }
+
+    public void setMeetingRemarks(String meetingRemarks) {
+        this.remarks = meetingRemarks;
+    }
 }
 

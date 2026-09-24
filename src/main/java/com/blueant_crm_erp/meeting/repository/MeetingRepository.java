@@ -42,6 +42,8 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>,
 
     long countByLeadId(Long leadId);
 
+    long countByLeadIdAndMeetingStatus(Long leadId, MeetingStatus meetingStatus);
+
     long countByMeetingStatus(MeetingStatus status);
 
     /**
@@ -109,4 +111,9 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>,
      * Find meeting history for a lead (e.g. COMPLETED meetings).
      */
     List<Meeting> findByLeadIdAndMeetingStatusOrderByMeetingNumberAsc(Long leadId, MeetingStatus meetingStatus);
+
+    /**
+     * Find meeting history for a lead matching any of the specified meeting statuses.
+     */
+    List<Meeting> findByLeadIdAndMeetingStatusInOrderByMeetingNumberAsc(Long leadId, List<MeetingStatus> meetingStatuses);
 }

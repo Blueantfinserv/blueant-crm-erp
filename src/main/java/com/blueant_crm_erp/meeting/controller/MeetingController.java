@@ -187,7 +187,8 @@ public class MeetingController {
         // We can reuse getMeetingsBySequence and filter in frontend, or filter here.
         // For simplicity, returning the sequence, but filtered could be done in service.
         List<MeetingSummaryResponse> history = meetingService.getMeetingsBySequence(leadId).stream()
-                .filter(m -> com.blueant_crm_erp.meeting.enums.MeetingStatus.COMPLETED.equals(m.getMeetingStatus()))
+                .filter(m -> com.blueant_crm_erp.meeting.enums.MeetingStatus.COMPLETED.equals(m.getMeetingStatus()) ||
+                             com.blueant_crm_erp.meeting.enums.MeetingStatus.NOT_CONDUCTED.equals(m.getMeetingStatus()))
                 .toList();
         return ApiResponse.success(history);
     }

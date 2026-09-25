@@ -257,8 +257,9 @@ public class MeetingServiceImpl implements MeetingService {
             }
         }
         
+        String statusFilter = request.getVerificationStatus() != null ? null : "completed";
         org.springframework.data.jpa.domain.Specification<Meeting> spec = MeetingSearchSpecification.build(
-                request.getKeyword(), null, "completed", null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName(), empCode);
+                request.getKeyword(), null, statusFilter, null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName(), empCode);
         Page<Meeting> meetingPage = meetingRepository.findAll(spec, pageable);
         List<MeetingSummaryResponse> responses = meetingMapper.toSummaryResponseList(meetingPage.getContent());
         

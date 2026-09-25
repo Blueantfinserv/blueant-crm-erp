@@ -726,9 +726,9 @@ public class SalesCoordinatorVerificationIntegrationTest {
 
     @Test
     @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
-    public void testPendingVerificationQueueExcludesNotConductedMeetings() throws Exception {
+    public void testPendingVerificationQueueIncludesNotConductedMeetings() throws Exception {
         CreateLeadRequest leadRequest = new CreateLeadRequest();
-        leadRequest.setClientName("Not Conducted Exclude Client");
+        leadRequest.setClientName("Not Conducted Include Client");
         leadRequest.setMobileNumber(String.valueOf(System.currentTimeMillis()).substring(3, 13));
         leadRequest.setLeadSource(com.blueant_crm_erp.lead.enums.LeadSource.MANUAL);
         leadRequest.setLocation("Delhi");
@@ -745,9 +745,9 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .build();
         MeetingResponse meetingResponse = meetingService.createMeeting(meetingRequest, "EMP000001");
 
-        // Manually complete but mark as NOT_CONDUCTED in DB to test exclusion
+        // Mark as NOT_CONDUCTED with PENDING verification
         Meeting meeting = meetingRepository.findByMeetingCode(meetingResponse.getMeetingCode()).orElseThrow();
-        meeting.setMeetingStatus(MeetingStatus.COMPLETED);
+        meeting.setMeetingStatus(MeetingStatus.NOT_CONDUCTED);
         meeting.setMeetingConducted(com.blueant_crm_erp.meeting.enums.MeetingConductStatus.NOT_CONDUCTED);
         
         MeetingVerification verification = MeetingVerification.builder()
@@ -758,11 +758,11 @@ public class SalesCoordinatorVerificationIntegrationTest {
         meeting.setVerification(verification);
         meetingRepository.save(meeting);
 
-        // Assert it is excluded
+        // Assert it is included
         mockMvc.perform(get("/v1/meetings")
                 .param("verificationStatus", "PENDING"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse.getMeetingCode() + "')]").doesNotExist());
+                .andExpect(jsonPath("$.data[?(@.meetingCode == '" + meetingResponse.getMeetingCode() + "')]").exists());
     }
 
     @Test

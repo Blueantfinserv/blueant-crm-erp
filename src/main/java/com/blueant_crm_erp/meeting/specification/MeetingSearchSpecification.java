@@ -20,7 +20,7 @@ public final class MeetingSearchSpecification {
         if (request == null) {
             return build(null, null, "completed", null, null, null, null, null);
         }
-        return build(request.getKeyword(), null, "completed", null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName(), null);
+        return build(request.getKeyword(), null, request.getVerificationStatus() != null ? null : "completed", null, request.getVerificationStatus(), request.getSalesPersonId(), request.getSalesPersonName(), null);
     }
 
     public static Specification<Meeting> build(String keyword, String dateFilter, String statusFilter, Integer sequenceFilter) {
@@ -36,7 +36,28 @@ public final class MeetingSearchSpecification {
 
         // 1. Status Filter (Queue Rules)
         Specification<Meeting> statusSpec;
-        if ("completed".equalsIgnoreCase(statusFilter) || verificationStatus != null) {
+        if (verificationStatus != null) {
+            if ("completed".equalsIgnoreCase(statusFilter)) {
+                statusSpec = (root, query, cb) -> cb.and(
+                    cb.equal(root.get("meetingStatus"), MeetingStatus.COMPLETED),
+                    cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
+                );
+            } else if ("not_conducted".equalsIgnoreCase(statusFilter)) {
+                statusSpec = (root, query, cb) -> cb.and(
+                    cb.equal(root.get("meetingStatus"), MeetingStatus.NOT_CONDUCTED),
+                    cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
+                );
+            } else if ("all".equalsIgnoreCase(statusFilter)) {
+                // Exclude cancelled
+                statusSpec = (root, query, cb) -> cb.notEqual(root.get("meetingStatus"), MeetingStatus.CANCELLED);
+            } else {
+                // When verificationStatus is specified, include both COMPLETED and NOT_CONDUCTED
+                statusSpec = (root, query, cb) -> cb.and(
+                    root.get("meetingStatus").in(Arrays.asList(MeetingStatus.COMPLETED, MeetingStatus.NOT_CONDUCTED)),
+                    cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
+                );
+            }
+        } else if ("completed".equalsIgnoreCase(statusFilter)) {
             statusSpec = (root, query, cb) -> cb.and(
                 cb.equal(root.get("meetingStatus"), MeetingStatus.COMPLETED),
                 cb.equal(root.get("status"), com.blueant_crm_erp.common.enums.Status.ACTIVE)
@@ -112,10 +133,8 @@ public final class MeetingSearchSpecification {
 
         // 5. Verification Status Filter
         if (verificationStatus != null) {
-            Specification<Meeting> verificationSpec = (root, query, cb) -> cb.and(
-                cb.equal(root.join("verification").get("verificationStatus"), verificationStatus),
-                cb.equal(root.get("meetingConducted"), com.blueant_crm_erp.meeting.enums.MeetingConductStatus.CONDUCTED)
-            );
+            Specification<Meeting> verificationSpec = (root, query, cb) ->
+                cb.equal(root.join("verification").get("verificationStatus"), verificationStatus);
             spec = spec.and(verificationSpec);
         }
 

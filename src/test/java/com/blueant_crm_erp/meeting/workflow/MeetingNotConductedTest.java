@@ -308,9 +308,11 @@ public class MeetingNotConductedTest {
         long afterCompletedCount = meetingRepository.countByMeetingStatus(MeetingStatus.COMPLETED);
         assertThat(afterCompletedCount).isEqualTo(initialCompletedCount);
 
-        // No new meeting was created for this lead
+        // Verified NOT_CONDUCTED created exactly one scheduled meeting for the lead
         long leadMeetingCount = meetingRepository.countByLeadId(meeting.getLead().getId());
-        assertThat(leadMeetingCount).isEqualTo(1);
+        assertThat(leadMeetingCount).isEqualTo(2);
+        long scheduledMeetingsCount = meetingRepository.countByLeadIdAndMeetingStatus(meeting.getLead().getId(), MeetingStatus.SCHEDULED);
+        assertThat(scheduledMeetingsCount).isEqualTo(1);
     }
 
     @Test
@@ -478,22 +480,15 @@ public class MeetingNotConductedTest {
         assertThat(m1AfterVerification.getMeetingStatus()).isEqualTo(MeetingStatus.NOT_CONDUCTED);
         assertThat(m1AfterVerification.getMeetingNumber()).isEqualTo(1);
 
-        // Step 4: Later, Sales Person schedules the second visit (Meeting #2)
-        CreateMeetingRequest schedM2Req = CreateMeetingRequest.builder()
-                .leadId(UUID.fromString(lead.getUniqueLeadId()))
-                .meetingMode(MeetingMode.PHYSICAL)
-                .meetingDate(LocalDate.now().plusDays(2))
-                .meetingTime(LocalTime.of(14, 0))
-                .meetingLocation("Clinic Location")
-                .meetingStatus(MeetingStatus.SCHEDULED)
-                .build();
-        MeetingResponse m2Resp = meetingService.createMeeting(schedM2Req, ADMIN_USER);
-        String m2Code = m2Resp.getMeetingCode();
+        // Step 4: Meeting #2 was automatically scheduled upon PC verification of NOT_CONDUCTED
+        Meeting m2 = meetingRepository.findTopByLeadIdOrderByMeetingNumberDesc(lead.getId()).orElseThrow();
+        String m2Code = m2.getMeetingCode();
 
         assertThat(m2Code).isNotEqualTo(m1Code);
-        assertThat(m2Resp.getMeetingNumber()).isEqualTo(2); // Sequence progresses to 2
-        assertThat(m2Resp.getMeetingTitle()).isEqualTo("1st Meeting"); // Index 1
-        assertThat(m2Resp.getMeetingStatus()).isEqualTo(MeetingStatus.SCHEDULED);
+        assertThat(m2.getMeetingNumber()).isEqualTo(2); // Sequence progresses to 2
+        assertThat(m2.getMeetingType()).isEqualTo(com.blueant_crm_erp.meeting.enums.MeetingType.INTRO); // INTRO remains INTRO
+        assertThat(m2.getMeetingTitle()).isEqualTo("Intro Meeting");
+        assertThat(m2.getMeetingStatus()).isEqualTo(MeetingStatus.SCHEDULED);
 
         // Step 5: Sales Person conducts the second visit and submits CONDUCTED
         MeetingWorkflowRequest conductedM2Req = MeetingWorkflowRequest.builder()

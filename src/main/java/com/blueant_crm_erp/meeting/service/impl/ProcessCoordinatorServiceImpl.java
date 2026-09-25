@@ -32,6 +32,8 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
     private final ApplicationEventPublisher eventPublisher;
     private final MeetingMapper meetingMapper;
     private final com.blueant_crm_erp.lead.repository.LeadRepository leadRepository;
+    private final com.blueant_crm_erp.meeting.service.FollowUpService followUpService;
+    private final com.blueant_crm_erp.meeting.repository.MeetingUpdateRepository meetingUpdateRepository;
 
     @Override
     public MeetingResponse verifyMeeting(String meetingCode, MeetingVerificationRequest request, String currentUserEmail) {
@@ -50,7 +52,7 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
 
         if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED &&
             meeting.getMeetingStatus() != MeetingStatus.NOT_CONDUCTED) {
-            throw new IllegalArgumentException("Meeting must be completed or not conducted.");
+            throw new IllegalArgumentException("Meeting must be completed.");
         }
 
         MeetingVerification verification = meetingVerificationRepository.findByMeetingId(meeting.getId())
@@ -206,6 +208,38 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
             leadRepository.save(lead);
             log.info("[PostPcVerification] Lead {} confirmed WORK_IN_PROGRESS (Stage: FOLLOW_UP) after NOT_CONDUCTED visit verification.",
                     lead.getLeadCode());
+
+            // After successful PC verification of a NOT_CONDUCTED meeting with a valid nextPlanDate,
+            // create exactly ONE NEW scheduled meeting for that nextPlanDate.
+            java.time.LocalDate nextPlanDate = meeting.getNextMeetingDate();
+            java.time.LocalTime nextPlanTime = meeting.getNextMeetingTime();
+            if (nextPlanDate == null) {
+                java.util.Optional<com.blueant_crm_erp.meeting.entity.MeetingUpdate> latestUpdate =
+                        meetingUpdateRepository.findTopByMeetingIdOrderByUpdateNumberDesc(meeting.getId());
+                if (latestUpdate.isPresent() && latestUpdate.get().getNextPlanDate() != null) {
+                    nextPlanDate = latestUpdate.get().getNextPlanDate();
+                    nextPlanTime = latestUpdate.get().getNextPlanTime();
+                }
+            }
+
+            if (nextPlanDate != null) {
+                boolean alreadyHasScheduled = meetingRepository.existsByLeadIdAndMeetingStatus(lead.getId(), MeetingStatus.SCHEDULED);
+                int nextSequence = meeting.getMeetingNumber() + 1;
+                boolean nextSequenceExists = meetingRepository.existsByLeadIdAndMeetingNumber(lead.getId(), nextSequence);
+
+                if (!alreadyHasScheduled && !nextSequenceExists) {
+                    Meeting nextMeeting = followUpService.createFollowUp(
+                            meeting, nextPlanDate, nextPlanTime, meeting.getMeetingRemarks(), currentUserEmail);
+                    eventPublisher.publishEvent(new com.blueant_crm_erp.meeting.event.FollowUpCreatedEvent(
+                            this, meeting, nextMeeting, currentUserEmail));
+                    log.info("[PostPcVerification] Auto-scheduled next meeting {} (seq #{}, type: {}) for lead {} on {}",
+                            nextMeeting.getMeetingCode(), nextMeeting.getMeetingNumber(), nextMeeting.getMeetingType(),
+                            lead.getLeadCode(), nextPlanDate);
+                } else {
+                    log.info("[PostPcVerification] Skipping duplicate meeting creation for lead {}. (alreadyHasScheduled={}, nextSequenceExists={})",
+                            lead.getLeadCode(), alreadyHasScheduled, nextSequenceExists);
+                }
+            }
             return;
         }
 
@@ -287,7 +321,7 @@ public class ProcessCoordinatorServiceImpl implements ProcessCoordinatorService 
 
         if (meeting.getMeetingStatus() != MeetingStatus.COMPLETED &&
             meeting.getMeetingStatus() != MeetingStatus.NOT_CONDUCTED) {
-            throw new IllegalArgumentException("Meeting must be completed or not conducted.");
+            throw new IllegalArgumentException("Meeting must be completed.");
         }
 
         if (reason == null || reason.isBlank()) {

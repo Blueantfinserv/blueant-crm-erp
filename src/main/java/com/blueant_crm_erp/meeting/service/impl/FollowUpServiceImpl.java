@@ -63,29 +63,47 @@ public class FollowUpServiceImpl implements FollowUpService {
         // Sequential meeting number — never skip
         nextMeeting.setMeetingNumber(nextMeetingNumber);
 
-        // Business rule: First meeting is INTRO, subsequent meetings are FOLLOW_UP
-        nextMeeting.setMeetingType(nextMeetingNumber == 1 ? MeetingType.INTRO : MeetingType.FOLLOW_UP);
-
-        // Title
-        String title;
-        int meetingIndex = nextMeetingNumber - 1; // Since sequence 2 = 1st meeting
-        
-        if (nextMeetingNumber == 1) {
-            title = "Intro Meeting";
-        } else if (meetingIndex == 1) {
-            title = "1st Meeting";
-        } else if (meetingIndex == 2) {
-            title = "2nd Meeting";
-        } else if (meetingIndex == 3) {
-            title = "3rd Meeting";
+        // Business rule:
+        // If current meeting was NOT_CONDUCTED, the new scheduled meeting preserves meetingType (e.g. INTRO remains INTRO)
+        if (currentMeeting.getMeetingConducted() == com.blueant_crm_erp.meeting.enums.MeetingConductStatus.NOT_CONDUCTED) {
+            com.blueant_crm_erp.meeting.enums.MeetingType preservedType = currentMeeting.getMeetingType() != null
+                    ? currentMeeting.getMeetingType()
+                    : MeetingType.INTRO;
+            nextMeeting.setMeetingType(preservedType);
+            if (preservedType == MeetingType.INTRO) {
+                nextMeeting.setMeetingTitle("Intro Meeting");
+            } else {
+                nextMeeting.setMeetingTitle(currentMeeting.getMeetingTitle() != null ? currentMeeting.getMeetingTitle() : "Follow-up Meeting");
+            }
         } else {
-            title = meetingIndex + "th Meeting";
+            // First meeting is INTRO, subsequent meetings are FOLLOW_UP
+            nextMeeting.setMeetingType(nextMeetingNumber == 1 ? MeetingType.INTRO : MeetingType.FOLLOW_UP);
+
+            // Title
+            String title;
+            int meetingIndex = nextMeetingNumber - 1; // Since sequence 2 = 1st meeting
+
+            if (nextMeetingNumber == 1) {
+                title = "Intro Meeting";
+            } else if (meetingIndex == 1) {
+                title = "1st Meeting";
+            } else if (meetingIndex == 2) {
+                title = "2nd Meeting";
+            } else if (meetingIndex == 3) {
+                title = "3rd Meeting";
+            } else {
+                title = meetingIndex + "th Meeting";
+            }
+            nextMeeting.setMeetingTitle(title);
         }
-        nextMeeting.setMeetingTitle(title);
 
         // Inherit from current meeting
         nextMeeting.setLead(currentMeeting.getLead());
-        nextMeeting.setAssignedEmployee(currentMeeting.getAssignedEmployee());
+        com.blueant_crm_erp.user.entity.User owner = currentMeeting.getAssignedEmployee();
+        if (owner == null && currentMeeting.getLead() != null) {
+            owner = currentMeeting.getLead().getAssignedSalesPerson();
+        }
+        nextMeeting.setAssignedEmployee(owner);
         nextMeeting.setMeetingMode(currentMeeting.getMeetingMode());
 
         // Schedule

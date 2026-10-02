@@ -8,7 +8,8 @@ import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingLeadStatus;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
 import com.blueant_crm_erp.exception.lead.LeadTerminalStateException;
-import lombok.RequiredArgsConstructor;
+import com.blueant_crm_erp.meeting.enums.SalesRole;
+import com.blueant_crm_erp.util.meeting.SalesRoleResolver;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -21,7 +22,6 @@ import java.util.Set;
  * ============================================================================
  */
 @Component
-@RequiredArgsConstructor
 public class MeetingWorkflowValidator {
 
     /** Lead statuses that block any new meeting creation */
@@ -33,16 +33,34 @@ public class MeetingWorkflowValidator {
             LeadStatus.NOT_INTERESTED
     );
 
+    private final SalesRoleResolver salesRoleResolver;
+
+    public MeetingWorkflowValidator() {
+        this.salesRoleResolver = new SalesRoleResolver();
+    }
+
+    public MeetingWorkflowValidator(SalesRoleResolver salesRoleResolver) {
+        this.salesRoleResolver = salesRoleResolver != null ? salesRoleResolver : new SalesRoleResolver();
+    }
+
     /**
-     * Validates the workflow request payload.
+     * Validates the workflow request payload without meeting context.
+     * Preserved for backward compatibility.
      */
     public void validate(MeetingWorkflowRequest request) {
+        validate(null, request);
+    }
+
+    /**
+     * Validates the workflow request payload with role-aware checks based on the meeting's assigned owner.
+     */
+    public void validate(Meeting meeting, MeetingWorkflowRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Workflow request cannot be null.");
         }
 
         if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
-            validateNotConducted(request);
+            validateNotConducted(meeting, request);
             return;
         }
 
@@ -70,17 +88,35 @@ public class MeetingWorkflowValidator {
             }
         }
 
+        SalesRole role = salesRoleResolver.resolve(meeting);
+
         // Validate nextPlanDate if provided
         if (request.getNextPlanDate() != null) {
-            if (request.getNextPlanDate().isBefore(LocalDate.now())) {
-                throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
+            if (role == SalesRole.RM) {
+                if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+                    throw new IllegalArgumentException("RM follow-up date cannot be in the past.");
+                }
+                if (request.getNextPlanDate().isAfter(LocalDate.now().plusMonths(1))) {
+                    throw new IllegalArgumentException("RM follow-up date cannot be more than one month from today.");
+                }
+            } else {
+                if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+                    throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
+                }
             }
         }
 
-        // Validate GPS coordinates and accuracy if provided
-        if (request.getLatitude() != null || request.getLongitude() != null) {
-            if (request.getLatitude() == null || request.getLongitude() == null) {
-                throw new IllegalArgumentException("Both latitude and longitude must be provided together.");
+        // Validate GPS coordinates and accuracy
+        if (role == SalesRole.RM) {
+            // RM requires latitude, longitude, and accuracy for CONDUCTED meetings
+            if (request.getLatitude() == null) {
+                throw new IllegalArgumentException("Latitude is required for RM conducted meeting.");
+            }
+            if (request.getLongitude() == null) {
+                throw new IllegalArgumentException("Longitude is required for RM conducted meeting.");
+            }
+            if (request.getAccuracy() == null) {
+                throw new IllegalArgumentException("Location accuracy is required for RM conducted meeting.");
             }
             if (request.getLatitude().compareTo(BigDecimal.valueOf(-90)) < 0 ||
                 request.getLatitude().compareTo(BigDecimal.valueOf(90)) > 0) {
@@ -90,14 +126,32 @@ public class MeetingWorkflowValidator {
                 request.getLongitude().compareTo(BigDecimal.valueOf(180)) > 0) {
                 throw new IllegalArgumentException("Longitude must be between -180 and +180 degrees.");
             }
-        }
+            if (request.getAccuracy() < 0) {
+                throw new IllegalArgumentException("Location accuracy must not be negative.");
+            }
+        } else {
+            // Existing SM / default behavior: Geo coordinates and accuracy are optional
+            if (request.getLatitude() != null || request.getLongitude() != null) {
+                if (request.getLatitude() == null || request.getLongitude() == null) {
+                    throw new IllegalArgumentException("Both latitude and longitude must be provided together.");
+                }
+                if (request.getLatitude().compareTo(BigDecimal.valueOf(-90)) < 0 ||
+                    request.getLatitude().compareTo(BigDecimal.valueOf(90)) > 0) {
+                    throw new IllegalArgumentException("Latitude must be between -90 and +90 degrees.");
+                }
+                if (request.getLongitude().compareTo(BigDecimal.valueOf(-180)) < 0 ||
+                    request.getLongitude().compareTo(BigDecimal.valueOf(180)) > 0) {
+                    throw new IllegalArgumentException("Longitude must be between -180 and +180 degrees.");
+                }
+            }
 
-        if (request.getAccuracy() != null && request.getAccuracy() < 0) {
-            throw new IllegalArgumentException("Location accuracy must not be negative.");
+            if (request.getAccuracy() != null && request.getAccuracy() < 0) {
+                throw new IllegalArgumentException("Location accuracy must not be negative.");
+            }
         }
     }
 
-    private void validateNotConducted(MeetingWorkflowRequest request) {
+    private void validateNotConducted(Meeting meeting, MeetingWorkflowRequest request) {
         // Remarks / reason is mandatory
         String remarks = (request.getRemarks() != null && !request.getRemarks().isBlank())
                 ? request.getRemarks()
@@ -110,8 +164,19 @@ public class MeetingWorkflowValidator {
         if (request.getNextPlanDate() == null) {
             throw new IllegalArgumentException("Next plan date is mandatory when meeting is not conducted.");
         }
-        if (request.getNextPlanDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
+
+        SalesRole role = salesRoleResolver.resolve(meeting);
+        if (role == SalesRole.RM) {
+            if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+                throw new IllegalArgumentException("RM follow-up date cannot be in the past.");
+            }
+            if (request.getNextPlanDate().isAfter(LocalDate.now().plusMonths(1))) {
+                throw new IllegalArgumentException("RM follow-up date cannot be more than one month from today.");
+            }
+        } else {
+            if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+                throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
+            }
         }
 
         // Location coordinates and accuracy are mandatory for attempted visit verification

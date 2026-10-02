@@ -93,7 +93,7 @@ public class MeetingWorkflowServiceImpl implements MeetingWorkflowService {
         String previousStatus = meeting.getMeetingStatus().name();
 
         // ── Step 1: Guard Conditions ─────────────────────────────────────────
-        workflowValidator.validate(request);
+        workflowValidator.validate(meeting, request);
         workflowValidator.validateMeetingState(meeting);
         workflowValidator.validateWorkflowTransition(meeting, request);
 

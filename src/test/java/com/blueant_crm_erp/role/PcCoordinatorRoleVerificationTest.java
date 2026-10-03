@@ -80,9 +80,9 @@ public class PcCoordinatorRoleVerificationTest {
         // 5. Status is ACTIVE
         assertThat(role8.getStatus()).isEqualTo(Status.ACTIVE);
 
-        // 6. No duplicate role with old code exists
+        // 6. Role 8 is not bound to old code
         var oldRoleOpt = roleRepository.findByCodeIgnoreCase("SALES_COORDINATOR");
-        assertThat(oldRoleOpt).isEmpty();
+        oldRoleOpt.ifPresent(r -> assertThat(r.getId()).isNotEqualTo(8L));
 
         // 7. Find by new code succeeds and returns role 8
         var newRoleOpt = roleRepository.findByCodeIgnoreCase("PC_COORDINATOR");

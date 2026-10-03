@@ -122,7 +122,7 @@ public class MeetingController {
         return ApiResponse.success("Meeting deactivated successfully", null);
     }
 
-    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('MEETING_UPDATE') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RELATIONSHIP_MANAGER')")
     @PostMapping("/{meetingCode}/workflow-update")
     @ResponseStatus(HttpStatus.OK)
     @Operation(

@@ -54,10 +54,10 @@ public class RoleSeederImpl implements BootstrapSeeder {
             buildRole("Super Admin", BootstrapConstants.ROLE_SUPER_ADMIN, 1, true, false),
             buildRole("Admin", BootstrapConstants.ROLE_ADMIN, 2, true, false),
             buildRole("Business Head", BootstrapConstants.ROLE_BUSINESS_HEAD, 3, true, false),
-            buildRole("Sales Manager", BootstrapConstants.ROLE_SALES_MANAGER, 4, true, false),
+            buildRole("Sales Coordinator", BootstrapConstants.ROLE_SALES_COORDINATOR, 4, true, false),
             buildRole("Team Leader", BootstrapConstants.ROLE_TEAM_LEADER, 5, true, false),
             buildRole("Relationship Manager", BootstrapConstants.ROLE_RELATIONSHIP_MANAGER, 6, true, false),
-            buildRole("Employee", BootstrapConstants.ROLE_EMPLOYEE, 7, true, true),
+            buildRole("Sales Manager", BootstrapConstants.ROLE_SALES_MANAGER, 7, true, true),
             buildRole("PC Coordinator", BootstrapConstants.ROLE_PC_COORDINATOR, 8, true, false)
         );
 

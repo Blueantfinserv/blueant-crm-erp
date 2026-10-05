@@ -99,6 +99,13 @@ public class MeetingWorkflowValidator {
                 if (request.getNextPlanDate().isAfter(LocalDate.now().plusMonths(1))) {
                     throw new IllegalArgumentException("RM follow-up date cannot be more than one month from today.");
                 }
+            } else if (role == SalesRole.SC) {
+                if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+                    throw new IllegalArgumentException("SC follow-up date cannot be in the past.");
+                }
+                if (request.getNextPlanDate().isAfter(LocalDate.now().plusMonths(1))) {
+                    throw new IllegalArgumentException("SC follow-up date cannot be more than one month from today.");
+                }
             } else {
                 if (request.getNextPlanDate().isBefore(LocalDate.now())) {
                     throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
@@ -173,29 +180,56 @@ public class MeetingWorkflowValidator {
             if (request.getNextPlanDate().isAfter(LocalDate.now().plusMonths(1))) {
                 throw new IllegalArgumentException("RM follow-up date cannot be more than one month from today.");
             }
+        } else if (role == SalesRole.SC) {
+            if (request.getNextPlanDate().isBefore(LocalDate.now())) {
+                throw new IllegalArgumentException("SC follow-up date cannot be in the past.");
+            }
+            if (request.getNextPlanDate().isAfter(LocalDate.now().plusMonths(1))) {
+                throw new IllegalArgumentException("SC follow-up date cannot be more than one month from today.");
+            }
         } else {
             if (request.getNextPlanDate().isBefore(LocalDate.now())) {
                 throw new IllegalArgumentException(MeetingConstants.WORKFLOW_NEXT_MEETING_DATE_PAST);
             }
         }
 
-        // Location coordinates and accuracy are mandatory for attempted visit verification
-        if (request.getLatitude() == null || request.getLongitude() == null) {
-            throw new IllegalArgumentException("Location coordinates (latitude and longitude) are mandatory when meeting is not conducted.");
-        }
-        if (request.getLatitude().compareTo(BigDecimal.valueOf(-90)) < 0 ||
-            request.getLatitude().compareTo(BigDecimal.valueOf(90)) > 0) {
-            throw new IllegalArgumentException("Latitude must be between -90 and +90 degrees.");
-        }
-        if (request.getLongitude().compareTo(BigDecimal.valueOf(-180)) < 0 ||
-            request.getLongitude().compareTo(BigDecimal.valueOf(180)) > 0) {
-            throw new IllegalArgumentException("Longitude must be between -180 and +180 degrees.");
-        }
-        if (request.getAccuracy() == null) {
-            throw new IllegalArgumentException("Location accuracy is mandatory when meeting is not conducted.");
-        }
-        if (request.getAccuracy() < 0) {
-            throw new IllegalArgumentException("Location accuracy must not be negative.");
+        if (role == SalesRole.SC) {
+            // For SC, geo is optional even for not conducted meetings
+            if (request.getLatitude() != null || request.getLongitude() != null) {
+                if (request.getLatitude() == null || request.getLongitude() == null) {
+                    throw new IllegalArgumentException("Both latitude and longitude must be provided together.");
+                }
+                if (request.getLatitude().compareTo(BigDecimal.valueOf(-90)) < 0 ||
+                    request.getLatitude().compareTo(BigDecimal.valueOf(90)) > 0) {
+                    throw new IllegalArgumentException("Latitude must be between -90 and +90 degrees.");
+                }
+                if (request.getLongitude().compareTo(BigDecimal.valueOf(-180)) < 0 ||
+                    request.getLongitude().compareTo(BigDecimal.valueOf(180)) > 0) {
+                    throw new IllegalArgumentException("Longitude must be between -180 and +180 degrees.");
+                }
+            }
+            if (request.getAccuracy() != null && request.getAccuracy() < 0) {
+                throw new IllegalArgumentException("Location accuracy must not be negative.");
+            }
+        } else {
+            // Location coordinates and accuracy are mandatory for attempted visit verification
+            if (request.getLatitude() == null || request.getLongitude() == null) {
+                throw new IllegalArgumentException("Location coordinates (latitude and longitude) are mandatory when meeting is not conducted.");
+            }
+            if (request.getLatitude().compareTo(BigDecimal.valueOf(-90)) < 0 ||
+                request.getLatitude().compareTo(BigDecimal.valueOf(90)) > 0) {
+                throw new IllegalArgumentException("Latitude must be between -90 and +90 degrees.");
+            }
+            if (request.getLongitude().compareTo(BigDecimal.valueOf(-180)) < 0 ||
+                request.getLongitude().compareTo(BigDecimal.valueOf(180)) > 0) {
+                throw new IllegalArgumentException("Longitude must be between -180 and +180 degrees.");
+            }
+            if (request.getAccuracy() == null) {
+                throw new IllegalArgumentException("Location accuracy is mandatory when meeting is not conducted.");
+            }
+            if (request.getAccuracy() < 0) {
+                throw new IllegalArgumentException("Location accuracy must not be negative.");
+            }
         }
     }
 

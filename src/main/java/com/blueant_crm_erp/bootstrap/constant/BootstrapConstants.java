@@ -102,7 +102,11 @@ public final class BootstrapConstants {
     // =========================================================================
 
     public static final String DESIG_BH = "BH";
+    public static final String DESIG_TL = "TL";
+    public static final String DESIG_SC = "SC";
     public static final String DESIG_SM = "SM";
+    public static final String DESIG_RM = "RM";
+    public static final String DESIG_PC = "PC";
     public static final String DESIG_HRM = "HRM";
 
     // =========================================================================
@@ -176,7 +180,7 @@ public final class BootstrapConstants {
 
     public static final int DEFAULT_DEPARTMENT_COUNT = 6;
 
-    public static final int DEFAULT_DESIGNATION_COUNT = 20;
+    public static final int DEFAULT_DESIGNATION_COUNT = 6;
 
     public static final int DEFAULT_TEAM_COUNT = 10;
 

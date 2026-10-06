@@ -87,7 +87,10 @@ public class BootstrapValidator {
     public boolean hasDesignations() {
         return designationRepository.existsByCodeIgnoreCase(BootstrapConstants.DESIG_BH)
                 && designationRepository.existsByCodeIgnoreCase(BootstrapConstants.DESIG_SM)
-                && designationRepository.existsByCodeIgnoreCase(BootstrapConstants.DESIG_HRM);
+                && designationRepository.existsByCodeIgnoreCase(BootstrapConstants.DESIG_TL)
+                && designationRepository.existsByCodeIgnoreCase(BootstrapConstants.DESIG_SC)
+                && designationRepository.existsByCodeIgnoreCase(BootstrapConstants.DESIG_RM)
+                && designationRepository.existsByCodeIgnoreCase(BootstrapConstants.DESIG_PC);
     }
 
     /**

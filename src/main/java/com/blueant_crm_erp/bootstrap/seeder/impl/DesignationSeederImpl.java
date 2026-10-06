@@ -69,23 +69,13 @@ public class DesignationSeederImpl implements BootstrapSeeder {
         
         // Sales
         designations.add(buildDesignation("Business Head", BootstrapConstants.DESIG_BH, 1, salesDept));
+        designations.add(buildDesignation("Team Leader", BootstrapConstants.DESIG_TL, 3, salesDept));
+        designations.add(buildDesignation("Sales Coordinator", BootstrapConstants.DESIG_SC, 4, salesDept));
         designations.add(buildDesignation("Sales Manager", BootstrapConstants.DESIG_SM, 2, salesDept));
-        designations.add(buildDesignation("Team Leader", "TL", 3, salesDept));
-        designations.add(buildDesignation("Sales Executive", "SE", 4, salesDept));
-        designations.add(buildDesignation("Relationship Manager", "RM", 4, salesDept));
+        designations.add(buildDesignation("Relationship Manager", BootstrapConstants.DESIG_RM, 4, salesDept));
 
-        // HR
-        designations.add(buildDesignation("HR Manager", BootstrapConstants.DESIG_HRM, 2, hrDept));
-        designations.add(buildDesignation("HR Executive", "HRE", 4, hrDept));
-        
-        // Ops
-        designations.add(buildDesignation("Operations Manager", "OM", 2, opsDept));
-        designations.add(buildDesignation("Operations Executive", "OE", 4, opsDept));
-        
-        // Fill remaining to reach around 20 if needed
-        for (int i = 1; i <= 11; i++) {
-            designations.add(buildDesignation("General Executive " + i, "GE" + i, 5, opsDept));
-        }
+        // Operations
+        designations.add(buildDesignation("PC Coordinator", BootstrapConstants.DESIG_PC, 4, opsDept));
 
         List<Designation> designationsToSave = new ArrayList<>();
 

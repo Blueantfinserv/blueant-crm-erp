@@ -15,12 +15,15 @@ import com.blueant_crm_erp.lead.mapper.LeadMapper;
 import com.blueant_crm_erp.lead.repository.LeadRepository;
 import com.blueant_crm_erp.lead.service.LeadCodeGeneratorService;
 import com.blueant_crm_erp.lead.service.PhysicalLeadService;
+import com.blueant_crm_erp.lead.validator.LeadValidator;
 import com.blueant_crm_erp.user.entity.User;
 import com.blueant_crm_erp.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -38,6 +41,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
     private final UserRepository userRepository;
     private final LeadMapper leadMapper;
     private final LeadCodeGeneratorService leadCodeGeneratorService;
+    private final LeadValidator leadValidator;
 
     @Override
     public PhysicalLeadAssignmentResponse createPhysicalLead(CreatePhysicalLeadRequest request, String currentUserIdentifier) {
@@ -94,6 +98,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
         log.info("Assigning physical lead: {} to sales person: {} by coordinator: {}", leadCode, request.getSalesPersonEmployeeCode(), currentUserIdentifier);
 
         User coordinator = resolveUser(currentUserIdentifier);
+        boolean isCrm = isCrmCaller(coordinator);
 
         Lead lead = leadRepository.findByLeadCode(leadCode)
                 .orElseGet(() -> leadRepository.findByUniqueLeadId(leadCode)
@@ -105,10 +110,14 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
 
         User targetSalesPerson = resolveSalesPerson(request.getSalesPersonEmployeeCode());
 
+        if (isCrm) {
+            leadValidator.validateCrmTargetRoleAssignment(targetSalesPerson);
+        }
+
         lead.setAssignedSalesPerson(targetSalesPerson);
         lead.setAssignedBy(coordinator);
         lead.setAssignedAt(LocalDateTime.now());
-        lead.setAssignmentSource("SALES_COORDINATOR");
+        lead.setAssignmentSource(isCrm ? "CRM" : "SALES_COORDINATOR");
         lead.setIsPhysicalLead(true);
         lead.setLeadStatus(LeadStatus.ASSIGNED);
         lead.setLeadStage(LeadStage.LEAD_ASSIGNED);
@@ -121,7 +130,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
 
         if (StringUtils.hasText(request.getAssignmentReason())) {
             String updatedRemarks = (lead.getRemarks() != null ? lead.getRemarks() + " | " : "") 
-                    + "Assigned by Sales Coordinator: " + request.getAssignmentReason();
+                    + (isCrm ? "Assigned by CRM: " : "Assigned by Sales Coordinator: ") + request.getAssignmentReason();
             lead.setRemarks(updatedRemarks);
         }
 
@@ -182,6 +191,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
     private PhysicalLeadAssignmentResponse buildAssignmentResponse(Lead lead, String message) {
         User salesPerson = lead.getAssignedSalesPerson();
         User coordinator = lead.getAssignedBy();
+        boolean isCrm = "CRM".equalsIgnoreCase(lead.getAssignmentSource());
 
         return PhysicalLeadAssignmentResponse.builder()
                 .leadId(lead.getId())
@@ -202,9 +212,26 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 .assignedAt(lead.getAssignedAt())
                 .assignmentDate(lead.getAssignmentDate())
                 .assignmentSource(lead.getAssignmentSource())
-                .assignedByCoordinator(Boolean.TRUE.equals(lead.getIsPhysicalLead()) || "SALES_COORDINATOR".equalsIgnoreCase(lead.getAssignmentSource()) || coordinator != null)
-                .assignmentLabel("Assigned by Sales Coordinator")
+                .assignedByCoordinator(!isCrm && (Boolean.TRUE.equals(lead.getIsPhysicalLead()) || "SALES_COORDINATOR".equalsIgnoreCase(lead.getAssignmentSource()) || coordinator != null))
+                .assignmentLabel(isCrm ? "Assigned by CRM" : "Assigned by Sales Coordinator")
                 .statusMessage(message)
                 .build();
+    }
+
+    private boolean isCrmCaller(User caller) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities() != null) {
+            boolean hasCrmAuthority = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_CRM") ||
+                                   a.getAuthority().equalsIgnoreCase("CRM"));
+            if (hasCrmAuthority) {
+                return true;
+            }
+        }
+        if (caller != null && caller.getRole() != null) {
+            String roleCode = caller.getRole().getCode();
+            return "CRM".equalsIgnoreCase(roleCode) || "ROLE_CRM".equalsIgnoreCase(roleCode);
+        }
+        return false;
     }
 }

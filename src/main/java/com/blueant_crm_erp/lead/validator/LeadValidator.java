@@ -1,8 +1,11 @@
 package com.blueant_crm_erp.lead.validator;
 
+import com.blueant_crm_erp.bootstrap.constant.BootstrapConstants;
+import com.blueant_crm_erp.exception.auth.AccessDeniedException;
 import com.blueant_crm_erp.exception.common.BadRequestException;
 import com.blueant_crm_erp.lead.dto.request.*;
 import com.blueant_crm_erp.lead.service.LeadActivityTrackerService;
+import com.blueant_crm_erp.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -84,6 +87,59 @@ public class LeadValidator {
     }
 
     public void validateAssignmentRule() {
+    }
+
+    public void validateCrmTargetRoleAssignment(User assignee) {
+        if (!isAllowedTargetRoleForCrm(assignee)) {
+            throw new AccessDeniedException(
+                    "CRM users are only authorized to assign leads to RELATIONSHIP_MANAGER or SALES_COORDINATOR."
+            );
+        }
+    }
+
+    public boolean isAllowedTargetRoleForCrm(User assignee) {
+        if (assignee == null) {
+            return false;
+        }
+
+        String roleCode = assignee.getRole() != null ? assignee.getRole().getCode() : null;
+        String desigCode = assignee.getDesignation() != null ? assignee.getDesignation().getCode() : null;
+
+        // Explicitly forbidden target roles for CRM assignment
+        if (roleCode != null) {
+            String upperRole = roleCode.trim().toUpperCase();
+            if (upperRole.equals(BootstrapConstants.ROLE_PC_COORDINATOR) ||
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_PC_COORDINATOR) ||
+                upperRole.equals(BootstrapConstants.ROLE_SALES_MANAGER) ||
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_SALES_MANAGER) ||
+                upperRole.equals(BootstrapConstants.ROLE_ADMIN) ||
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_ADMIN) ||
+                upperRole.equals(BootstrapConstants.ROLE_SUPER_ADMIN) ||
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_SUPER_ADMIN)) {
+                return false;
+            }
+        }
+        if (desigCode != null) {
+            String upperDesig = desigCode.trim().toUpperCase();
+            if (upperDesig.equals(BootstrapConstants.DESIG_PC) ||
+                upperDesig.equals(BootstrapConstants.DESIG_SM)) {
+                return false;
+            }
+        }
+
+        // Allowed: RELATIONSHIP_MANAGER (role or designation)
+        boolean isRm = (roleCode != null && (roleCode.equalsIgnoreCase(BootstrapConstants.ROLE_RELATIONSHIP_MANAGER) ||
+                                             roleCode.equalsIgnoreCase("ROLE_" + BootstrapConstants.ROLE_RELATIONSHIP_MANAGER)))
+                || (desigCode != null && (desigCode.equalsIgnoreCase(BootstrapConstants.DESIG_RM) ||
+                                          desigCode.equalsIgnoreCase("RM")));
+
+        // Allowed: SALES_COORDINATOR (role or designation)
+        boolean isSc = (roleCode != null && (roleCode.equalsIgnoreCase(BootstrapConstants.ROLE_SALES_COORDINATOR) ||
+                                             roleCode.equalsIgnoreCase("ROLE_" + BootstrapConstants.ROLE_SALES_COORDINATOR)))
+                || (desigCode != null && (desigCode.equalsIgnoreCase(BootstrapConstants.DESIG_SC) ||
+                                          desigCode.equalsIgnoreCase("SC")));
+
+        return isRm || isSc;
     }
 
     public void validateConversionRule() {

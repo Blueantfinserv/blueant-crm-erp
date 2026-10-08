@@ -86,6 +86,8 @@ public final class BootstrapConstants {
 
     public static final String ROLE_SALES_COORDINATOR = "SALES_COORDINATOR";
 
+    public static final String ROLE_CRM = "CRM";
+
     // =========================================================================
     // Default Department Codes
     // =========================================================================

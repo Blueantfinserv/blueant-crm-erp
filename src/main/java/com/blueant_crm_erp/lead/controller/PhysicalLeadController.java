@@ -42,7 +42,7 @@ public class PhysicalLeadController {
     }
 
     @PostMapping("/{leadCode}/assign")
-    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM')")
     public ApiResponse<PhysicalLeadAssignmentResponse> assignPhysicalLead(
             @PathVariable String leadCode,
             @Valid @RequestBody AssignPhysicalLeadRequest request,
@@ -53,7 +53,7 @@ public class PhysicalLeadController {
     }
 
     @GetMapping("/eligible")
-    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM')")
     public ApiResponse<PageResponse<LeadResponse>> getEligiblePhysicalLeads(Pageable pageable) {
         return ApiResponse.success(physicalLeadService.getEligiblePhysicalLeads(pageable));
     }

@@ -127,11 +127,27 @@ public class LeadServiceImpl implements LeadService {
         User assignee = userRepository.findById(request.getAssignedUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getAssignedUserId()));
 
+        User caller = resolveCaller(currentUserEmail);
+        boolean isCrm = isCrmCaller(caller);
+        if (isCrm) {
+            leadValidator.validateCrmTargetRoleAssignment(assignee);
+        }
+
         Lead lead = leadRepository.findById(request.getLeadId())
                 .orElseThrow(() -> new LeadNotFoundException(request.getLeadId().toString()));
         lead.setAssignedSalesPerson(assignee);
         lead.setLeadStatus(LeadStatus.ASSIGNED);
         lead.setLeadStage(LeadStage.LEAD_ASSIGNED);
+        if (isCrm) {
+            lead.setAssignmentSource("CRM");
+            if (caller != null) {
+                lead.setAssignedBy(caller);
+            }
+            lead.setAssignedAt(LocalDateTime.now());
+        } else if (caller != null && lead.getAssignedBy() == null) {
+            lead.setAssignedBy(caller);
+            lead.setAssignedAt(LocalDateTime.now());
+        }
         lead = leadRepository.save(lead);
 
         return leadMapper.toResponse(lead);
@@ -344,7 +360,7 @@ public class LeadServiceImpl implements LeadService {
                                a.getAuthority().equalsIgnoreCase("ADMIN") ||
                                a.getAuthority().equalsIgnoreCase("ROLE_SUPER_ADMIN") ||
                                a.getAuthority().equalsIgnoreCase("SUPER_ADMIN") ||
-                                a.getAuthority().equalsIgnoreCase("ROLE_PC_COORDINATOR") ||
+                               a.getAuthority().equalsIgnoreCase("ROLE_PC_COORDINATOR") ||
                                a.getAuthority().equalsIgnoreCase("PC_COORDINATOR") ||
                                a.getAuthority().equalsIgnoreCase("ROLE_SALES_COORDINATOR") ||
                                a.getAuthority().equalsIgnoreCase("SALES_COORDINATOR") ||
@@ -354,7 +370,9 @@ public class LeadServiceImpl implements LeadService {
                                a.getAuthority().equalsIgnoreCase("ROLE_SALES_MANAGER") ||
                                a.getAuthority().equalsIgnoreCase("SALES_MANAGER") ||
                                a.getAuthority().equalsIgnoreCase("ROLE_TEAM_LEADER") ||
-                               a.getAuthority().equalsIgnoreCase("TEAM_LEADER"));
+                               a.getAuthority().equalsIgnoreCase("TEAM_LEADER") ||
+                               a.getAuthority().equalsIgnoreCase("ROLE_CRM") ||
+                               a.getAuthority().equalsIgnoreCase("CRM"));
 
         if (auth.getPrincipal() instanceof CustomUserDetails cud) {
             if (cud.getRoleCode() != null) {
@@ -362,7 +380,7 @@ public class LeadServiceImpl implements LeadService {
                 if (roleCode.equals("ADMIN") || roleCode.equals("SUPER_ADMIN") ||
                     roleCode.equals("PC_COORDINATOR") || roleCode.equals("SALES_COORDINATOR") ||
                     roleCode.equals("BUSINESS_HEAD") || roleCode.equals("SALES_MANAGER") ||
-                    roleCode.equals("TEAM_LEADER")) {
+                    roleCode.equals("TEAM_LEADER") || roleCode.equals("CRM")) {
                     hasElevated = true;
                 }
             }
@@ -453,5 +471,39 @@ public class LeadServiceImpl implements LeadService {
     private Lead getLeadByUniqueLeadId(String uniqueLeadId) {
         return leadRepository.findByUniqueLeadId(uniqueLeadId)
                 .orElseThrow(() -> new LeadNotFoundException(uniqueLeadId));
+    }
+
+    private User resolveCaller(String identifier) {
+        if (!StringUtils.hasText(identifier)) {
+            return null;
+        }
+        User user = userRepository.findByEmployeeCodeIgnoreCaseAndDeletedFalse(identifier)
+                .orElseGet(() -> userRepository.findByEmailIgnoreCaseAndDeletedFalse(identifier)
+                        .orElse(null));
+
+        if (user == null) {
+            try {
+                Long id = Long.parseLong(identifier);
+                user = userRepository.findById(id).orElse(null);
+            } catch (NumberFormatException ignored) {}
+        }
+        return user;
+    }
+
+    private boolean isCrmCaller(User caller) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities() != null) {
+            boolean hasCrmAuthority = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_CRM") ||
+                                   a.getAuthority().equalsIgnoreCase("CRM"));
+            if (hasCrmAuthority) {
+                return true;
+            }
+        }
+        if (caller != null && caller.getRole() != null) {
+            String roleCode = caller.getRole().getCode();
+            return "CRM".equalsIgnoreCase(roleCode) || "ROLE_CRM".equalsIgnoreCase(roleCode);
+        }
+        return false;
     }
 }

@@ -38,7 +38,7 @@ public class LeadController {
         return ApiResponse.success("Lead updated successfully", leadService.updateLead(uniqueLeadId, request, principal.getName()));
     }
 
-    @PreAuthorize("hasAuthority('LEAD_UPDATE') or hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM', 'PC_COORDINATOR')")
+    @PreAuthorize("hasAuthority('LEAD_UPDATE') or hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM_ONBOARDING', 'PC_COORDINATOR')")
     @PostMapping("/assign")
     public ApiResponse<LeadResponse> assignLead(@Valid @RequestBody AssignLeadRequest request, Principal principal) {
         return ApiResponse.success("Lead assigned successfully", leadService.assignLead(request, principal.getName()));
@@ -68,19 +68,19 @@ public class LeadController {
         return ApiResponse.success("Lead converted successfully", leadService.convertLead(request, principal.getName()));
     }
 
-    @PreAuthorize("hasAuthority('LEAD_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM')")
+    @PreAuthorize("hasAuthority('LEAD_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM_ONBOARDING')")
     @GetMapping("/{uniqueLeadId}")
     public ApiResponse<LeadDetailResponse> getLeadDetails(@PathVariable String uniqueLeadId) {
         return ApiResponse.success(leadService.getLeadDetails(uniqueLeadId));
     }
 
-    @PreAuthorize("hasAuthority('LEAD_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM')")
+    @PreAuthorize("hasAuthority('LEAD_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM_ONBOARDING')")
     @PostMapping("/search")
     public ApiResponse<PageResponse<LeadResponse>> searchLeads(@RequestBody LeadSearchRequest request, Pageable pageable) {
         return ApiResponse.success(leadService.searchLeads(request, pageable));
     }
 
-    @PreAuthorize("hasAuthority('LEAD_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM')")
+    @PreAuthorize("hasAuthority('LEAD_READ') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM_ONBOARDING')")
     @PostMapping("/filter")
     public ApiResponse<PageResponse<LeadResponse>> filterLeads(@RequestBody LeadFilterRequest request, Pageable pageable) {
         return ApiResponse.success(leadService.filterLeads(request, pageable));

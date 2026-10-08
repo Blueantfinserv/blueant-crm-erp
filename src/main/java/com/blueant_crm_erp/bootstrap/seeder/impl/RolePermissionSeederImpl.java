@@ -106,6 +106,10 @@ public class RolePermissionSeederImpl implements BootstrapSeeder {
                     } else if (p.getCode().contains("_READ")) {
                         shouldMap = true;
                     }
+                } else if (role.getCode().equals(BootstrapConstants.ROLE_CRM_ONBOARDING)) {
+                    if (p.getCode().equals("LEAD_READ") || p.getCode().equals("PHYSICAL_LEAD_ASSIGN")) {
+                        shouldMap = true;
+                    }
                 } else if (p.getCode().contains("_READ")) {
                     shouldMap = true; // Simple logic: everyone can read
                 }

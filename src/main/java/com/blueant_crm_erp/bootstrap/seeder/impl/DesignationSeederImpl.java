@@ -56,8 +56,9 @@ public class DesignationSeederImpl implements BootstrapSeeder {
         Department salesDept = departmentRepository.findByCodeIgnoreCase(BootstrapConstants.DEPT_SALES).orElse(null);
         Department hrDept = departmentRepository.findByCodeIgnoreCase(BootstrapConstants.DEPT_HR).orElse(null);
         Department opsDept = departmentRepository.findByCodeIgnoreCase(BootstrapConstants.DEPT_OPS).orElse(null);
+        Department crmDept = departmentRepository.findByCodeIgnoreCase(BootstrapConstants.DEPT_CRM).orElse(null);
         
-        if (salesDept == null || hrDept == null || opsDept == null) {
+        if (salesDept == null || hrDept == null || opsDept == null || crmDept == null) {
             log.warn("Required departments not found. Cannot seed designations.");
             return SeederResult.builder()
                     .moduleName("Designations")
@@ -76,6 +77,9 @@ public class DesignationSeederImpl implements BootstrapSeeder {
 
         // Operations
         designations.add(buildDesignation("PC Coordinator", BootstrapConstants.DESIG_PC, 4, opsDept));
+
+        // CRM
+        designations.add(buildDesignation("CRM Onboarding", BootstrapConstants.DESIG_CRM_ONBOARDING, 4, crmDept));
 
         List<Designation> designationsToSave = new ArrayList<>();
 

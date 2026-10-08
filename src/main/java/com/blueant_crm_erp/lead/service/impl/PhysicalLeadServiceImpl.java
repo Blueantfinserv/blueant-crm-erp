@@ -117,7 +117,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
         lead.setAssignedSalesPerson(targetSalesPerson);
         lead.setAssignedBy(coordinator);
         lead.setAssignedAt(LocalDateTime.now());
-        lead.setAssignmentSource(isCrm ? "CRM" : "SALES_COORDINATOR");
+        lead.setAssignmentSource(isCrm ? "CRM_ONBOARDING" : "SALES_COORDINATOR");
         lead.setIsPhysicalLead(true);
         lead.setLeadStatus(LeadStatus.ASSIGNED);
         lead.setLeadStage(LeadStage.LEAD_ASSIGNED);
@@ -130,7 +130,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
 
         if (StringUtils.hasText(request.getAssignmentReason())) {
             String updatedRemarks = (lead.getRemarks() != null ? lead.getRemarks() + " | " : "") 
-                    + (isCrm ? "Assigned by CRM: " : "Assigned by Sales Coordinator: ") + request.getAssignmentReason();
+                    + (isCrm ? "Assigned by CRM Onboarding: " : "Assigned by Sales Coordinator: ") + request.getAssignmentReason();
             lead.setRemarks(updatedRemarks);
         }
 
@@ -191,7 +191,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
     private PhysicalLeadAssignmentResponse buildAssignmentResponse(Lead lead, String message) {
         User salesPerson = lead.getAssignedSalesPerson();
         User coordinator = lead.getAssignedBy();
-        boolean isCrm = "CRM".equalsIgnoreCase(lead.getAssignmentSource());
+        boolean isCrm = "CRM_ONBOARDING".equalsIgnoreCase(lead.getAssignmentSource()) || "CRM".equalsIgnoreCase(lead.getAssignmentSource());
 
         return PhysicalLeadAssignmentResponse.builder()
                 .leadId(lead.getId())
@@ -213,7 +213,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 .assignmentDate(lead.getAssignmentDate())
                 .assignmentSource(lead.getAssignmentSource())
                 .assignedByCoordinator(!isCrm && (Boolean.TRUE.equals(lead.getIsPhysicalLead()) || "SALES_COORDINATOR".equalsIgnoreCase(lead.getAssignmentSource()) || coordinator != null))
-                .assignmentLabel(isCrm ? "Assigned by CRM" : "Assigned by Sales Coordinator")
+                .assignmentLabel(isCrm ? "Assigned by CRM Onboarding" : "Assigned by Sales Coordinator")
                 .statusMessage(message)
                 .build();
     }
@@ -222,15 +222,27 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getAuthorities() != null) {
             boolean hasCrmAuthority = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_CRM") ||
-                                   a.getAuthority().equalsIgnoreCase("CRM"));
+                    .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_CRM_ONBOARDING") ||
+                                   a.getAuthority().equalsIgnoreCase("CRM_ONBOARDING"));
             if (hasCrmAuthority) {
+                if (caller != null && caller.getDepartment() != null) {
+                    return "CRM".equalsIgnoreCase(caller.getDepartment().getCode()) ||
+                           Long.valueOf(2L).equals(caller.getDepartment().getId());
+                }
                 return true;
             }
         }
         if (caller != null && caller.getRole() != null) {
             String roleCode = caller.getRole().getCode();
-            return "CRM".equalsIgnoreCase(roleCode) || "ROLE_CRM".equalsIgnoreCase(roleCode);
+            boolean isCrmRole = "CRM_ONBOARDING".equalsIgnoreCase(roleCode) ||
+                                "ROLE_CRM_ONBOARDING".equalsIgnoreCase(roleCode);
+            if (isCrmRole) {
+                if (caller.getDepartment() != null) {
+                    return "CRM".equalsIgnoreCase(caller.getDepartment().getCode()) ||
+                           Long.valueOf(2L).equals(caller.getDepartment().getId());
+                }
+                return true;
+            }
         }
         return false;
     }

@@ -86,7 +86,7 @@ public final class BootstrapConstants {
 
     public static final String ROLE_SALES_COORDINATOR = "SALES_COORDINATOR";
 
-    public static final String ROLE_CRM = "CRM";
+    public static final String ROLE_CRM_ONBOARDING = "CRM_ONBOARDING";
 
     // =========================================================================
     // Default Department Codes
@@ -110,6 +110,7 @@ public final class BootstrapConstants {
     public static final String DESIG_RM = "RM";
     public static final String DESIG_PC = "PC";
     public static final String DESIG_HRM = "HRM";
+    public static final String DESIG_CRM_ONBOARDING = "CRM_ONBOARDING";
 
     // =========================================================================
     // Default Team Codes
@@ -182,11 +183,11 @@ public final class BootstrapConstants {
 
     public static final int DEFAULT_DEPARTMENT_COUNT = 6;
 
-    public static final int DEFAULT_DESIGNATION_COUNT = 6;
+    public static final int DEFAULT_DESIGNATION_COUNT = 7;
 
     public static final int DEFAULT_TEAM_COUNT = 10;
 
-    public static final int DEFAULT_ROLE_COUNT = 8;
+    public static final int DEFAULT_ROLE_COUNT = 9;
 
     public static final int DEFAULT_PERMISSION_COUNT = 100;
 

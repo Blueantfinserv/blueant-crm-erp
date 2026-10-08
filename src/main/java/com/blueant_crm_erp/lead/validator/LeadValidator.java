@@ -112,17 +112,26 @@ public class LeadValidator {
                 upperRole.equals("ROLE_" + BootstrapConstants.ROLE_PC_COORDINATOR) ||
                 upperRole.equals(BootstrapConstants.ROLE_SALES_MANAGER) ||
                 upperRole.equals("ROLE_" + BootstrapConstants.ROLE_SALES_MANAGER) ||
+                upperRole.equals(BootstrapConstants.ROLE_TEAM_LEADER) ||
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_TEAM_LEADER) ||
+                upperRole.equals(BootstrapConstants.ROLE_BUSINESS_HEAD) ||
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_BUSINESS_HEAD) ||
                 upperRole.equals(BootstrapConstants.ROLE_ADMIN) ||
                 upperRole.equals("ROLE_" + BootstrapConstants.ROLE_ADMIN) ||
                 upperRole.equals(BootstrapConstants.ROLE_SUPER_ADMIN) ||
-                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_SUPER_ADMIN)) {
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_SUPER_ADMIN) ||
+                upperRole.equals(BootstrapConstants.ROLE_CRM_ONBOARDING) ||
+                upperRole.equals("ROLE_" + BootstrapConstants.ROLE_CRM_ONBOARDING)) {
                 return false;
             }
         }
         if (desigCode != null) {
             String upperDesig = desigCode.trim().toUpperCase();
             if (upperDesig.equals(BootstrapConstants.DESIG_PC) ||
-                upperDesig.equals(BootstrapConstants.DESIG_SM)) {
+                upperDesig.equals(BootstrapConstants.DESIG_SM) ||
+                upperDesig.equals(BootstrapConstants.DESIG_TL) ||
+                upperDesig.equals(BootstrapConstants.DESIG_BH) ||
+                upperDesig.equals(BootstrapConstants.DESIG_CRM_ONBOARDING)) {
                 return false;
             }
         }

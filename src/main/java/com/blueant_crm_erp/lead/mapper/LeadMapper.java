@@ -61,8 +61,8 @@ public interface LeadMapper {
     @Mapping(source = "assignedSalesPerson.fullName",    target = "assignedEmployeeName")
     @Mapping(source = "assignedBy.employeeCode",        target = "assignedByEmployeeCode")
     @Mapping(source = "assignedBy.fullName",            target = "assignedByEmployeeName")
-    @Mapping(target = "assignedByCoordinator",          expression = "java(!\"CRM\".equalsIgnoreCase(entity.getAssignmentSource()) && (Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null))")
-    @Mapping(target = "assignmentLabel",                expression = "java(\"CRM\".equalsIgnoreCase(entity.getAssignmentSource()) ? \"Assigned by CRM\" : ((Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null) ? \"Assigned by Sales Coordinator\" : null))")
+    @Mapping(target = "assignedByCoordinator",          expression = "java(!\"CRM_ONBOARDING\".equalsIgnoreCase(entity.getAssignmentSource()) && !\"CRM\".equalsIgnoreCase(entity.getAssignmentSource()) && (Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null))")
+    @Mapping(target = "assignmentLabel",                expression = "java((\"CRM_ONBOARDING\".equalsIgnoreCase(entity.getAssignmentSource()) || \"CRM\".equalsIgnoreCase(entity.getAssignmentSource())) ? \"Assigned by CRM Onboarding\" : ((Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null) ? \"Assigned by Sales Coordinator\" : null))")
     @Mapping(target = "nextPlanDate",                    expression = "java(entity.getNextPlanDate() != null ? entity.getNextPlanDate().toLocalDate() : null)")
     LeadResponse toResponse(Lead entity);
 
@@ -83,8 +83,8 @@ public interface LeadMapper {
     @Mapping(source = "assignedLeader.fullName",         target = "leaderName")
     @Mapping(source = "assignedBy.employeeCode",        target = "assignedByEmployeeCode")
     @Mapping(source = "assignedBy.fullName",            target = "assignedByEmployeeName")
-    @Mapping(target = "assignedByCoordinator",          expression = "java(!\"CRM\".equalsIgnoreCase(entity.getAssignmentSource()) && (Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null))")
-    @Mapping(target = "assignmentLabel",                expression = "java(\"CRM\".equalsIgnoreCase(entity.getAssignmentSource()) ? \"Assigned by CRM\" : ((Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null) ? \"Assigned by Sales Coordinator\" : null))")
+    @Mapping(target = "assignedByCoordinator",          expression = "java(!\"CRM_ONBOARDING\".equalsIgnoreCase(entity.getAssignmentSource()) && !\"CRM\".equalsIgnoreCase(entity.getAssignmentSource()) && (Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null))")
+    @Mapping(target = "assignmentLabel",                expression = "java((\"CRM_ONBOARDING\".equalsIgnoreCase(entity.getAssignmentSource()) || \"CRM\".equalsIgnoreCase(entity.getAssignmentSource())) ? \"Assigned by CRM Onboarding\" : ((Boolean.TRUE.equals(entity.getIsPhysicalLead()) || \"SALES_COORDINATOR\".equalsIgnoreCase(entity.getAssignmentSource()) || entity.getAssignedBy() != null) ? \"Assigned by Sales Coordinator\" : null))")
     @Mapping(target = "nextPlanDate",                    expression = "java(entity.getNextPlanDate() != null ? entity.getNextPlanDate().toLocalDate() : null)")
     @Mapping(target = "lastCallDate",                    expression = "java(entity.getLastCallDate() != null ? entity.getLastCallDate().toLocalDate() : null)")
     @Mapping(target = "audit",                           ignore = true)

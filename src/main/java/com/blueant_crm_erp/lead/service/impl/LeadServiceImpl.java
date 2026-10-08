@@ -139,7 +139,7 @@ public class LeadServiceImpl implements LeadService {
         lead.setLeadStatus(LeadStatus.ASSIGNED);
         lead.setLeadStage(LeadStage.LEAD_ASSIGNED);
         if (isCrm) {
-            lead.setAssignmentSource("CRM");
+            lead.setAssignmentSource("CRM_ONBOARDING");
             if (caller != null) {
                 lead.setAssignedBy(caller);
             }
@@ -371,8 +371,8 @@ public class LeadServiceImpl implements LeadService {
                                a.getAuthority().equalsIgnoreCase("SALES_MANAGER") ||
                                a.getAuthority().equalsIgnoreCase("ROLE_TEAM_LEADER") ||
                                a.getAuthority().equalsIgnoreCase("TEAM_LEADER") ||
-                               a.getAuthority().equalsIgnoreCase("ROLE_CRM") ||
-                               a.getAuthority().equalsIgnoreCase("CRM"));
+                               a.getAuthority().equalsIgnoreCase("ROLE_CRM_ONBOARDING") ||
+                               a.getAuthority().equalsIgnoreCase("CRM_ONBOARDING"));
 
         if (auth.getPrincipal() instanceof CustomUserDetails cud) {
             if (cud.getRoleCode() != null) {
@@ -380,7 +380,7 @@ public class LeadServiceImpl implements LeadService {
                 if (roleCode.equals("ADMIN") || roleCode.equals("SUPER_ADMIN") ||
                     roleCode.equals("PC_COORDINATOR") || roleCode.equals("SALES_COORDINATOR") ||
                     roleCode.equals("BUSINESS_HEAD") || roleCode.equals("SALES_MANAGER") ||
-                    roleCode.equals("TEAM_LEADER") || roleCode.equals("CRM")) {
+                    roleCode.equals("TEAM_LEADER") || roleCode.equals("CRM_ONBOARDING")) {
                     hasElevated = true;
                 }
             }
@@ -494,15 +494,27 @@ public class LeadServiceImpl implements LeadService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getAuthorities() != null) {
             boolean hasCrmAuthority = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_CRM") ||
-                                   a.getAuthority().equalsIgnoreCase("CRM"));
+                    .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_CRM_ONBOARDING") ||
+                                   a.getAuthority().equalsIgnoreCase("CRM_ONBOARDING"));
             if (hasCrmAuthority) {
+                if (caller != null && caller.getDepartment() != null) {
+                    return "CRM".equalsIgnoreCase(caller.getDepartment().getCode()) ||
+                           Long.valueOf(2L).equals(caller.getDepartment().getId());
+                }
                 return true;
             }
         }
         if (caller != null && caller.getRole() != null) {
             String roleCode = caller.getRole().getCode();
-            return "CRM".equalsIgnoreCase(roleCode) || "ROLE_CRM".equalsIgnoreCase(roleCode);
+            boolean isCrmRole = "CRM_ONBOARDING".equalsIgnoreCase(roleCode) ||
+                                "ROLE_CRM_ONBOARDING".equalsIgnoreCase(roleCode);
+            if (isCrmRole) {
+                if (caller.getDepartment() != null) {
+                    return "CRM".equalsIgnoreCase(caller.getDepartment().getCode()) ||
+                           Long.valueOf(2L).equals(caller.getDepartment().getId());
+                }
+                return true;
+            }
         }
         return false;
     }

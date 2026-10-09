@@ -32,7 +32,7 @@ public class PhysicalLeadController {
     private final PhysicalLeadService physicalLeadService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('ADMIN', 'SUPER_ADMIN', 'CRM_ONBOARDING')")
     public ApiResponse<PhysicalLeadAssignmentResponse> createPhysicalLead(
             @Valid @RequestBody CreatePhysicalLeadRequest request,
             Principal principal) {

@@ -8,6 +8,7 @@ import com.blueant_crm_erp.common.enums.Gender;
 import com.blueant_crm_erp.common.enums.Status;
 import com.blueant_crm_erp.lead.dto.request.AssignLeadRequest;
 import com.blueant_crm_erp.lead.dto.request.CreateLeadRequest;
+import com.blueant_crm_erp.lead.dto.request.CreatePhysicalLeadRequest;
 import com.blueant_crm_erp.lead.dto.request.LeadFilterRequest;
 import com.blueant_crm_erp.lead.dto.request.LeadSearchRequest;
 import com.blueant_crm_erp.lead.dto.response.LeadDetailResponse;
@@ -783,5 +784,276 @@ public class CrmLeadAssignmentIntegrationTest {
         Lead reloaded = leadRepository.findById(lead.getId()).orElseThrow();
         assertThat(reloaded.getAssignedSalesPerson().getId()).isEqualTo(rmUser.getId());
         assertThat(reloaded.getAssignmentSource()).isEqualTo("CRM_ONBOARDING");
+    }
+
+    // =========================================================================
+    // 22. CRM_ONBOARDING creates new physical Lead assigned to RM (Success)
+    // =========================================================================
+    @Test
+    @DisplayName("22. CRM_ONBOARDING creates new physical Lead assigned to RM")
+    void test22_crmCreatesPhysicalLead_assignedToRm_success() throws Exception {
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("CRM Physical Lead to RM")
+                .mobileNumber("9" + String.format("%09d", (long) (Math.random() * 1000000000L)))
+                .location("Delhi")
+                .speciality("Cardiology")
+                .clinicAddress("Apollo Clinic")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .assignmentDate(LocalDate.now())
+                .remarks("Created and assigned by CRM")
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.assignedEmployeeCode").value(rmUser.getEmployeeCode()))
+                .andExpect(jsonPath("$.data.assignmentSource").value("CRM_ONBOARDING"))
+                .andExpect(jsonPath("$.data.assignmentLabel").value("Assigned by CRM Onboarding"))
+                .andExpect(jsonPath("$.data.assignedByCoordinator").value(false));
+
+        Lead created = leadRepository.findByMobileNumber(request.getMobileNumber()).orElseThrow();
+        assertThat(created.getAssignedSalesPerson().getId()).isEqualTo(rmUser.getId());
+        assertThat(created.getAssignedBy().getId()).isEqualTo(crmUser.getId());
+        assertThat(created.getAssignmentSource()).isEqualTo("CRM_ONBOARDING");
+        assertThat(created.getIsPhysicalLead()).isTrue();
+        assertThat(created.getLeadStatus()).isEqualTo(LeadStatus.ASSIGNED);
+    }
+
+    // =========================================================================
+    // 23. CRM_ONBOARDING creates new physical Lead assigned to SC (Success)
+    // =========================================================================
+    @Test
+    @DisplayName("23. CRM_ONBOARDING creates new physical Lead assigned to SC")
+    void test23_crmCreatesPhysicalLead_assignedToSc_success() throws Exception {
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("CRM Physical Lead to SC")
+                .mobileNumber("9" + String.format("%09d", (long) (Math.random() * 1000000000L)))
+                .location("Noida")
+                .speciality("Orthopedics")
+                .clinicAddress("Fortis Hospital")
+                .salesPersonEmployeeCode(scUser.getEmployeeCode())
+                .assignmentDate(LocalDate.now())
+                .remarks("Created and assigned to SC by CRM")
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.assignedEmployeeCode").value(scUser.getEmployeeCode()))
+                .andExpect(jsonPath("$.data.assignmentSource").value("CRM_ONBOARDING"))
+                .andExpect(jsonPath("$.data.assignmentLabel").value("Assigned by CRM Onboarding"));
+
+        Lead created = leadRepository.findByMobileNumber(request.getMobileNumber()).orElseThrow();
+        assertThat(created.getAssignedSalesPerson().getId()).isEqualTo(scUser.getId());
+        assertThat(created.getAssignmentSource()).isEqualTo("CRM_ONBOARDING");
+    }
+
+    // =========================================================================
+    // 24. CRM attempts creation assigned to SM — rejected (Forbidden)
+    // =========================================================================
+    @Test
+    @DisplayName("24. CRM creates physical Lead assigned to SM — rejected (Forbidden)")
+    void test24_crmCreatesPhysicalLead_assignedToSm_forbidden() throws Exception {
+        String mobile = "9" + String.format("%09d", (long) (Math.random() * 1000000000L));
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("CRM Lead to SM")
+                .mobileNumber(mobile)
+                .location("Delhi")
+                .speciality("Pediatrics")
+                .clinicAddress("Max Hospital")
+                .salesPersonEmployeeCode(smUser.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        // Rollback check: no lead persisted
+        assertThat(leadRepository.findByMobileNumber(mobile)).isEmpty();
+    }
+
+    // =========================================================================
+    // 25. CRM attempts creation assigned to PC — rejected (Forbidden)
+    // =========================================================================
+    @Test
+    @DisplayName("25. CRM creates physical Lead assigned to PC — rejected (Forbidden)")
+    void test25_crmCreatesPhysicalLead_assignedToPc_forbidden() throws Exception {
+        String mobile = "9" + String.format("%09d", (long) (Math.random() * 1000000000L));
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("CRM Lead to PC")
+                .mobileNumber(mobile)
+                .location("Delhi")
+                .speciality("Dermatology")
+                .clinicAddress("Skin Clinic")
+                .salesPersonEmployeeCode(pcCoordinatorUser.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        // Rollback check: no lead persisted
+        assertThat(leadRepository.findByMobileNumber(mobile)).isEmpty();
+    }
+
+    // =========================================================================
+    // 26. CRM attempts creation assigned to Admin / Super Admin — rejected (Forbidden)
+    // =========================================================================
+    @Test
+    @DisplayName("26. CRM creates physical Lead assigned to Admin — rejected (Forbidden)")
+    void test26_crmCreatesPhysicalLead_assignedToAdmin_forbidden() throws Exception {
+        String mobile = "9" + String.format("%09d", (long) (Math.random() * 1000000000L));
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("CRM Lead to Admin")
+                .mobileNumber(mobile)
+                .location("Delhi")
+                .speciality("Neurology")
+                .clinicAddress("Medanta")
+                .salesPersonEmployeeCode(adminUser.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        // Rollback check: no lead persisted
+        assertThat(leadRepository.findByMobileNumber(mobile)).isEmpty();
+    }
+
+    // =========================================================================
+    // 27. CRM attempts creation assigned to self / CRM target — rejected (Forbidden)
+    // =========================================================================
+    @Test
+    @DisplayName("27. CRM creates physical Lead assigned to self/CRM — rejected (Forbidden)")
+    void test27_crmCreatesPhysicalLead_assignedToCrmSelf_forbidden() throws Exception {
+        String mobile = "9" + String.format("%09d", (long) (Math.random() * 1000000000L));
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("CRM Lead to CRM Self")
+                .mobileNumber(mobile)
+                .location("Delhi")
+                .speciality("General")
+                .clinicAddress("Clinic")
+                .salesPersonEmployeeCode(crmUser.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        // Rollback check: no lead persisted
+        assertThat(leadRepository.findByMobileNumber(mobile)).isEmpty();
+    }
+
+    // =========================================================================
+    // 28. PC Coordinator physical Lead creation still succeeds with SALES_COORDINATOR attribution
+    // =========================================================================
+    @Test
+    @DisplayName("28. PC Coordinator physical Lead creation retains SALES_COORDINATOR attribution")
+    void test28_pcCreatesPhysicalLead_salesCoordinatorAttribution() throws Exception {
+        CreatePhysicalLeadRequest request = CreatePhysicalLeadRequest.builder()
+                .clientName("PC Physical Lead")
+                .mobileNumber("9" + String.format("%09d", (long) (Math.random() * 1000000000L)))
+                .location("Gurgaon")
+                .speciality("Cardiology")
+                .clinicAddress("Paras Hospital")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .assignmentDate(LocalDate.now())
+                .remarks("Created and assigned by PC")
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(pcCoordinatorUser.getEmployeeCode()).roles("PC_COORDINATOR").authorities(
+                        new SimpleGrantedAuthority("ROLE_PC_COORDINATOR"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.assignmentSource").value("SALES_COORDINATOR"))
+                .andExpect(jsonPath("$.data.assignmentLabel").value("Assigned by Sales Coordinator"))
+                .andExpect(jsonPath("$.data.assignedByCoordinator").value(true));
+
+        Lead created = leadRepository.findByMobileNumber(request.getMobileNumber()).orElseThrow();
+        assertThat(created.getAssignedBy().getId()).isEqualTo(pcCoordinatorUser.getId());
+        assertThat(created.getAssignmentSource()).isEqualTo("SALES_COORDINATOR");
+    }
+
+    // =========================================================================
+    // 29. Duplicate mobile validation on physical Lead creation remains intact
+    // =========================================================================
+    @Test
+    @DisplayName("29. Duplicate mobile on physical Lead creation rejected with 400")
+    void test29_duplicateMobile_physicalLeadCreation_rejected() throws Exception {
+        String mobile = "9" + String.format("%09d", (long) (Math.random() * 1000000000L));
+        CreatePhysicalLeadRequest request1 = CreatePhysicalLeadRequest.builder()
+                .clientName("First Client")
+                .mobileNumber(mobile)
+                .location("Delhi")
+                .speciality("General")
+                .clinicAddress("Clinic 1")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .build();
+
+        // First creation succeeds
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request1)))
+                .andExpect(status().isOk());
+
+        // Second creation with duplicate mobile must fail
+        CreatePhysicalLeadRequest request2 = CreatePhysicalLeadRequest.builder()
+                .clientName("Second Client")
+                .mobileNumber(mobile)
+                .location("Delhi")
+                .speciality("Dentistry")
+                .clinicAddress("Clinic 2")
+                .salesPersonEmployeeCode(scUser.getEmployeeCode())
+                .build();
+
+        mockMvc.perform(post("/v1/Leads_assign")
+                .with(user(crmUser.getEmployeeCode()).roles("CRM_ONBOARDING").authorities(
+                        new SimpleGrantedAuthority("ROLE_CRM_ONBOARDING"),
+                        new SimpleGrantedAuthority("PHYSICAL_LEAD_ASSIGN")
+                ))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request2)))
+                .andExpect(status().isBadRequest());
     }
 }

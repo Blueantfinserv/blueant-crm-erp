@@ -49,6 +49,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 request.getClientName(), request.getSalesPersonEmployeeCode(), currentUserIdentifier);
 
         User coordinator = resolveUser(currentUserIdentifier);
+        boolean isCrm = isCrmCaller(coordinator);
 
         if (leadRepository.existsByMobileNumber(request.getMobileNumber())) {
             throw new BadRequestException(LeadConstants.LEAD_DUPLICATE_MOBILE);
@@ -59,6 +60,11 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
         }
 
         User assignedSalesPerson = resolveSalesPerson(request.getSalesPersonEmployeeCode());
+
+        if (isCrm) {
+            leadValidator.validateCrmTargetRoleAssignment(assignedSalesPerson);
+        }
+
         LocalDateTime now = LocalDateTime.now();
 
         Lead lead = Lead.builder()
@@ -84,7 +90,7 @@ public class PhysicalLeadServiceImpl implements PhysicalLeadService {
                 .assignedBy(coordinator)
                 .assignedAt(now)
                 .assignmentDate(request.getAssignmentDate())
-                .assignmentSource("SALES_COORDINATOR")
+                .assignmentSource(isCrm ? "CRM_ONBOARDING" : "SALES_COORDINATOR")
                 .build();
 
         lead = leadRepository.save(lead);

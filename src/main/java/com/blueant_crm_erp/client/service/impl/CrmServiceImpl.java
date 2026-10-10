@@ -442,10 +442,12 @@ public class CrmServiceImpl implements CrmService {
         List<Client> clients;
         if (userOpt.isPresent()) {
             Long userId = userOpt.get().getId();
-            clients = clientRepository.findAll((root, query, cb) -> cb.or(
-                    cb.equal(root.get("salesPerson").get("id"), userId),
-                    cb.equal(root.get("lead").get("assignedSalesPerson").get("id"), userId)
-            ));
+            clients = clientRepository.findAll((root, query, cb) -> {
+                var spPredicate = cb.equal(root.get("salesPerson").get("id"), userId);
+                var leadJoin = root.join("lead", jakarta.persistence.criteria.JoinType.LEFT);
+                var leadPredicate = cb.and(cb.isNotNull(root.get("lead")), cb.equal(leadJoin.get("assignedSalesPerson").get("id"), userId));
+                return cb.or(spPredicate, leadPredicate);
+            });
         } else {
             clients = clientRepository.findAll();
         }

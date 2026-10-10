@@ -20,7 +20,7 @@ import lombok.experimental.SuperBuilder;
 public class Client extends BaseVersionEntity {
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lead_id", nullable = false, unique = true)
+    @JoinColumn(name = "lead_id", nullable = true, unique = true)
     private Lead lead;
 
     @Column(name = "client_code", nullable = false, unique = true, length = 50)
@@ -53,6 +53,34 @@ public class Client extends BaseVersionEntity {
 
     @Column(name = "client_since")
     private java.time.LocalDate clientSince;
+
+    @Column(name = "speciality", length = 100)
+    private String speciality;
+
+    @Column(name = "location", length = 150)
+    private String location;
+
+    @Column(name = "clinic_address", length = 500)
+    private String clinicAddress;
+
+    @Column(name = "alternate_mobile_number", length = 20)
+    private String alternateMobileNumber;
+
+    @Column(name = "remarks", length = 1000)
+    private String remarks;
+
+    @Column(name = "assignment_date")
+    private java.time.LocalDate assignmentDate;
+
+    @Column(name = "best_time_to_meet", length = 50)
+    private String bestTimeToMeet;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_by_id", foreignKey = @ForeignKey(name = "fk_client_assigned_by"))
+    private com.blueant_crm_erp.user.entity.User assignedBy;
+
+    @Column(name = "assigned_at")
+    private java.time.LocalDateTime assignedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "relationship_manager_id", foreignKey = @ForeignKey(name = "fk_client_rm"))

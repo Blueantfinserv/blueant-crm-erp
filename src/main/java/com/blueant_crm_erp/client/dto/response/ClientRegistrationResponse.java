@@ -1,9 +1,12 @@
 package com.blueant_crm_erp.client.dto.response;
 
+import com.blueant_crm_erp.client.enums.ClientPaymentStatus;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -12,6 +15,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ClientRegistrationResponse {
 
+    // Identity & Core (Existing)
     private Long id;
     private String clientCode;
     private String clientName;
@@ -26,13 +30,60 @@ public class ClientRegistrationResponse {
     private LocalDate assignmentDate;
     private String bestTimeToMeet;
 
+    // Assigned Sales Person (Existing)
     private Long assignedSalesPersonId;
     private String assignedSalesPersonCode;
     private String assignedSalesPersonName;
     private String assignedSalesPersonRole;
 
+    // Assignment & Creator Metadata (Existing & Enhanced)
     private String assignedBy;
     private LocalDateTime assignedAt;
     private LocalDateTime createdAt;
     private String createdBy;
+    private String createdByRole;
+
+    private Long previousSalesPersonId;
+    private String previousSalesPersonCode;
+    private String previousSalesPersonName;
+
+    // Section A: Personal & Family Details
+    private String panNumber;
+    private LocalDate dateOfBirth;
+    private String motherName;
+    private String placeOfBirth;
+    private String occupation;
+    private String familyHeadName;
+    private String familyDetails;
+    private String residentialAddress;
+    private String correspondenceAddress;
+    private String officeAddress;
+    private String city;
+    private String state;
+    private String pinCode;
+
+    // Section B: Client Source & Ownership
+    private String clientSource;
+    private String sourceDescription;
+
+    // Section C: Investment & Application Details
+    private LocalDate applicationReceivedDate;
+    private String applicationMode;
+    private String investmentType;
+    private List<String> investmentTypes;
+    private BigDecimal firstInvestmentAmount;
+    private BigDecimal expectedMaxSIP;
+    private String investwellId;
+    private LocalDate clientReportDate;
+    private ClientPaymentStatus paymentStatus;
+    private BigDecimal paymentAmount;
+    private LocalDate paymentDate;
+    private String paymentReference;
+
+    // Section D: Nominees
+    private List<ClientNomineeResponse> nominees;
+
+    // Section E: Documents & Completion Status
+    private List<ClientDocumentResponse> documents;
+    private String documentCompletionStatus;
 }

@@ -35,4 +35,15 @@ public class ClientRegistrationController {
         ClientRegistrationResponse response = clientRegistrationService.registerClient(request, currentUser);
         return ApiResponse.success("Client registered and assigned successfully", response);
     }
+
+    @Operation(summary = "Get client full profile", description = "Retrieves complete profile details of a client including personal, source, investment, nominees, documents, and assignment history")
+    @GetMapping("/{clientCode}/profile")
+    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('CRM_ONBOARDING', 'RELATIONSHIP_MANAGER', 'SALES_COORDINATOR', 'ADMIN', 'SUPER_ADMIN')")
+    public ApiResponse<com.blueant_crm_erp.client.dto.response.ClientProfileResponse> getClientProfile(
+            @PathVariable String clientCode,
+            Principal principal) {
+        String currentUser = principal != null ? principal.getName() : "system";
+        com.blueant_crm_erp.client.dto.response.ClientProfileResponse response = clientRegistrationService.getClientProfile(clientCode, currentUser);
+        return ApiResponse.success("Client profile retrieved successfully", response);
+    }
 }

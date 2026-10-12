@@ -2,6 +2,8 @@ package com.blueant_crm_erp.client;
 
 import com.blueant_crm_erp.auth.security.CustomUserDetailsService;
 import com.blueant_crm_erp.bootstrap.constant.BootstrapConstants;
+import com.blueant_crm_erp.client.dto.request.ClientDocumentRequest;
+import com.blueant_crm_erp.client.dto.request.ClientNomineeRequest;
 import com.blueant_crm_erp.client.dto.request.ClientMeetingUpdateRequest;
 import com.blueant_crm_erp.client.dto.request.ClientMeetingVerificationRequest;
 import com.blueant_crm_erp.client.dto.request.CreateClientMeetingRequest;
@@ -9,9 +11,14 @@ import com.blueant_crm_erp.client.dto.request.CreateClientRegistrationRequest;
 import com.blueant_crm_erp.client.entity.Client;
 import com.blueant_crm_erp.client.entity.ClientMeeting;
 import com.blueant_crm_erp.client.entity.ClientMeetingVerification;
+import com.blueant_crm_erp.client.enums.ClientDocumentType;
+import com.blueant_crm_erp.client.enums.ClientPaymentStatus;
 import com.blueant_crm_erp.client.enums.ClientStatus;
+import com.blueant_crm_erp.client.repository.ClientAssignmentHistoryRepository;
+import com.blueant_crm_erp.client.repository.ClientDocumentRepository;
 import com.blueant_crm_erp.client.repository.ClientMeetingRepository;
 import com.blueant_crm_erp.client.repository.ClientMeetingVerificationRepository;
+import com.blueant_crm_erp.client.repository.ClientNomineeRepository;
 import com.blueant_crm_erp.client.repository.ClientRepository;
 import com.blueant_crm_erp.client.service.ClientMeetingService;
 import com.blueant_crm_erp.common.enums.Gender;
@@ -96,6 +103,15 @@ public class ClientWorkflowIntegrationTest {
 
     @Autowired
     private ClientRepository clientRepository;
+
+    @Autowired
+    private ClientNomineeRepository clientNomineeRepository;
+
+    @Autowired
+    private ClientDocumentRepository clientDocumentRepository;
+
+    @Autowired
+    private ClientAssignmentHistoryRepository clientAssignmentHistoryRepository;
 
     @Autowired
     private ClientMeetingRepository clientMeetingRepository;
@@ -336,6 +352,274 @@ public class ClientWorkflowIntegrationTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("1.6 Full profile registration with Section A-E, nominees, documents and initial assignment history")
+    void test1_6_fullProfileRegistrationWithNomineesDocumentsAndHistory() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate dob = LocalDate.of(1985, 5, 20);
+        LocalDate appDate = LocalDate.now().minusDays(1);
+        LocalDate reportDate = LocalDate.now();
+        LocalDate paymentDate = LocalDate.now();
+
+        ClientNomineeRequest nominee1 = ClientNomineeRequest.builder()
+                .nomineeName("Anita Rathore")
+                .relationship("Spouse")
+                .dateOfBirth(LocalDate.of(1987, 8, 14))
+                .contactNumber("9876500001")
+                .panNumber("ABCDE1234F")
+                .isMinor(false)
+                .build();
+
+        ClientNomineeRequest nominee2 = ClientNomineeRequest.builder()
+                .nomineeName("Aarav Rathore")
+                .relationship("Son")
+                .dateOfBirth(LocalDate.of(2015, 3, 10))
+                .isMinor(true)
+                .guardianName("Anita Rathore")
+                .guardianRelationship("Mother")
+                .guardianContact("9876500001")
+                .guardianPan("ABCDE1234F")
+                .build();
+
+        ClientDocumentRequest doc1 = ClientDocumentRequest.builder()
+                .documentType(ClientDocumentType.PAN_KYC)
+                .documentName("Client PAN Card")
+                .received(true)
+                .receivedDate(LocalDate.now())
+                .verificationStatus(VerificationStatus.VERIFIED)
+                .documentReference("DOC-REF-001")
+                .remarks("Verified via NSDL")
+                .build();
+
+        ClientDocumentRequest doc2 = ClientDocumentRequest.builder()
+                .documentType(ClientDocumentType.APPLICATION_FORM)
+                .documentName("Signed Application Form")
+                .received(true)
+                .receivedDate(LocalDate.now())
+                .verificationStatus(VerificationStatus.PENDING)
+                .documentReference("DOC-REF-002")
+                .remarks("Awaiting PC check")
+                .build();
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Vikram Profile")
+                .mobileNumber(mobile)
+                .alternateMobileNumber("9876543211")
+                .email("dr.profile" + UUID.randomUUID().toString().substring(0, 5) + "@example.com")
+                .speciality("Neurology")
+                .location("Connaught Place, New Delhi")
+                .clinicAddress("Clinic 12, Medical Plaza")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .assignmentDate(LocalDate.now())
+                .bestTimeToMeet("12:00 PM - 3:00 PM")
+                .remarks("Complete onboarding profile")
+                // Section A
+                .panNumber("ABCDE1234F")
+                .dateOfBirth(dob)
+                .motherName("Sunita Rathore")
+                .placeOfBirth("New Delhi")
+                .occupation("Doctor")
+                .familyHeadName("Vikram Rathore")
+                .familyDetails("Spouse, 1 child")
+                .residentialAddress("Flat 402, Green Valley")
+                .correspondenceAddress("Clinic 12, Medical Plaza")
+                .officeAddress("Apollo Hospital, Sarita Vihar")
+                .city("New Delhi")
+                .state("Delhi")
+                .pinCode("110001")
+                // Section B
+                .clientSource("Doctor Referral")
+                .sourceDescription("Referred by Dr. Sharma")
+                // Section C
+                .applicationReceivedDate(appDate)
+                .applicationMode("PHYSICAL")
+                .investmentTypes(java.util.List.of("New SIP", "Lumpsum"))
+                .firstInvestmentAmount(new BigDecimal("50000.00"))
+                .expectedMaxSIP(new BigDecimal("100000.00"))
+                .investwellId("IW-99881")
+                .clientReportDate(reportDate)
+                .paymentStatus(ClientPaymentStatus.YES)
+                .paymentAmount(new BigDecimal("50000.00"))
+                .paymentDate(paymentDate)
+                .paymentReference("PAY-REF-XYZ")
+                // Section D
+                .nominees(java.util.List.of(nominee1, nominee2))
+                // Section E
+                .documents(java.util.List.of(doc1, doc2))
+                .build();
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.clientName").value("Dr. Vikram Profile"))
+                .andExpect(jsonPath("$.data.panNumber").value("ABCDE1234F"))
+                .andExpect(jsonPath("$.data.motherName").value("Sunita Rathore"))
+                .andExpect(jsonPath("$.data.city").value("New Delhi"))
+                .andExpect(jsonPath("$.data.clientSource").value("Doctor Referral"))
+                .andExpect(jsonPath("$.data.investmentType").value("New SIP, Lumpsum"))
+                .andExpect(jsonPath("$.data.investmentTypes[0]").value("New SIP"))
+                .andExpect(jsonPath("$.data.investmentTypes[1]").value("Lumpsum"))
+                .andExpect(jsonPath("$.data.paymentStatus").value("YES"))
+                .andExpect(jsonPath("$.data.nominees").isArray())
+                .andExpect(jsonPath("$.data.nominees.length()").value(2))
+                .andExpect(jsonPath("$.data.documents").isArray())
+                .andExpect(jsonPath("$.data.documents.length()").value(2))
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("ALL_RECEIVED"));
+
+        // Verify Database Persistence
+        Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
+        assertThat(client.getPanNumber()).isEqualTo("ABCDE1234F");
+        assertThat(client.getDateOfBirth()).isEqualTo(dob);
+        assertThat(client.getCity()).isEqualTo("New Delhi");
+        assertThat(client.getInvestmentType()).isEqualTo("New SIP, Lumpsum");
+        assertThat(client.getPaymentStatus()).isEqualTo(ClientPaymentStatus.YES);
+
+        // Verify Nominees
+        var savedNominees = clientNomineeRepository.findByClientIdOrderByCreatedAtAsc(client.getId());
+        assertThat(savedNominees).hasSize(2);
+        assertThat(savedNominees.get(0).getNomineeName()).isEqualTo("Anita Rathore");
+        assertThat(savedNominees.get(0).getIsMinor()).isFalse();
+        assertThat(savedNominees.get(1).getNomineeName()).isEqualTo("Aarav Rathore");
+        assertThat(savedNominees.get(1).getIsMinor()).isTrue();
+        assertThat(savedNominees.get(1).getGuardianName()).isEqualTo("Anita Rathore");
+
+        // Verify Documents
+        var savedDocs = clientDocumentRepository.findByClientIdOrderByCreatedAtAsc(client.getId());
+        assertThat(savedDocs).hasSize(2);
+        assertThat(savedDocs.get(0).getDocumentType()).isEqualTo(ClientDocumentType.PAN_KYC);
+        assertThat(savedDocs.get(0).getReceived()).isTrue();
+        assertThat(savedDocs.get(0).getVerificationStatus()).isEqualTo(VerificationStatus.VERIFIED);
+
+        // Verify Assignment History
+        var histories = clientAssignmentHistoryRepository.findByClientIdOrderByAssignedAtDesc(client.getId());
+        assertThat(histories).hasSize(1);
+        assertThat(histories.get(0).getAssignedFromUser()).isNull();
+        assertThat(histories.get(0).getAssignedToUser().getId()).isEqualTo(rmUser.getId());
+        assertThat(histories.get(0).getAssignedByUser().getId()).isEqualTo(crmUser.getId());
+    }
+
+    @Test
+    @DisplayName("1.7 Minor nominee without guardian details is rejected with HTTP 400 Bad Request")
+    void test1_7_minorNomineeWithoutGuardianRejected() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        ClientNomineeRequest minorNomineeWithoutGuardian = ClientNomineeRequest.builder()
+                .nomineeName("Baby Rathore")
+                .relationship("Child")
+                .isMinor(true)
+                // guardianName is missing!
+                .build();
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Vikram Guardian Test")
+                .mobileNumber(mobile)
+                .speciality("Neurology")
+                .location("Delhi")
+                .clinicAddress("Clinic 12")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .nominees(java.util.List.of(minorNomineeWithoutGuardian))
+                .build();
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Guardian name is required for minor nominee")));
+    }
+
+    @Test
+    @DisplayName("1.8 Authorized user can retrieve complete client profile endpoint")
+    void test1_8_clientFullProfileRetrievalEndpoint() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Profile Fetch Test")
+                .mobileNumber(mobile)
+                .speciality("Cardiology")
+                .location("Connaught Place")
+                .clinicAddress("Fortis Plaza")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .panNumber("ABCDE9999Z")
+                .city("Gurugram")
+                .clientSource("Direct")
+                .investmentType("New SIP")
+                .build();
+
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        String responseStr = mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String clientCode = objectMapper.readTree(responseStr).path("data").path("clientCode").asText();
+
+        // Retrieve full profile via GET /v1/clients/{clientCode}/profile as RM
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        mockMvc.perform(get("/v1/clients/" + clientCode + "/profile")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.clientCode").value(clientCode))
+                .andExpect(jsonPath("$.data.clientName").value("Dr. Profile Fetch Test"))
+                .andExpect(jsonPath("$.data.panNumber").value("ABCDE9999Z"))
+                .andExpect(jsonPath("$.data.city").value("Gurugram"))
+                .andExpect(jsonPath("$.data.clientSource").value("Direct"))
+                .andExpect(jsonPath("$.data.investmentType").value("New SIP"))
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("NO_DOCUMENTS"))
+                .andExpect(jsonPath("$.data.assignmentHistories").isArray())
+                .andExpect(jsonPath("$.data.assignmentHistories.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("1.9 Unauthenticated access to client profile retrieval is rejected with HTTP 401/403")
+    void test1_9_clientProfileRetrievalUnauthorizedForbidden() throws Exception {
+        mockMvc.perform(get("/v1/clients/BA-CL-NONEXISTENT/profile"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("1.10 Backward compatibility: Registration succeeds with only mandatory fields and zero optional profile fields")
+    void test1_10_backwardCompatibilityOmitAllOptionalFields() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Minimal Client")
+                .mobileNumber(mobile)
+                .speciality("Dentistry")
+                .location("South Ex")
+                .clinicAddress("Dental Care 1")
+                .salesPersonEmployeeCode(scUser.getEmployeeCode())
+                .build();
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.clientName").value("Dr. Minimal Client"))
+                .andExpect(jsonPath("$.data.panNumber").doesNotExist())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("NO_DOCUMENTS"));
+
+        Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
+        assertThat(client.getPanNumber()).isNull();
+        assertThat(client.getDateOfBirth()).isNull();
+        assertThat(client.getClientSource()).isNull();
+        assertThat(client.getNominees()).isEmpty();
+        assertThat(client.getDocuments()).isEmpty();
     }
 
     // =========================================================================

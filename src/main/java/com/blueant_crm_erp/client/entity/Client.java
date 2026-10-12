@@ -48,7 +48,7 @@ public class Client extends BaseVersionEntity {
     @Column(name = "scheme", length = 150)
     private String scheme;
 
-    @Column(name = "investment_type", length = 50)
+    @Column(name = "investment_type", length = 255)
     private String investmentType;
 
     @Column(name = "client_since")
@@ -100,5 +100,105 @@ public class Client extends BaseVersionEntity {
 
     @Column(name = "next_followup_date")
     private java.time.LocalDate nextFollowupDate;
+
+    // --- Section A: Personal & Family Details ---
+
+    @Column(name = "date_of_birth")
+    private java.time.LocalDate dateOfBirth;
+
+    @Column(name = "mother_name", length = 150)
+    private String motherName;
+
+    @Column(name = "place_of_birth", length = 100)
+    private String placeOfBirth;
+
+    @Column(name = "occupation", length = 100)
+    private String occupation;
+
+    @Column(name = "family_head_name", length = 150)
+    private String familyHeadName;
+
+    @Column(name = "family_details", length = 1000)
+    private String familyDetails;
+
+    @Column(name = "residential_address", length = 500)
+    private String residentialAddress;
+
+    @Column(name = "correspondence_address", length = 500)
+    private String correspondenceAddress;
+
+    @Column(name = "office_address", length = 500)
+    private String officeAddress;
+
+    @Column(name = "city", length = 100)
+    private String city;
+
+    @Column(name = "state", length = 100)
+    private String state;
+
+    @Column(name = "pin_code", length = 20)
+    private String pinCode;
+
+    // --- Section B: Client Source & Ownership ---
+
+    @Column(name = "client_source", length = 100)
+    private String clientSource;
+
+    @Column(name = "source_description", length = 500)
+    private String sourceDescription;
+
+    @Column(name = "created_by_role", length = 50)
+    private String createdByRole;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "previous_sales_person_id", foreignKey = @ForeignKey(name = "fk_client_prev_sales_person"))
+    private com.blueant_crm_erp.user.entity.User previousSalesPerson;
+
+    // --- Section C: Investment & Application Details ---
+
+    @Column(name = "application_received_date")
+    private java.time.LocalDate applicationReceivedDate;
+
+    @Column(name = "application_mode", length = 50)
+    private String applicationMode;
+
+    @Column(name = "first_investment_amount", precision = 15, scale = 2)
+    private java.math.BigDecimal firstInvestmentAmount;
+
+    @Column(name = "expected_max_sip", precision = 15, scale = 2)
+    private java.math.BigDecimal expectedMaxSIP;
+
+    @Column(name = "investwell_id", length = 100)
+    private String investwellId;
+
+    @Column(name = "client_report_date")
+    private java.time.LocalDate clientReportDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 50)
+    private com.blueant_crm_erp.client.enums.ClientPaymentStatus paymentStatus;
+
+    @Column(name = "payment_amount", precision = 15, scale = 2)
+    private java.math.BigDecimal paymentAmount;
+
+    @Column(name = "payment_date")
+    private java.time.LocalDate paymentDate;
+
+    @Column(name = "payment_reference", length = 100)
+    private String paymentReference;
+
+    // --- Section D & E & Ownership Child Collections ---
+
+    @lombok.Builder.Default
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<ClientNominee> nominees = new java.util.ArrayList<>();
+
+    @lombok.Builder.Default
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<ClientDocument> documents = new java.util.ArrayList<>();
+
+    @lombok.Builder.Default
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<ClientAssignmentHistory> assignmentHistories = new java.util.ArrayList<>();
 
 }

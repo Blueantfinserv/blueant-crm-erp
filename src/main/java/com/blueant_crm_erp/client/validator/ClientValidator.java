@@ -55,6 +55,55 @@ public class ClientValidator {
                 throw new BadRequestException("Invalid bestTimeToMeet: '" + trimmed + "'. Allowed values: " + ALLOWED_BEST_TIME_TO_MEET);
             }
         }
+
+        if (request.getDateOfBirth() != null && !request.getDateOfBirth().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Date of birth must be in the past.");
+        }
+
+        if (request.getFirstInvestmentAmount() != null && request.getFirstInvestmentAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("First investment amount must be non-negative.");
+        }
+
+        if (request.getExpectedMaxSIP() != null && request.getExpectedMaxSIP().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Expected max SIP must be non-negative.");
+        }
+
+        if (request.getPaymentAmount() != null && request.getPaymentAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Payment amount must be non-negative.");
+        }
+
+        if (request.getNominees() != null) {
+            for (com.blueant_crm_erp.client.dto.request.ClientNomineeRequest nominee : request.getNominees()) {
+                if (nominee.getNomineeName() == null || nominee.getNomineeName().isBlank()) {
+                    throw new BadRequestException("Nominee name is required.");
+                }
+                if (nominee.getRelationship() == null || nominee.getRelationship().isBlank()) {
+                    throw new BadRequestException("Nominee relationship is required.");
+                }
+                if (nominee.getDateOfBirth() != null && !nominee.getDateOfBirth().isBefore(LocalDate.now())) {
+                    throw new BadRequestException("Nominee date of birth must be in the past.");
+                }
+                if (Boolean.TRUE.equals(nominee.getIsMinor())) {
+                    if (nominee.getGuardianName() == null || nominee.getGuardianName().isBlank()) {
+                        throw new BadRequestException("Guardian name is required for minor nominee: " + nominee.getNomineeName());
+                    }
+                    if (nominee.getGuardianRelationship() == null || nominee.getGuardianRelationship().isBlank()) {
+                        throw new BadRequestException("Guardian relationship is required for minor nominee: " + nominee.getNomineeName());
+                    }
+                }
+            }
+        }
+
+        if (request.getDocuments() != null) {
+            for (com.blueant_crm_erp.client.dto.request.ClientDocumentRequest doc : request.getDocuments()) {
+                if (doc.getDocumentType() == null) {
+                    throw new BadRequestException("Document type is required.");
+                }
+                if (doc.getReceivedDate() != null && doc.getReceivedDate().isAfter(LocalDate.now())) {
+                    throw new BadRequestException("Document received date cannot be in the future.");
+                }
+            }
+        }
     }
 
     public void validateSalesPersonEligibility(User user) {

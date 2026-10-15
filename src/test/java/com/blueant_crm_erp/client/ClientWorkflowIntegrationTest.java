@@ -9,6 +9,7 @@ import com.blueant_crm_erp.client.dto.request.ClientMeetingVerificationRequest;
 import com.blueant_crm_erp.client.dto.request.CreateClientMeetingRequest;
 import com.blueant_crm_erp.client.dto.request.CreateClientRegistrationRequest;
 import com.blueant_crm_erp.client.entity.Client;
+import com.blueant_crm_erp.client.entity.ClientDocument;
 import com.blueant_crm_erp.client.entity.ClientMeeting;
 import com.blueant_crm_erp.client.entity.ClientMeetingVerification;
 import com.blueant_crm_erp.client.enums.ClientDocumentType;
@@ -17,6 +18,7 @@ import com.blueant_crm_erp.client.enums.ClientStatus;
 import com.blueant_crm_erp.client.repository.ClientAssignmentHistoryRepository;
 import com.blueant_crm_erp.client.repository.ClientDocumentRepository;
 import com.blueant_crm_erp.client.repository.ClientMeetingRepository;
+import com.blueant_crm_erp.client.repository.ClientMeetingUpdateRepository;
 import com.blueant_crm_erp.client.repository.ClientMeetingVerificationRepository;
 import com.blueant_crm_erp.client.repository.ClientNomineeRepository;
 import com.blueant_crm_erp.client.repository.ClientRepository;
@@ -65,8 +67,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.mock.web.MockMultipartFile;
+import java.nio.charset.StandardCharsets;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -115,6 +120,9 @@ public class ClientWorkflowIntegrationTest {
 
     @Autowired
     private ClientMeetingRepository clientMeetingRepository;
+
+    @Autowired
+    private ClientMeetingUpdateRepository clientMeetingUpdateRepository;
 
     @Autowired
     private ClientMeetingVerificationRepository clientMeetingVerificationRepository;
@@ -1187,4 +1195,502 @@ public class ClientWorkflowIntegrationTest {
         assertThat(client3Resp.getActiveMeetingCode()).isNull();
         assertThat(client3Resp.getActiveMeetingStatus()).isNull();
     }
+
+    // =========================================================================
+    // 6. Assignment Dates Tests (Today & Future Allowed, Past Rejected, Separate assignedAt)
+    // =========================================================================
+
+    @Test
+    @DisplayName("6.1 Today's assignment date is accepted and assignedAt remains separate audit timestamp")
+    void test6_1_todayAssignmentDateAccepted() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate today = LocalDate.now();
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Today Assign")
+                .mobileNumber(mobile)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Apollo")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .assignmentDate(today)
+                .build();
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.assignmentDate").value(today.toString()))
+                .andExpect(jsonPath("$.data.assignedAt").isNotEmpty());
+
+        Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
+        assertThat(client.getAssignmentDate()).isEqualTo(today);
+        assertThat(client.getAssignedAt()).isNotNull();
+
+        var histories = clientAssignmentHistoryRepository.findByClientIdOrderByAssignedAtDesc(client.getId());
+        assertThat(histories).hasSize(1);
+        assertThat(histories.get(0).getAssignmentDate()).isEqualTo(today);
+        assertThat(histories.get(0).getAssignedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("6.2 Future assignment date (e.g. 20 Oct 2026) is accepted and persisted correctly")
+    void test6_2_futureAssignmentDateAccepted() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate futureDate = LocalDate.now().plusDays(10);
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Future Assign")
+                .mobileNumber(mobile)
+                .speciality("Neurology")
+                .location("Noida")
+                .clinicAddress("Fortis")
+                .salesPersonEmployeeCode(scUser.getEmployeeCode())
+                .assignmentDate(futureDate)
+                .build();
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.assignmentDate").value(futureDate.toString()))
+                .andExpect(jsonPath("$.data.assignedSalesPersonCode").value(scUser.getEmployeeCode()));
+
+        Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
+        assertThat(client.getAssignmentDate()).isEqualTo(futureDate);
+        assertThat(client.getAssignedAt()).isNotNull();
+
+        // Assignment history has the future effective date
+        var histories = clientAssignmentHistoryRepository.findByClientIdOrderByAssignedAtDesc(client.getId());
+        assertThat(histories.get(0).getAssignmentDate()).isEqualTo(futureDate);
+    }
+
+    @Test
+    @DisplayName("6.3 Past assignment date is rejected by Client-specific validator with HTTP 400 Bad Request")
+    void test6_3_pastAssignmentDateRejected() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate pastDate = LocalDate.now().minusDays(1);
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Past Assign")
+                .mobileNumber(mobile)
+                .speciality("Dentistry")
+                .location("Delhi")
+                .clinicAddress("Clinic")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .assignmentDate(pastDate) // In the past!
+                .build();
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Assignment date cannot be in the past")));
+    }
+
+    @Test
+    @DisplayName("6.4 Future-dated Client appears in the assigned RM/SC Work Follow without auto-created meeting")
+    void test6_4_futureDatedClientAppearsInWorkFollowWithoutAutoMeeting() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate futureAssignDate = LocalDate.now().plusDays(5);
+
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-FUT-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Future Work Follow")
+                .mobileNumber(mobile)
+                .speciality("Orthopedics")
+                .location("Delhi")
+                .clinicAddress("Care Clinic")
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .assignmentDate(futureAssignDate)
+                .assignedAt(java.time.LocalDateTime.now())
+                .build());
+
+        // Zero meetings auto-created
+        assertThat(clientMeetingRepository.countByClientIdAndMeetingStatus(client.getId(), MeetingStatus.SCHEDULED)).isEqualTo(0);
+
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        mockMvc.perform(get("/v1/clients/work-follow")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[?(@.clientCode == '" + client.getClientCode() + "')]").exists())
+                .andExpect(jsonPath("$.data.content[?(@.clientCode == '" + client.getClientCode() + "')].assignmentDate").value(futureAssignDate.toString()))
+                .andExpect(jsonPath("$.data.content[?(@.clientCode == '" + client.getClientCode() + "')].activeMeetingCode", org.hamcrest.Matchers.contains((Object) null)));
+    }
+
+    // =========================================================================
+    // 7. Actual Meetings Before Assignment Date & PC Verification Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("7.1 Client assigned for future date (20 Oct) allows conducted meeting update on earlier actual date (16 Oct)")
+    void test7_1_earlyActualMeetingAcceptedBeforeAssignmentDate() throws Exception {
+        LocalDate assignmentDate = LocalDate.of(2026, 10, 20);
+        LocalDate actualMeetingDate = LocalDate.of(2026, 10, 16);
+
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-EARLY-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Rahul Sharma Early Meeting")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Fortis")
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .assignmentDate(assignmentDate)
+                .assignedAt(java.time.LocalDateTime.now())
+                .build());
+
+        // Schedule meeting for client (initial scheduled date e.g. assignment date 20 Oct)
+        ClientMeeting meeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .meetingCode("BA-CLM-EARLY-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .meetingNumber(1)
+                .client(client)
+                .assignedEmployee(rmUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(assignmentDate)
+                .meetingTime(LocalTime.of(11, 0))
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .meetingConducted(MeetingConductStatus.NOT_CONDUCTED)
+                .verifiedByPc(false)
+                .build());
+
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        // Submit conducted meeting update with ACTUAL meeting date: 16 Oct (earlier than 20 Oct assignmentDate)
+        ClientMeetingUpdateRequest updateReq = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(actualMeetingDate) // 16 Oct: earlier than 20 Oct assignmentDate!
+                .meetingTime(LocalTime.of(14, 30))
+                .aloneWith("SELF")
+                .businessGenerated("NO")
+                .remarks("Met Dr. Rahul Sharma on 16 Oct ahead of planned schedule")
+                .nextPlanDate(LocalDate.now().plusDays(20))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/" + meeting.getMeetingCode() + "/update")
+                        .with(user(rmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.meetingDate").value("2026-10-16"))
+                .andExpect(jsonPath("$.data.meetingStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.verificationStatus").value("PENDING"));
+
+        // Verify Database: Meeting has 16 Oct, Client preserved 20 Oct assignmentDate
+        ClientMeeting updatedMeeting = clientMeetingRepository.findById(meeting.getId()).orElseThrow();
+        assertThat(updatedMeeting.getMeetingDate()).isEqualTo(actualMeetingDate);
+
+        Client reloadedClient = clientRepository.findById(client.getId()).orElseThrow();
+        assertThat(reloadedClient.getAssignmentDate()).isEqualTo(assignmentDate); // Preserved as 20 Oct!
+
+        var auditUpdates = clientMeetingUpdateRepository.findByClientMeetingIdOrderByUpdateNumberAsc(meeting.getId());
+        assertThat(auditUpdates).hasSize(1);
+        assertThat(auditUpdates.get(0).getMeetingDate()).isEqualTo(actualMeetingDate); // 16 Oct!
+    }
+
+    @Test
+    @DisplayName("7.2 Early actual meeting (16 Oct) proceeds through PC verification; assignment date remains 20 Oct and meeting date remains 16 Oct")
+    void test7_2_earlyActualMeetingPcVerification() throws Exception {
+        LocalDate assignmentDate = LocalDate.of(2026, 10, 20);
+        LocalDate actualMeetingDate = LocalDate.of(2026, 10, 16);
+
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-PCVER-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Early Verif Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .speciality("Neurology")
+                .location("Delhi")
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .assignmentDate(assignmentDate)
+                .assignedAt(java.time.LocalDateTime.now())
+                .build());
+
+        ClientMeeting meeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .meetingCode("BA-CLM-PCVER-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .meetingNumber(1)
+                .client(client)
+                .assignedEmployee(rmUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(actualMeetingDate)
+                .meetingTime(LocalTime.of(15, 0))
+                .meetingStatus(MeetingStatus.COMPLETED)
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .businessGenerated("NO")
+                .verifiedByPc(false)
+                .build());
+
+        clientMeetingVerificationRepository.save(ClientMeetingVerification.builder()
+                .clientMeeting(meeting)
+                .attemptNumber(1)
+                .isCurrent(true)
+                .verificationStatus(VerificationStatus.PENDING)
+                .build());
+
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        ClientMeetingVerificationRequest verifReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(actualMeetingDate)
+                .meetingTime(LocalTime.of(15, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .remarks("PC verified actual meeting held on 16 Oct")
+                .nextFollowupDate(LocalDate.now().plusMonths(1))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meeting.getMeetingCode() + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("VERIFIED"));
+
+        // Assert strictly: Assignment date remains 20 Oct, Meeting date remains 16 Oct
+        Client reloadedClient = clientRepository.findById(client.getId()).orElseThrow();
+        assertThat(reloadedClient.getAssignmentDate()).isEqualTo(assignmentDate);
+
+        ClientMeeting verifiedMeeting = clientMeetingRepository.findById(meeting.getId()).orElseThrow();
+        assertThat(verifiedMeeting.getMeetingDate()).isEqualTo(actualMeetingDate);
+        assertThat(verifiedMeeting.getVerifiedByPc()).isTrue();
+    }
+
+    @Test
+    @DisplayName("7.3 Unauthorized and wrong-assignee meeting update remains strictly rejected")
+    void test7_3_unauthorizedMeetingUpdateRejected() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-AUTH-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Auth Guard Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .assignmentDate(LocalDate.now().plusDays(3))
+                .build());
+
+        ClientMeeting meeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .meetingCode("BA-CLM-AUTH-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .meetingNumber(1)
+                .client(client)
+                .assignedEmployee(rmUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .meetingConducted(MeetingConductStatus.NOT_CONDUCTED)
+                .build());
+
+        UserDetails otherRmPrincipal = customUserDetailsService.loadUserByUsername(otherRmUser.getEmployeeCode());
+
+        ClientMeetingUpdateRequest updateReq = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("NO")
+                .remarks("Attempted update by other RM")
+                .nextPlanDate(LocalDate.now().plusDays(10))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/" + meeting.getMeetingCode() + "/update")
+                        .with(user(otherRmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden());
+    }
+
+    // =========================================================================
+    // 8. Secure KYC Document Upload, Attachment, Download & Authorization Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("8.1 Document upload endpoint accepts valid PDF and JPEG with genuine magic bytes")
+    void test8_1_validDocumentUploadSuccess() throws Exception {
+        byte[] pdfContent = "%PDF-1.4 mock valid pdf document content".getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile pdfFile = new MockMultipartFile(
+                "file", "pan_kyc.pdf", "application/pdf", pdfContent);
+
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(multipart("/v1/clients/documents/upload")
+                        .file(pdfFile)
+                        .param("documentType", "PAN_KYC")
+                        .with(user(crmPrincipal)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.documentReference").isNotEmpty())
+                .andExpect(jsonPath("$.data.fileName").value("pan_kyc.pdf"))
+                .andExpect(jsonPath("$.data.documentType").value("PAN_KYC"))
+                .andExpect(jsonPath("$.data.uploadStatus").value("SUCCESS"));
+
+        byte[] jpegContent = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 0x4A, 0x46};
+        MockMultipartFile jpgFile = new MockMultipartFile(
+                "file", "application_form.jpg", "image/jpeg", jpegContent);
+
+        mockMvc.perform(multipart("/v1/clients/documents/upload")
+                        .file(jpgFile)
+                        .param("documentType", "APPLICATION_FORM")
+                        .with(user(crmPrincipal)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentType").value("APPLICATION_FORM"));
+    }
+
+    @Test
+    @DisplayName("8.2 Invalid file extension (.exe) and spoofed file signature are rejected with HTTP 400 Bad Request")
+    void test8_2_invalidAndSpoofedFilesRejected() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        // Forbidden extension (.exe)
+        MockMultipartFile exeFile = new MockMultipartFile(
+                "file", "malicious.exe", "application/octet-stream", "MZ dummy binary content".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/v1/clients/documents/upload")
+                        .file(exeFile)
+                        .param("documentType", "PAN_KYC")
+                        .with(user(crmPrincipal)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Unsupported file type")));
+
+        // Spoofed PDF (has .pdf name but content is plain text, not starting with %PDF-)
+        MockMultipartFile fakePdfFile = new MockMultipartFile(
+                "file", "fake.pdf", "application/pdf", "This is plain text pretending to be PDF".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/v1/clients/documents/upload")
+                        .file(fakePdfFile)
+                        .param("documentType", "PAN_KYC")
+                        .with(user(crmPrincipal)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Invalid file signature")));
+    }
+
+    @Test
+    @DisplayName("8.3 Oversized file exceeding 10MB is rejected with HTTP 400 Bad Request")
+    void test8_3_oversizedFileRejected() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        // Create dummy file > 10MB
+        byte[] oversizedContent = new byte[10 * 1024 * 1024 + 1024];
+        // Set valid PDF magic bytes at header to test size limit specifically
+        System.arraycopy("%PDF-".getBytes(StandardCharsets.UTF_8), 0, oversizedContent, 0, 5);
+
+        MockMultipartFile largeFile = new MockMultipartFile(
+                "file", "huge.pdf", "application/pdf", oversizedContent);
+
+        mockMvc.perform(multipart("/v1/clients/documents/upload")
+                        .file(largeFile)
+                        .param("documentType", "PAN_KYC")
+                        .with(user(crmPrincipal)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("exceeds maximum allowed limit of 10MB")));
+    }
+
+    @Test
+    @DisplayName("8.4 Multiple documents can be attached and retrieved for a registered Client")
+    void test8_4_multipleDocumentsAttachedAndRetrieved() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-DOCS-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Multi Docs Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        // Attach Document 1: PAN_KYC
+        byte[] pdfBytes = "%PDF-1.4 pan content".getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile file1 = new MockMultipartFile("file", "pan.pdf", "application/pdf", pdfBytes);
+
+        mockMvc.perform(multipart("/v1/clients/" + client.getClientCode() + "/documents")
+                        .file(file1)
+                        .param("documentType", "PAN_KYC")
+                        .param("documentName", "Doctor PAN Card")
+                        .param("remarks", "Clear copy")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentType").value("PAN_KYC"))
+                .andExpect(jsonPath("$.data.documentReference").isNotEmpty());
+
+        // Attach Document 2: NOMINEE_DOCUMENTS
+        byte[] jpegBytes = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 0x4A, 0x46};
+        MockMultipartFile file2 = new MockMultipartFile("file", "nominee_id.jpg", "image/jpeg", jpegBytes);
+
+        mockMvc.perform(multipart("/v1/clients/" + client.getClientCode() + "/documents")
+                        .file(file2)
+                        .param("documentType", "NOMINEE_DOCUMENTS")
+                        .param("documentName", "Nominee Aadhar")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentType").value("NOMINEE_DOCUMENTS"));
+
+        // Retrieve client documents
+        mockMvc.perform(get("/v1/clients/" + client.getClientCode() + "/documents")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("8.5 Cross-client file access is denied: Unauthorized RM cannot download another RM's client document")
+    void test8_5_crossClientFileAccessDenied() throws Exception {
+        // Client assigned to rmUser
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-CROSS-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Protected Files Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        ClientDocument doc = clientDocumentRepository.save(ClientDocument.builder()
+                .client(client)
+                .documentType(ClientDocumentType.PAN_KYC)
+                .documentName("Confidential_PAN.pdf")
+                .documentReference("ref-pan-mock-key-1234.pdf")
+                .received(true)
+                .verificationStatus(VerificationStatus.PENDING)
+                .build());
+
+        // otherRmUser attempts to download rmUser's client's document -> 403 Forbidden!
+        UserDetails otherRmPrincipal = customUserDetailsService.loadUserByUsername(otherRmUser.getEmployeeCode());
+
+        mockMvc.perform(get("/v1/clients/" + client.getClientCode() + "/documents/" + doc.getId() + "/download")
+                        .with(user(otherRmPrincipal)))
+                .andExpect(status().isForbidden());
+
+        // Authorized assigned RM can download successfully -> 200 OK
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+        mockMvc.perform(get("/v1/clients/" + client.getClientCode() + "/documents/" + doc.getId() + "/download")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string(
+                        "Content-Disposition", org.hamcrest.Matchers.containsString("Confidential_PAN.pdf")));
+
+        // CRM Onboarding can download successfully -> 200 OK
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+        mockMvc.perform(get("/v1/clients/" + client.getClientCode() + "/documents/" + doc.getId() + "/download")
+                        .with(user(crmPrincipal)))
+                .andExpect(status().isOk());
+    }
 }
+

@@ -49,6 +49,10 @@ public class ClientValidator {
             throw new BadRequestException("Registration request cannot be null.");
         }
 
+        if (request.getAssignmentDate() != null && request.getAssignmentDate().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Assignment date cannot be in the past. It must be today or a future date.");
+        }
+
         if (request.getBestTimeToMeet() != null && !request.getBestTimeToMeet().isBlank()) {
             String trimmed = request.getBestTimeToMeet().trim();
             if (!ALLOWED_BEST_TIME_TO_MEET.contains(trimmed)) {

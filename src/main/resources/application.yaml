@@ -334,7 +334,21 @@ management:
 
 
 # ==============================================================================
-# AWS Configuration
+# Storage Configuration (Railway Persistent Volume & Local)
+# ==============================================================================
+
+storage:
+  type: filesystem
+  local:
+    base-dir: ${STORAGE_BASE_PATH:/app/storage}
+  fail-fast-on-startup: ${STORAGE_FAIL_FAST_ON_STARTUP:false}
+  cleanup:
+    enabled: ${STORAGE_CLEANUP_ENABLED:true}
+    cron: ${STORAGE_CLEANUP_CRON:0 0 2 * * ?}
+    retention-hours: ${STORAGE_CLEANUP_RETENTION_HOURS:24}
+
+# ==============================================================================
+# AWS Configuration (Disabled by default - requires explicit authorization)
 # ==============================================================================
 
 aws:
@@ -344,6 +358,7 @@ aws:
     bucket:
 
       name: ${AWS_S3_BUCKET_NAME:blueant-documents}
+
 
 
 # ==============================================================================

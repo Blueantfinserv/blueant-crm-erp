@@ -19,9 +19,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -74,6 +80,37 @@ public class SalesCoordinatorVerificationIntegrationTest {
 
     @Autowired
     private com.blueant_crm_erp.user.repository.TeamRepository teamRepository;
+
+    private void conductMeetingAsAssignedEmployee(String meetingCode, MeetingWorkflowRequest workflowRequest) {
+        Meeting meeting = meetingRepository.findByMeetingCode(meetingCode)
+                .orElseThrow(() -> new IllegalArgumentException("Meeting not found: " + meetingCode));
+        String empCode = null;
+        if (meeting.getAssignedEmployee() != null && org.springframework.util.StringUtils.hasText(meeting.getAssignedEmployee().getEmployeeCode())) {
+            empCode = meeting.getAssignedEmployee().getEmployeeCode();
+        } else if (meeting.getLead() != null && meeting.getLead().getAssignedSalesPerson() != null &&
+                   org.springframework.util.StringUtils.hasText(meeting.getLead().getAssignedSalesPerson().getEmployeeCode())) {
+            empCode = meeting.getLead().getAssignedSalesPerson().getEmployeeCode();
+        } else {
+            empCode = "EMP000001";
+        }
+
+        Authentication previousAuth = SecurityContextHolder.getContext().getAuthentication();
+        try {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(
+                            empCode,
+                            "N/A",
+                            List.of(
+                                    new SimpleGrantedAuthority("ROLE_EMPLOYEE"),
+                                    new SimpleGrantedAuthority("MEETING_UPDATE")
+                            )
+                    )
+            );
+            meetingService.processMeetingUpdateWorkflow(meetingCode, workflowRequest, empCode);
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(previousAuth);
+        }
+    }
 
     @Test
     @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
@@ -142,7 +179,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testSalesCoordinatorAccessAndVerificationFlow() throws Exception {
         // 1. Create a lead first
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -169,7 +206,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Client is not interested at this stage.")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // Verify state is now PENDING
         MeetingVerification initialVer = meetingVerificationRepository.findByMeetingMeetingCode(meetingResponse.getMeetingCode())
@@ -238,7 +275,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testSalesCoordinatorRejectionFlow() throws Exception {
         // 1. Create a lead first
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -265,7 +302,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Rejected meeting candidate")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // 3. Test successful rejection by Sales Coordinator
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/reject")
@@ -507,7 +544,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testVerificationPayloadStrictness() throws Exception {
         // 1. Create a lead first
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -535,7 +572,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Client is not interested")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // Verification payload with extra malicious fields
         String maliciousPayload = "{" +
@@ -593,7 +630,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testPendingVerificationQueueReturnsCompletedConductedPendingMeetings() throws Exception {
         // 1. Create lead
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -621,7 +658,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted successfully")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000001");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // 4. Assert queue contains this completed conducted pending meeting
         mockMvc.perform(get("/v1/meetings")
@@ -631,7 +668,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testPendingVerificationQueueReturnsMeetingsAcrossSalesExecutives() throws Exception {
         // 1. Create RM 2
         getOrCreateSecondSalesperson();
@@ -660,7 +697,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.WORK_IN_PROGRESS)
                 .remarks("RM 1 Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse1.getMeetingCode(), workflowRequest1, "EMP000001");
+        conductMeetingAsAssignedEmployee(meetingResponse1.getMeetingCode(), workflowRequest1);
 
         // 3. Create lead assigned to RM 2
         CreateLeadRequest leadRequest2 = new CreateLeadRequest();
@@ -686,7 +723,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.WORK_IN_PROGRESS)
                 .remarks("RM 2 Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse2.getMeetingCode(), workflowRequest2, "EMP000002");
+        conductMeetingAsAssignedEmployee(meetingResponse2.getMeetingCode(), workflowRequest2);
 
         // 4. Assert both meetings are in the queue for the Sales Coordinator
         mockMvc.perform(get("/v1/meetings")
@@ -766,7 +803,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testPendingVerificationQueueExcludesVerifiedMeetings() throws Exception {
         CreateLeadRequest leadRequest = new CreateLeadRequest();
         leadRequest.setClientName("Verified Exclude Client");
@@ -791,7 +828,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000001");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // Verify meeting
         MeetingVerificationRequest validRequest = MeetingVerificationRequest.builder()
@@ -819,7 +856,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testPendingVerificationQueueExcludesRejectedMeetings() throws Exception {
         CreateLeadRequest leadRequest = new CreateLeadRequest();
         leadRequest.setClientName("Rejected Exclude Client");
@@ -844,7 +881,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000001");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // Reject meeting
         mockMvc.perform(post("/v1/meetings/verification/" + meetingResponse.getMeetingCode() + "/reject")
@@ -859,7 +896,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testSalesCoordinatorCanVerifyAnotherSalesExecutivesMeeting() throws Exception {
         getOrCreateSecondSalesperson();
         
@@ -886,7 +923,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "EMP000002");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // Verify meeting
         MeetingVerificationRequest validRequest = MeetingVerificationRequest.builder()
@@ -1050,7 +1087,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
         assertThat(meeting.getVerification().getVerificationStatus()).isEqualTo(VerificationStatus.PENDING);
     }
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testVerificationWithOnlyMeetingTiming() throws Exception {
         // 1. Create a lead first
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -1077,7 +1114,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // 3. Verify with ONLY meetingTiming
         MeetingVerificationRequest timingOnlyRequest = MeetingVerificationRequest.builder()
@@ -1099,7 +1136,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testVerificationWithAllNewOptionalFields() throws Exception {
         // 1. Create lead and meeting, then conduct it
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -1124,7 +1161,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // 2. Verify with all fields
         MeetingVerificationRequest allFieldsRequest = MeetingVerificationRequest.builder()
@@ -1156,7 +1193,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testVerificationMissingTimingFailure() throws Exception {
         // Verification payload without meetingTiming should return 400 Bad Request
         MeetingVerificationRequest request = MeetingVerificationRequest.builder()
@@ -1170,7 +1207,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testVerificationWithInvalidEnumFailure() throws Exception {
         // 1. Create a lead first
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -1197,7 +1234,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // 3. Verify with invalid ageGroup value
         MeetingVerificationRequest request = MeetingVerificationRequest.builder()
@@ -1212,7 +1249,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testVerificationWithMeetingWithSelfNormalizesPersonNameToNull() throws Exception {
         // 1. Create lead and meeting, then conduct it
         CreateLeadRequest leadRequest = new CreateLeadRequest();
@@ -1237,7 +1274,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(meetingResponse.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(meetingResponse.getMeetingCode(), workflowRequest);
 
         // 2. Verify with meetingWith = SELF and personName = "Amit"
         // Since meetingWith = SELF, personName should be normalized to NULL
@@ -1256,7 +1293,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testVerificationAuditFieldsVerifiedAndPendingLifecycle() throws Exception {
         CreateLeadRequest leadRequest = new CreateLeadRequest();
         leadRequest.setClientName("Verification Audit Client");
@@ -1281,7 +1318,7 @@ public class SalesCoordinatorVerificationIntegrationTest {
                 .leadStatus(com.blueant_crm_erp.meeting.enums.MeetingLeadStatus.CLIENT_NOT_INTERESTED)
                 .remarks("Conducted successfully")
                 .build();
-        meetingService.processMeetingUpdateWorkflow(createdMeeting.getMeetingCode(), workflowRequest, "salesperson@blueant.com");
+        conductMeetingAsAssignedEmployee(createdMeeting.getMeetingCode(), workflowRequest);
 
         // 3. Meeting is now PENDING verification:
         // Verify that in MeetingResponse, verificationStatus is PENDING and verifiedBy / verifiedAt are null

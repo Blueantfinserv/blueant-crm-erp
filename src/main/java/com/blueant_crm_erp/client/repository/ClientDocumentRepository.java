@@ -10,4 +10,6 @@ import java.util.List;
 public interface ClientDocumentRepository extends JpaRepository<ClientDocument, Long> {
     List<ClientDocument> findByClientIdOrderByCreatedAtAsc(Long clientId);
     List<ClientDocument> findByClientId(Long clientId);
+    boolean existsByDocumentReference(String documentReference);
+    boolean existsByDocumentReferenceContaining(String filename);
 }

@@ -22,6 +22,8 @@ import com.blueant_crm_erp.client.repository.ClientMeetingUpdateRepository;
 import com.blueant_crm_erp.client.repository.ClientMeetingVerificationRepository;
 import com.blueant_crm_erp.client.repository.ClientNomineeRepository;
 import com.blueant_crm_erp.client.repository.ClientRepository;
+import com.blueant_crm_erp.client.dto.response.ClientDocumentResponse;
+import com.blueant_crm_erp.client.service.ClientDocumentService;
 import com.blueant_crm_erp.client.service.ClientMeetingService;
 import com.blueant_crm_erp.common.enums.Gender;
 import com.blueant_crm_erp.common.enums.Status;
@@ -135,6 +137,9 @@ public class ClientWorkflowIntegrationTest {
 
     @Autowired
     private ClientMeetingService clientMeetingService;
+
+    @Autowired
+    private ClientDocumentService clientDocumentService;
 
     private User crmUser;
     private User rmUser;
@@ -1653,7 +1658,7 @@ public class ClientWorkflowIntegrationTest {
     @Test
     @DisplayName("8.5 Cross-client file access is denied: Unauthorized RM cannot download another RM's client document")
     void test8_5_crossClientFileAccessDenied() throws Exception {
-        // Client assigned to rmUser
+        // Client A assigned to rmUser
         Client client = clientRepository.save(Client.builder()
                 .clientCode("BA-CL-CROSS-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
                 .clientName("Dr. Protected Files Client")
@@ -1662,14 +1667,12 @@ public class ClientWorkflowIntegrationTest {
                 .salesPerson(rmUser)
                 .build());
 
-        ClientDocument doc = clientDocumentRepository.save(ClientDocument.builder()
-                .client(client)
-                .documentType(ClientDocumentType.PAN_KYC)
-                .documentName("Confidential_PAN.pdf")
-                .documentReference("ref-pan-mock-key-1234.pdf")
-                .received(true)
-                .verificationStatus(VerificationStatus.PENDING)
-                .build());
+        // Upload and attach genuine test file using real storage service
+        byte[] originalBytes = "%PDF-1.4 confidential KYC doctor tax returns".getBytes(StandardCharsets.UTF_8);
+        MockMultipartFile testPdf = new MockMultipartFile("file", "Confidential_PAN.pdf", "application/pdf", originalBytes);
+
+        ClientDocumentResponse doc = clientDocumentService.attachDocumentToClient(
+                client.getClientCode(), testPdf, ClientDocumentType.PAN_KYC, "Confidential_PAN.pdf", "Strictly Private", true, rmUser.getEmployeeCode());
 
         // otherRmUser attempts to download rmUser's client's document -> 403 Forbidden!
         UserDetails otherRmPrincipal = customUserDetailsService.loadUserByUsername(otherRmUser.getEmployeeCode());
@@ -1678,13 +1681,29 @@ public class ClientWorkflowIntegrationTest {
                         .with(user(otherRmPrincipal)))
                 .andExpect(status().isForbidden());
 
-        // Authorized assigned RM can download successfully -> 200 OK
+        // Authorized assigned RM can download successfully -> 200 OK with EXACT BYTES
         UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
-        mockMvc.perform(get("/v1/clients/" + client.getClientCode() + "/documents/" + doc.getId() + "/download")
+        byte[] downloadedBytes = mockMvc.perform(get("/v1/clients/" + client.getClientCode() + "/documents/" + doc.getId() + "/download")
                         .with(user(rmPrincipal)))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string(
-                        "Content-Disposition", org.hamcrest.Matchers.containsString("Confidential_PAN.pdf")));
+                        "Content-Disposition", org.hamcrest.Matchers.containsString("Confidential_PAN.pdf")))
+                .andReturn().getResponse().getContentAsByteArray();
+
+        assertThat(downloadedBytes).isEqualTo(originalBytes);
+
+        // Path tampering defense: Client B cannot be used to download Client A's document ID -> 404 Not Found
+        Client clientB = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-CROSS-B-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Other Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        mockMvc.perform(get("/v1/clients/" + clientB.getClientCode() + "/documents/" + doc.getId() + "/download")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isNotFound());
 
         // CRM Onboarding can download successfully -> 200 OK
         UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());

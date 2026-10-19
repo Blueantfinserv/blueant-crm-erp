@@ -10,4 +10,6 @@ import java.util.Optional;
 @Repository
 public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSpecificationExecutor<Document> {
     Optional<Document> findByS3Key(String s3Key);
+    boolean existsByS3Key(String s3Key);
+    boolean existsByS3KeyContaining(String s3Key);
 }

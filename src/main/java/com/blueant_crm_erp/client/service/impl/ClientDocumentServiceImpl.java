@@ -51,7 +51,7 @@ public class ClientDocumentServiceImpl implements ClientDocumentService {
         clientDocumentValidator.validateKycDocument(file);
 
         // 2. Upload to secure storage service
-        String s3Key = storageService.uploadFile(file);
+        String s3Key = storageService.uploadTemporaryFile(file);
         if (!StringUtils.hasText(s3Key)) {
             log.error("Storage service returned empty file key for uploaded file: {}", file.getOriginalFilename());
             throw new BadRequestException("Failed to securely store uploaded document.");

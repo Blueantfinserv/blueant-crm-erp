@@ -12,10 +12,12 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import java.io.IOException;
 import java.util.UUID;
 
 @Service
+@ConditionalOnProperty(name = "storage.type", havingValue = "s3")
 @RequiredArgsConstructor
 @Slf4j
 public class S3StorageServiceImpl implements StorageService {
@@ -82,5 +84,15 @@ public class S3StorageServiceImpl implements StorageService {
                 .build();
         s3Client.deleteObject(deleteObjectRequest);
         */
+    }
+
+    @Override
+    public String uploadTemporaryFile(MultipartFile file) {
+        return uploadFile(file);
+    }
+
+    @Override
+    public String promoteToPermanent(String fileKey) {
+        return fileKey;
     }
 }

@@ -27,6 +27,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +39,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,16 +100,61 @@ public class MeetingVerificationDateMappingTest {
         return lead;
     }
 
+    private static final LocalDate INTRO_NEXT_PLAN_DATE = LocalDate.now().plusDays(5);
+    private static final LocalDate FOLLOW_UP_NEXT_PLAN_DATE = LocalDate.now().plusDays(10);
+
+    private MeetingResponse conductMeetingAsAssignedEmployee(String meetingIdentifier, MeetingWorkflowRequest workflowRequest) {
+        String empCode = null;
+        if (meetingIdentifier.startsWith("NEW_")) {
+            String uniqueLeadIdStr = meetingIdentifier.substring(4);
+            Lead lead = leadRepository.findByUniqueLeadId(uniqueLeadIdStr)
+                    .orElseThrow(() -> new IllegalStateException("Lead not found for identifier: " + meetingIdentifier));
+            if (lead.getAssignedSalesPerson() != null && org.springframework.util.StringUtils.hasText(lead.getAssignedSalesPerson().getEmployeeCode())) {
+                empCode = lead.getAssignedSalesPerson().getEmployeeCode();
+            }
+        } else {
+            Meeting meeting = meetingRepository.findByMeetingCode(meetingIdentifier)
+                    .orElseThrow(() -> new IllegalStateException("Meeting not found: " + meetingIdentifier));
+            if (meeting.getAssignedEmployee() != null && org.springframework.util.StringUtils.hasText(meeting.getAssignedEmployee().getEmployeeCode())) {
+                empCode = meeting.getAssignedEmployee().getEmployeeCode();
+            } else if (meeting.getLead() != null && meeting.getLead().getAssignedSalesPerson() != null &&
+                       org.springframework.util.StringUtils.hasText(meeting.getLead().getAssignedSalesPerson().getEmployeeCode())) {
+                empCode = meeting.getLead().getAssignedSalesPerson().getEmployeeCode();
+            }
+        }
+
+        if (!org.springframework.util.StringUtils.hasText(empCode)) {
+            throw new IllegalStateException("Cannot resolve assigned salesperson for meeting preparation: " + meetingIdentifier);
+        }
+
+        Authentication previousAuth = SecurityContextHolder.getContext().getAuthentication();
+        try {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(
+                            empCode,
+                            "N/A",
+                            List.of(
+                                    new SimpleGrantedAuthority("ROLE_EMPLOYEE"),
+                                    new SimpleGrantedAuthority("MEETING_UPDATE")
+                            )
+                    )
+            );
+            return meetingService.processMeetingUpdateWorkflow(meetingIdentifier, workflowRequest, empCode);
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(previousAuth);
+        }
+    }
+
     /**
      * Helper to set up the scenario:
-     * Intro meeting on 2026-09-23 with nextPlanDate = 2026-09-28.
+     * Intro meeting on 2026-09-23 with nextPlanDate = INTRO_NEXT_PLAN_DATE.
      * Intro meeting is conducted and verified by Coordinator.
-     * Follow-up meeting is created with scheduled date 2026-09-28.
+     * Follow-up meeting is created with scheduled date INTRO_NEXT_PLAN_DATE.
      */
     private Meeting[] setupIntroAndFollowUpScenario() throws Exception {
         Lead lead = createTestLeadWithSalesPerson("Date Mapping Test Lead");
 
-        // 1. Conduct Intro Meeting on 2026-09-23 with planned follow-up on 2026-09-28
+        // 1. Conduct Intro Meeting on 2026-09-23 with planned follow-up on INTRO_NEXT_PLAN_DATE
         MeetingWorkflowRequest introWorkflowReq = MeetingWorkflowRequest.builder()
                 .meetingDate(LocalDate.of(2026, 9, 23))
                 .meetingTime(LocalTime.of(10, 0))
@@ -113,16 +163,16 @@ public class MeetingVerificationDateMappingTest {
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Intro meeting conducted. Follow-up planned.")
-                .nextPlanDate(LocalDate.of(2026, 9, 28))
+                .nextPlanDate(INTRO_NEXT_PLAN_DATE)
                 .nextPlanTime(LocalTime.of(11, 0))
                 .build();
 
-        meetingService.processMeetingUpdateWorkflow("NEW_" + lead.getUniqueLeadId(), introWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee("NEW_" + lead.getUniqueLeadId(), introWorkflowReq);
 
         // Intro meeting is meeting #1
         Meeting introMeeting = meetingRepository.findByLeadIdOrderByMeetingNumberAsc(lead.getId()).get(0);
         assertThat(introMeeting.getMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 23));
-        assertThat(introMeeting.getNextMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 28));
+        assertThat(introMeeting.getNextMeetingDate()).isEqualTo(INTRO_NEXT_PLAN_DATE);
 
         // 2. Coordinator verifies Intro Meeting
         MeetingVerificationRequest introVerifyReq = MeetingVerificationRequest.builder()
@@ -141,20 +191,20 @@ public class MeetingVerificationDateMappingTest {
         // 3. Follow-up meeting (meeting #2) was automatically created
         Meeting followUpMeeting = meetingRepository.findByLeadIdAndMeetingNumber(lead.getId(), 2)
                 .orElseThrow(() -> new IllegalStateException("Follow-up meeting #2 should have been created"));
-        assertThat(followUpMeeting.getMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 28));
+        assertThat(followUpMeeting.getMeetingDate()).isEqualTo(INTRO_NEXT_PLAN_DATE);
         assertThat(followUpMeeting.getMeetingStatus()).isEqualTo(MeetingStatus.SCHEDULED);
 
         return new Meeting[]{introMeeting, followUpMeeting};
     }
 
     @Test
-    @DisplayName("TEST 1: Current follow-up meeting receives its own actual meetingDate (2026-09-25) and NOT 2026-09-28")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @DisplayName("TEST 1: Current follow-up meeting receives its own actual meetingDate (2026-09-25) and NOT previous scheduled date")
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test1_FollowUpMeetingReceivesOwnMeetingDateNotPreviousNextDate() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
 
-        // Sales Person conducts the follow-up meeting early on 2026-09-25 with next follow-up on 2026-09-30
+        // Sales Person conducts the follow-up meeting early on 2026-09-25 with next follow-up on FOLLOW_UP_NEXT_PLAN_DATE
         MeetingWorkflowRequest followUpWorkflowReq = MeetingWorkflowRequest.builder()
                 .meetingDate(LocalDate.of(2026, 9, 25))
                 .meetingTime(LocalTime.of(14, 0))
@@ -163,29 +213,29 @@ public class MeetingVerificationDateMappingTest {
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Follow-up conducted early. Client wants proposal.")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .nextPlanTime(LocalTime.of(15, 0))
                 .build();
 
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
-        // Verify that Coordinator query via GET /v1/meetings/verification/{meetingCode} receives meetingDate = 2026-09-25 and NOT 2026-09-28
+        // Verify that Coordinator query via GET /v1/meetings/verification/{meetingCode} receives meetingDate = 2026-09-25 and NOT INTRO_NEXT_PLAN_DATE
         mockMvc.perform(get("/v1/meetings/verification/" + followUpMeeting.getMeetingCode()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.meetingCode").value(followUpMeeting.getMeetingCode()))
                 .andExpect(jsonPath("$.meetingDate").value("2026-09-25"))
-                .andExpect(jsonPath("$.nextMeetingDate").value("2026-09-30"));
+                .andExpect(jsonPath("$.nextMeetingDate").value(FOLLOW_UP_NEXT_PLAN_DATE.toString()));
 
         // Also verify GET /v1/meetings/{meetingCode} returns meetingDate = 2026-09-25
         mockMvc.perform(get("/v1/meetings/" + followUpMeeting.getMeetingCode()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.meetingDate").value("2026-09-25"))
-                .andExpect(jsonPath("$.data.nextMeetingDate").value("2026-09-30"));
+                .andExpect(jsonPath("$.data.nextMeetingDate").value(FOLLOW_UP_NEXT_PLAN_DATE.toString()));
     }
 
     @Test
     @DisplayName("TEST 2: Coordinator verification with meetingDate (2026-09-25) succeeds on later date")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test2_CoordinatorVerificationWithMeetingDateOnLaterDateSucceeds() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
@@ -195,9 +245,9 @@ public class MeetingVerificationDateMappingTest {
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Conducted early")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .build();
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
         Map<String, Object> verifyPayload = new HashMap<>();
         verifyPayload.put("meetingDate", "2026-09-25");
@@ -229,7 +279,7 @@ public class MeetingVerificationDateMappingTest {
 
     @Test
     @DisplayName("TEST 3: Past meetingDate must NOT fail because it is before verification date/current date")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test3_PastMeetingDateDoesNotFail() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
@@ -244,7 +294,7 @@ public class MeetingVerificationDateMappingTest {
                 .remarks("Conducted in past")
                 .nextPlanDate(LocalDate.now().plusDays(5))
                 .build();
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
         // Coordinator submits past meeting date - must succeed and not be rejected by any future-date validation
         MeetingVerificationRequest verifyReq = MeetingVerificationRequest.builder()
@@ -270,7 +320,7 @@ public class MeetingVerificationDateMappingTest {
 
     @Test
     @DisplayName("TEST 4: Existing verification questions continue to work exactly as before")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test4_ExistingVerificationQuestionsWorkAsBefore() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
@@ -280,9 +330,9 @@ public class MeetingVerificationDateMappingTest {
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Conducted early")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .build();
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
         MeetingVerificationRequest verifyReq = MeetingVerificationRequest.builder()
                 .meetingDate(LocalDate.of(2026, 9, 25))
@@ -331,7 +381,7 @@ public class MeetingVerificationDateMappingTest {
 
     @Test
     @DisplayName("TEST 5: verifiedAt remains verification timestamp and is not overwritten by meetingDate")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test5_VerifiedAtRemainsTimestampAndNotOverwrittenByMeetingDate() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
@@ -341,9 +391,9 @@ public class MeetingVerificationDateMappingTest {
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Conducted early")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .build();
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
         LocalDateTime beforeVerification = LocalDateTime.now().minusSeconds(1);
 
@@ -369,21 +419,21 @@ public class MeetingVerificationDateMappingTest {
 
     @Test
     @DisplayName("TEST 6: Previous Intro meeting dates remain unchanged")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test6_PreviousIntroMeetingDatesRemainUnchanged() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting introMeeting = meetings[0];
         Meeting followUpMeeting = meetings[1];
 
-        // Sales Person conducts follow-up on 2026-09-25 with next follow-up on 2026-09-30
+        // Sales Person conducts follow-up on 2026-09-25 with next follow-up on FOLLOW_UP_NEXT_PLAN_DATE
         MeetingWorkflowRequest followUpWorkflowReq = MeetingWorkflowRequest.builder()
                 .meetingDate(LocalDate.of(2026, 9, 25))
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Follow-up meeting done")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .build();
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
         // Coordinator verifies follow-up meeting with meetingDate = 2026-09-25
         MeetingVerificationRequest verifyReq = MeetingVerificationRequest.builder()
@@ -402,25 +452,25 @@ public class MeetingVerificationDateMappingTest {
         // Previous Intro meeting's meetingDate and nextMeetingDate must remain unchanged
         Meeting introReloaded = meetingRepository.findByMeetingCode(introMeeting.getMeetingCode()).orElseThrow();
         assertThat(introReloaded.getMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 23));
-        assertThat(introReloaded.getNextMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 28));
+        assertThat(introReloaded.getNextMeetingDate()).isEqualTo(INTRO_NEXT_PLAN_DATE);
     }
 
     @Test
     @DisplayName("TEST 7: Current follow-up meeting dates remain correct")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test7_CurrentFollowUpMeetingDatesRemainCorrect() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
 
-        // Sales Person conducts follow-up on 2026-09-25 with next follow-up on 2026-09-30
+        // Sales Person conducts follow-up on 2026-09-25 with next follow-up on FOLLOW_UP_NEXT_PLAN_DATE
         MeetingWorkflowRequest followUpWorkflowReq = MeetingWorkflowRequest.builder()
                 .meetingDate(LocalDate.of(2026, 9, 25))
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Follow-up meeting done")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .build();
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
         // Coordinator verifies follow-up meeting with meetingDate = 2026-09-25
         MeetingVerificationRequest verifyReq = MeetingVerificationRequest.builder()
@@ -439,34 +489,34 @@ public class MeetingVerificationDateMappingTest {
         // Current follow-up meeting dates are correct
         Meeting followUpReloaded = meetingRepository.findByMeetingCode(followUpMeeting.getMeetingCode()).orElseThrow();
         assertThat(followUpReloaded.getMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 25));
-        assertThat(followUpReloaded.getNextMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 30));
+        assertThat(followUpReloaded.getNextMeetingDate()).isEqualTo(FOLLOW_UP_NEXT_PLAN_DATE);
         assertThat(followUpReloaded.getMeetingStatus()).isEqualTo(MeetingStatus.COMPLETED);
     }
 
     @Test
     @DisplayName("TEST 8: Follow-up sequential creation workflow continues to work intact")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test8_FollowUpSequentialCreationRemainsIntact() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
 
-        // Updating follow-up meeting (sequence 2) with WORK_IN_PROGRESS and nextPlanDate = 2026-09-30 creates sequence 3
+        // Updating follow-up meeting (sequence 2) with WORK_IN_PROGRESS and nextPlanDate = FOLLOW_UP_NEXT_PLAN_DATE creates sequence 3
         MeetingWorkflowRequest followUpWorkflowReq = MeetingWorkflowRequest.builder()
                 .meetingDate(LocalDate.of(2026, 9, 25))
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Follow-up meeting conducted")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .nextPlanTime(LocalTime.of(16, 0))
                 .build();
 
-        MeetingResponse response = meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        MeetingResponse response = conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
-        // The newly created sequence 3 follow-up meeting exists and is SCHEDULED for 2026-09-30
+        // The newly created sequence 3 follow-up meeting exists and is SCHEDULED for FOLLOW_UP_NEXT_PLAN_DATE
         Meeting seq3Meeting = meetingRepository.findByLeadIdAndMeetingNumber(followUpMeeting.getLead().getId(), 3)
                 .orElseThrow(() -> new IllegalStateException("Sequential meeting #3 should exist"));
 
-        assertThat(seq3Meeting.getMeetingDate()).isEqualTo(LocalDate.of(2026, 9, 30));
+        assertThat(seq3Meeting.getMeetingDate()).isEqualTo(FOLLOW_UP_NEXT_PLAN_DATE);
         assertThat(seq3Meeting.getMeetingTime()).isEqualTo(LocalTime.of(16, 0));
         assertThat(seq3Meeting.getMeetingStatus()).isEqualTo(MeetingStatus.SCHEDULED);
         assertThat(response.getMeetingCode()).isEqualTo(seq3Meeting.getMeetingCode());
@@ -474,7 +524,7 @@ public class MeetingVerificationDateMappingTest {
 
     @Test
     @DisplayName("TEST 9: Existing API behavior remains backward compatible when meetingDate is omitted from verification request")
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void test9_VerificationWithoutMeetingDateRemainsBackwardCompatible() throws Exception {
         Meeting[] meetings = setupIntroAndFollowUpScenario();
         Meeting followUpMeeting = meetings[1];
@@ -484,9 +534,9 @@ public class MeetingVerificationDateMappingTest {
                 .leadStatus(MeetingLeadStatus.WORK_IN_PROGRESS)
                 .aloneWith("SELF")
                 .remarks("Follow-up conducted")
-                .nextPlanDate(LocalDate.of(2026, 9, 30))
+                .nextPlanDate(FOLLOW_UP_NEXT_PLAN_DATE)
                 .build();
-        meetingService.processMeetingUpdateWorkflow(followUpMeeting.getMeetingCode(), followUpWorkflowReq, "EMP000001");
+        conductMeetingAsAssignedEmployee(followUpMeeting.getMeetingCode(), followUpWorkflowReq);
 
         // Request WITHOUT meetingDate (backward compatible legacy payload)
         Map<String, Object> legacyPayload = new HashMap<>();

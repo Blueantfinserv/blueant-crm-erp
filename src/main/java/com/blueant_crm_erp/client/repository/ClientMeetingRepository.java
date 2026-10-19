@@ -38,4 +38,7 @@ public interface ClientMeetingRepository extends JpaRepository<ClientMeeting, Lo
 
     @Query("SELECT MAX(CAST(SUBSTRING(m.meetingCode, 13) AS long)) FROM ClientMeeting m WHERE m.meetingCode LIKE 'BA-CLM-%'")
     Long findMaxClientMeetingCodeSequence();
+
+    @Query("SELECT COUNT(m) > 0 FROM ClientMeeting m WHERE m.client.id = :clientId AND m.verifiedByPc = true AND UPPER(m.businessGenerated) = 'YES'")
+    boolean hasVerifiedBusinessGeneratedMeeting(@org.springframework.data.repository.query.Param("clientId") Long clientId);
 }

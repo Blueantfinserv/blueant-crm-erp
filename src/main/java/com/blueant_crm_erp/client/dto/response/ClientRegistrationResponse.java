@@ -86,4 +86,10 @@ public class ClientRegistrationResponse {
     // Section E: Documents & Completion Status
     private List<ClientDocumentResponse> documents;
     private String documentCompletionStatus;
+
+    // Section F: Family Management
+    private Long familyId;
+    private String familyCode;
+    private String familyName;
+    private Boolean isFamilyHead;
 }

@@ -25,6 +25,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -88,8 +93,50 @@ public class MeetingVerificationSnapshotIntegrationTest {
         return lead;
     }
 
+    private void conductMeetingAsAssignedEmployee(String meetingIdentifier, MeetingWorkflowRequest workflowRequest) {
+        String empCode = null;
+        if (meetingIdentifier.startsWith("NEW_")) {
+            String uniqueLeadIdStr = meetingIdentifier.substring(4);
+            Lead lead = leadRepository.findByUniqueLeadId(uniqueLeadIdStr)
+                    .orElseThrow(() -> new IllegalStateException("Lead not found for identifier: " + meetingIdentifier));
+            if (lead.getAssignedSalesPerson() != null && org.springframework.util.StringUtils.hasText(lead.getAssignedSalesPerson().getEmployeeCode())) {
+                empCode = lead.getAssignedSalesPerson().getEmployeeCode();
+            }
+        } else {
+            Meeting meeting = meetingRepository.findByMeetingCode(meetingIdentifier)
+                    .orElseThrow(() -> new IllegalStateException("Meeting not found: " + meetingIdentifier));
+            if (meeting.getAssignedEmployee() != null && org.springframework.util.StringUtils.hasText(meeting.getAssignedEmployee().getEmployeeCode())) {
+                empCode = meeting.getAssignedEmployee().getEmployeeCode();
+            } else if (meeting.getLead() != null && meeting.getLead().getAssignedSalesPerson() != null &&
+                       org.springframework.util.StringUtils.hasText(meeting.getLead().getAssignedSalesPerson().getEmployeeCode())) {
+                empCode = meeting.getLead().getAssignedSalesPerson().getEmployeeCode();
+            }
+        }
+
+        if (!org.springframework.util.StringUtils.hasText(empCode)) {
+            throw new IllegalStateException("Cannot resolve assigned salesperson for meeting preparation: " + meetingIdentifier);
+        }
+
+        Authentication previousAuth = SecurityContextHolder.getContext().getAuthentication();
+        try {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken(
+                            empCode,
+                            "N/A",
+                            List.of(
+                                    new SimpleGrantedAuthority("ROLE_EMPLOYEE"),
+                                    new SimpleGrantedAuthority("MEETING_UPDATE")
+                            )
+                    )
+            );
+            meetingService.processMeetingUpdateWorkflow(meetingIdentifier, workflowRequest, empCode);
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(previousAuth);
+        }
+    }
+
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testCompleteVerificationSnapshotLifecycle() throws Exception {
         Lead lead = createLeadWithSalesPerson("Snapshot Verification Client");
 
@@ -108,7 +155,7 @@ public class MeetingVerificationSnapshotIntegrationTest {
                 .visitingCard("/api/v1/documents/201/download")
                 .build();
 
-        meetingService.processMeetingUpdateWorkflow("NEW_" + lead.getUniqueLeadId(), workflowRequest, "EMP000001");
+        conductMeetingAsAssignedEmployee("NEW_" + lead.getUniqueLeadId(), workflowRequest);
 
         // Fetch completed initial meeting
         Meeting completedMeeting = meetingRepository.findByLeadIdOrderByMeetingNumberAsc(lead.getId()).get(0);
@@ -220,7 +267,7 @@ public class MeetingVerificationSnapshotIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_SALES_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
+    @WithMockUser(username = "coordinator@blueant.com", authorities = {"ROLE_PC_COORDINATOR", "MEETING_READ", "MEETING_VERIFY"})
     public void testRejectionPreservesRejectionStateWithoutSnapshotFalsification() throws Exception {
         Lead lead = createLeadWithSalesPerson("Rejected Snapshot Client");
 
@@ -230,7 +277,7 @@ public class MeetingVerificationSnapshotIntegrationTest {
                 .remarks("Client not interested")
                 .build();
 
-        meetingService.processMeetingUpdateWorkflow("NEW_" + lead.getUniqueLeadId(), workflowRequest, "EMP000001");
+        conductMeetingAsAssignedEmployee("NEW_" + lead.getUniqueLeadId(), workflowRequest);
 
         Meeting completedMeeting = meetingRepository.findByLeadIdOrderByMeetingNumberAsc(lead.getId()).get(0);
 

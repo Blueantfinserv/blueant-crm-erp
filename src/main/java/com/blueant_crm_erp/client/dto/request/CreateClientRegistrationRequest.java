@@ -144,4 +144,16 @@ public class CreateClientRegistrationRequest {
 
     @Valid
     private List<ClientDocumentRequest> documents;
+
+    // --- Section F: Family Management (Optional) ---
+
+    @Size(max = 50, message = "Family code cannot exceed 50 characters.")
+    private String familyCode;
+
+    @Size(max = 150, message = "New family name cannot exceed 150 characters.")
+    private String newFamilyName;
+
+    private com.blueant_crm_erp.client.enums.FamilyRelationship relationshipToHead;
+
+    private Boolean designateAsHead;
 }

@@ -63,7 +63,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -1710,6 +1712,377 @@ public class ClientWorkflowIntegrationTest {
         mockMvc.perform(get("/v1/clients/" + client.getClientCode() + "/documents/" + doc.getId() + "/download")
                         .with(user(crmPrincipal)))
                 .andExpect(status().isOk());
+    }
+
+    // =========================================================================
+    // 9. Direct Client Meeting Update Tests (Work Follow Direct Submission)
+    // =========================================================================
+
+    @Test
+    @DisplayName("9.1 First direct Client meeting update: creates meeting #1 and queues PC verification without prior scheduling")
+    void test9_1_firstDirectClientMeetingUpdate() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-DIRECT-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Direct Update Client 1")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .location("Delhi")
+                .clinicAddress("Apollo Hospital OPD")
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        // Ensure NO meetings exist for this client
+        assertThat(clientMeetingRepository.findByClientId(client.getId(), Pageable.unpaged()).getContent()).isEmpty();
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        ClientMeetingUpdateRequest request = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .remarks("First direct meeting conducted from Work Follow successfully")
+                .nextPlanDate(LocalDate.now().plusDays(10))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(15.0)
+                .build();
+
+        // Direct update via POST /v1/clients/{clientCode}/meetings/update -> 200 OK
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.meetingCode").isNotEmpty())
+                .andExpect(jsonPath("$.data.meetingNumber").value(1))
+                .andExpect(jsonPath("$.data.clientCode").value(client.getClientCode()))
+                .andExpect(jsonPath("$.data.meetingStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.meetingConducted").value("CONDUCTED"))
+                .andExpect(jsonPath("$.data.verificationStatus").value("PENDING"));
+
+        // Verify database: 1 meeting created, 1 update audit record, 1 verification attempt in PENDING
+        List<ClientMeeting> meetings = clientMeetingRepository.findByClientId(client.getId(), Pageable.unpaged()).getContent();
+        assertThat(meetings).hasSize(1);
+        ClientMeeting meeting = meetings.get(0);
+        assertThat(meeting.getMeetingNumber()).isEqualTo(1);
+        assertThat(meeting.getMeetingStatus()).isEqualTo(MeetingStatus.COMPLETED);
+        assertThat(meeting.getMeetingLocation()).isEqualTo("Apollo Hospital OPD");
+
+        int updatesCount = clientMeetingUpdateRepository.countByClientMeetingId(meeting.getId());
+        assertThat(updatesCount).isEqualTo(1);
+
+        ClientMeetingVerification verif = clientMeetingVerificationRepository
+                .findByClientMeetingIdAndIsCurrentTrue(meeting.getId()).orElseThrow();
+        assertThat(verif.getVerificationStatus()).isEqualTo(VerificationStatus.PENDING);
+        assertThat(verif.getAttemptNumber()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("9.2 Direct Client meeting update with existing SCHEDULED meeting updates the same meeting without creating duplicate")
+    void test9_2_directClientMeetingUpdateWithExistingScheduled() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-DIRECT-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Direct Update Client 2")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(scUser)
+                .build());
+
+        // Pre-existing scheduled meeting
+        ClientMeeting scheduledMeeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .meetingCode("BA-CLM-SCHEDULED-123")
+                .meetingNumber(1)
+                .client(client)
+                .assignedEmployee(scUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .meetingConducted(MeetingConductStatus.NOT_CONDUCTED)
+                .build());
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(scUser.getEmployeeCode());
+
+        ClientMeetingUpdateRequest request = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.NOT_CONDUCTED)
+                .meetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(15, 30))
+                .remarks("Client was busy with surgery; reschedule requested")
+                .nextPlanDate(LocalDate.now().plusDays(5))
+                .build();
+
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.meetingCode").value(scheduledMeeting.getMeetingCode()))
+                .andExpect(jsonPath("$.data.meetingStatus").value("NOT_CONDUCTED"))
+                .andExpect(jsonPath("$.data.verificationStatus").value("PENDING"));
+
+        // Total meetings for client remains exactly 1
+        assertThat(clientMeetingRepository.findByClientId(client.getId(), Pageable.unpaged()).getContent()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("9.3 Unauthorized RM cannot submit direct meeting update for another RM's client -> 403 Forbidden")
+    void test9_3_directClientMeetingUpdate_unauthorizedForbidden() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-DIRECT-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Protected RM Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        UserDetails otherPrincipal = customUserDetailsService.loadUserByUsername(otherRmUser.getEmployeeCode());
+
+        ClientMeetingUpdateRequest request = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("NO")
+                .remarks("Unauthorized attempt")
+                .nextPlanDate(LocalDate.now().plusDays(7))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(otherPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("9.4 Direct Client meeting update for non-existent client code returns 404 Not Found")
+    void test9_4_directClientMeetingUpdate_nonExistentClient_returns404() throws Exception {
+        UserDetails principal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        ClientMeetingUpdateRequest request = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("NO")
+                .remarks("Trying non-existent client")
+                .nextPlanDate(LocalDate.now().plusDays(7))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        mockMvc.perform(post("/v1/clients/BA-CL-NON-EXISTENT-99999/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("9.5 Direct Client meeting update validation: RM missing geo-location or invalid aloneWith is rejected with 400")
+    void test9_5_directClientMeetingUpdate_validationFailures() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-DIRECT-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Validation Test Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        // 1. RM Conducted WITHOUT Geo -> 400 Bad Request
+        ClientMeetingUpdateRequest noGeoReq = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .remarks("Missing coordinates")
+                .build();
+
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(noGeoReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Location coordinates")));
+
+        // 2. aloneWith SOMEONE without personName / position -> 400 Bad Request
+        ClientMeetingUpdateRequest missingPersonReq = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SOMEONE")
+                .businessGenerated("YES")
+                .remarks("Met someone without details")
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(missingPersonReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Person name is required")));
+    }
+
+    @Test
+    @DisplayName("9.6 Duplicate direct meeting update retry while already PENDING PC verification is rejected with 400")
+    void test9_6_duplicateDirectUpdateWhilePendingVerification_rejected() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-DIRECT-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Pending Duplicate Test Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        UserDetails principal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        ClientMeetingUpdateRequest request = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .remarks("Initial meeting update")
+                .nextPlanDate(LocalDate.now().plusDays(10))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        // First update -> 200 OK
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        // Duplicate retry before PC verifies -> 400 Bad Request
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("pending PC verification")));
+    }
+
+    @Test
+    @DisplayName("9.7 End-to-end Lifecycle: Direct Update -> PC Rejection -> Direct Update Resubmission -> PC Verification")
+    void test9_7_directMeetingUpdate_fullRejectionAndVerificationLifecycle() throws Exception {
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-DIRECT-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Lifecycle Test Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        // Step 1: RM submits first direct meeting update -> PENDING (Attempt #1)
+        ClientMeetingUpdateRequest update1 = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .remarks("First submission")
+                .nextPlanDate(LocalDate.now().plusDays(10))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        String response1Str = mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(rmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(update1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("PENDING"))
+                .andReturn().getResponse().getContentAsString();
+
+        String meetingCode = objectMapper.readTree(response1Str).path("data").path("meetingCode").asText();
+
+        // Step 2: PC rejects meeting -> REJECTED (Attempt #1)
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meetingCode + "/reject")
+                        .with(user(pcPrincipal))
+                        .param("reason", "GPS coordinates mismatch with clinic location"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.data.rejectionReason").value("GPS coordinates mismatch with clinic location"));
+
+        // Step 3: RM resubmits via direct update endpoint -> PENDING (Attempt #2)
+        ClientMeetingUpdateRequest update2 = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .remarks("Corrected GPS submission with client at OPD")
+                .nextPlanDate(LocalDate.now().plusDays(10))
+                .latitude(new BigDecimal("28.6140"))
+                .longitude(new BigDecimal("77.2091"))
+                .accuracy(8.0)
+                .build();
+
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(rmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(update2)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.meetingCode").value(meetingCode))
+                .andExpect(jsonPath("$.data.verificationStatus").value("PENDING"));
+
+        // Verify verification attempts: Attempt 1 is non-current REJECTED, Attempt 2 is current PENDING
+        List<ClientMeetingVerification> verifs = clientMeetingVerificationRepository
+                .findByClientMeetingIdOrderByAttemptNumberAsc(
+                        clientMeetingRepository.findByMeetingCode(meetingCode).orElseThrow().getId());
+        assertThat(verifs).hasSize(2);
+        assertThat(verifs.get(0).getAttemptNumber()).isEqualTo(1);
+        assertThat(verifs.get(0).getIsCurrent()).isFalse();
+        assertThat(verifs.get(0).getVerificationStatus()).isEqualTo(VerificationStatus.REJECTED);
+        assertThat(verifs.get(1).getAttemptNumber()).isEqualTo(2);
+        assertThat(verifs.get(1).getIsCurrent()).isTrue();
+        assertThat(verifs.get(1).getVerificationStatus()).isEqualTo(VerificationStatus.PENDING);
+
+        // Step 4: PC verifies meeting with conditional questionnaire
+        ClientMeetingVerificationRequest pcVerifyReq = ClientMeetingVerificationRequest.builder()
+                .meetingTime(LocalTime.of(11, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .investmentType("New SIP")
+                .investmentAmount(new BigDecimal("25000.00"))
+                .remarks("Confirmed with client personally; SIP application in progress")
+                .nextFollowupDate(LocalDate.now().plusDays(10))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meetingCode + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(pcVerifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("VERIFIED"));
+
+        // Step 5: Verify meeting and client final states
+        ClientMeeting finalMeeting = clientMeetingRepository.findByMeetingCode(meetingCode).orElseThrow();
+        assertThat(finalMeeting.getVerifiedByPc()).isTrue();
+        assertThat(finalMeeting.getMeetingStatus()).isEqualTo(MeetingStatus.COMPLETED);
+
+        Client updatedClient = clientRepository.findById(client.getId()).orElseThrow();
+        assertThat(updatedClient.getInvestmentType()).isEqualTo("New SIP");
+        assertThat(updatedClient.getNextFollowupDate()).isEqualTo(LocalDate.now().plusDays(10));
     }
 }
 

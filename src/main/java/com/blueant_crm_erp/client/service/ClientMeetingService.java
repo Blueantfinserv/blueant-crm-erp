@@ -18,6 +18,8 @@ public interface ClientMeetingService {
 
     ClientMeetingResponse updateMeeting(String meetingCode, ClientMeetingUpdateRequest request, String currentUserIdentifier);
 
+    ClientMeetingResponse directClientMeetingUpdate(String clientCode, ClientMeetingUpdateRequest request, String currentUserIdentifier);
+
     List<ClientMeetingUpdateResponse> getMeetingUpdateHistory(String meetingCode, String currentUserIdentifier);
 
     List<ClientMeetingResponse> getClientMeetings(String clientCode, String currentUserIdentifier);

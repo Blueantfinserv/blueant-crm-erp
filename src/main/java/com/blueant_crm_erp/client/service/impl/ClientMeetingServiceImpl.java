@@ -21,6 +21,7 @@ import com.blueant_crm_erp.common.dto.response.PageResponse;
 import com.blueant_crm_erp.exception.common.BadRequestException;
 import com.blueant_crm_erp.exception.common.ResourceNotFoundException;
 import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
+import com.blueant_crm_erp.meeting.enums.MeetingMode;
 import com.blueant_crm_erp.meeting.enums.MeetingStatus;
 import com.blueant_crm_erp.meeting.enums.SalesRole;
 import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
@@ -234,6 +235,100 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
             throw new AccessDeniedException("You are not authorized to update meeting: " + meetingCode);
         }
 
+        return executeMeetingUpdate(meeting, request, currentUser);
+    }
+
+    @Override
+    @Transactional
+    public ClientMeetingResponse directClientMeetingUpdate(String clientCode, ClientMeetingUpdateRequest request, String currentUserIdentifier) {
+        log.info("Direct client meeting update for client: {}, conducted: {}, by: {}", clientCode, request.getMeetingConducted(), currentUserIdentifier);
+
+        User currentUser = resolveUserOrThrow(currentUserIdentifier);
+        boolean isAdmin = isAdminUser(currentUser);
+
+        if (!StringUtils.hasText(clientCode)) {
+            throw new BadRequestException("Client code is required.");
+        }
+
+        Client client = clientRepository.findByClientCode(clientCode.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with code: " + clientCode));
+
+        // Acquire pessimistic write lock on Client row to strictly serialize concurrent requests per client
+        Client lockedClient = clientRepository.findByIdWithPessimisticLock(client.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + client.getId()));
+
+        // Validate client ownership
+        if (!isAdmin && (lockedClient.getSalesPerson() == null || !lockedClient.getSalesPerson().getId().equals(currentUser.getId()))) {
+            throw new AccessDeniedException("You are not authorized to update meetings for client: " + lockedClient.getClientCode());
+        }
+
+        // Find existing meeting or create a new one
+        // 1. Look for an active SCHEDULED meeting
+        Optional<ClientMeeting> scheduledMeetingOpt = clientMeetingRepository
+                .findTopByClientIdAndMeetingStatusOrderByMeetingNumberDesc(lockedClient.getId(), MeetingStatus.SCHEDULED);
+
+        ClientMeeting targetMeeting;
+        if (scheduledMeetingOpt.isPresent()) {
+            targetMeeting = scheduledMeetingOpt.get();
+        } else {
+            // 2. Check the most recent meeting for this client, if any
+            Optional<ClientMeeting> latestMeetingOpt = clientMeetingRepository
+                    .findTopByClientIdOrderByMeetingNumberDesc(lockedClient.getId());
+
+            if (latestMeetingOpt.isPresent()) {
+                ClientMeeting latest = latestMeetingOpt.get();
+                // If the latest meeting has a pending PC verification, do not allow creating/submitting another meeting
+                Optional<ClientMeetingVerification> currentVerif = clientMeetingVerificationRepository
+                        .findByClientMeetingIdAndIsCurrentTrue(latest.getId());
+                if (currentVerif.isPresent() && currentVerif.get().getVerificationStatus() == VerificationStatus.PENDING) {
+                    throw new BadRequestException("Meeting update (#" + latest.getMeetingNumber() + ") is already submitted and pending PC verification.");
+                }
+
+                // If the latest meeting was rejected by PC and not verified, allow updating/resubmitting this meeting
+                if (currentVerif.isPresent() && currentVerif.get().getVerificationStatus() == VerificationStatus.REJECTED && !Boolean.TRUE.equals(latest.getVerifiedByPc())) {
+                    targetMeeting = latest;
+                } else {
+                    // Previous meeting was completed and verified (or closed), so create next sequential meeting
+                    targetMeeting = createDirectClientMeeting(lockedClient, request, currentUser, latest.getMeetingNumber() + 1);
+                }
+            } else {
+                // First meeting ever for this client
+                targetMeeting = createDirectClientMeeting(lockedClient, request, currentUser, 1);
+            }
+        }
+
+        return executeMeetingUpdate(targetMeeting, request, currentUser);
+    }
+
+    private ClientMeeting createDirectClientMeeting(Client client, ClientMeetingUpdateRequest request, User currentUser, int meetingNumber) {
+        String meetingCode = clientMeetingCodeGeneratorService.generateNextMeetingCode();
+        User assignedEmployee = client.getSalesPerson() != null ? client.getSalesPerson() : currentUser;
+        MeetingMode mode = request.getMeetingMode() != null ? request.getMeetingMode() : MeetingMode.PHYSICAL;
+
+        String location = StringUtils.hasText(client.getClinicAddress())
+                ? client.getClinicAddress().trim()
+                : (StringUtils.hasText(client.getLocation()) ? client.getLocation().trim() : "Client Location");
+
+        ClientMeeting meeting = ClientMeeting.builder()
+                .meetingCode(meetingCode)
+                .meetingNumber(meetingNumber)
+                .client(client)
+                .assignedEmployee(assignedEmployee)
+                .meetingMode(mode)
+                .meetingDate(request.getMeetingDate())
+                .meetingTime(request.getMeetingTime())
+                .meetingLocation(location)
+                .meetingStatus(MeetingStatus.SCHEDULED)
+                .meetingConducted(MeetingConductStatus.NOT_CONDUCTED)
+                .verifiedByPc(false)
+                .build();
+
+        ClientMeeting saved = clientMeetingRepository.save(meeting);
+        log.info("Created client meeting record for direct update: {}, sequence: #{}", meetingCode, meetingNumber);
+        return saved;
+    }
+
+    private ClientMeetingResponse executeMeetingUpdate(ClientMeeting meeting, ClientMeetingUpdateRequest request, User currentUser) {
         // Check state transitions: only SCHEDULED or REJECTED meetings can be updated/submitted
         if (meeting.getMeetingStatus() == MeetingStatus.COMPLETED && !Boolean.TRUE.equals(meeting.getVerifiedByPc())) {
             // Check if there is a pending verification
@@ -320,7 +415,7 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
         ClientMeetingVerification savedVerif = clientMeetingVerificationRepository.save(newAttempt);
 
         log.info("Client meeting updated and submitted for PC verification. Meeting: {}, Attempt: #{}",
-                meetingCode, attemptNumber);
+                savedMeeting.getMeetingCode(), attemptNumber);
 
         return mapToMeetingResponse(savedMeeting, savedVerif.getVerificationStatus().name());
     }

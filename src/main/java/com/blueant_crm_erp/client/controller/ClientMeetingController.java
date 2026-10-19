@@ -70,6 +70,20 @@ public class ClientMeetingController {
         return ApiResponse.success("Client meeting update submitted successfully", response);
     }
 
+    @Operation(summary = "Submit Direct Client Meeting Update Form",
+               description = "Allows an authorized RM/SC to submit a client meeting update directly from Client Work Follow without scheduling first. Obtains or creates the appropriate client meeting transactionally and queues for PC verification.")
+    @PostMapping("/v1/clients/{clientCode}/meetings/update")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('RELATIONSHIP_MANAGER', 'SALES_COORDINATOR', 'ADMIN', 'SUPER_ADMIN')")
+    public ApiResponse<ClientMeetingResponse> directClientMeetingUpdate(
+            @PathVariable String clientCode,
+            @Valid @RequestBody ClientMeetingUpdateRequest request,
+            Principal principal) {
+        String currentUser = principal != null ? principal.getName() : "system";
+        ClientMeetingResponse response = clientMeetingService.directClientMeetingUpdate(clientCode, request, currentUser);
+        return ApiResponse.success("Client meeting update submitted successfully", response);
+    }
+
     @Operation(summary = "Get meeting update history", description = "Returns immutable update audit records for a client meeting")
     @GetMapping("/v1/client-meetings/{meetingCode}/update-history")
     @ResponseStatus(HttpStatus.OK)

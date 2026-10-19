@@ -16,6 +16,7 @@ import com.blueant_crm_erp.client.repository.ClientRepository;
 import com.blueant_crm_erp.client.service.ClientCodeGeneratorService;
 import com.blueant_crm_erp.client.service.ClientRegistrationService;
 import com.blueant_crm_erp.client.validator.ClientValidator;
+import com.blueant_crm_erp.document.service.StorageService;
 import com.blueant_crm_erp.exception.client.ClientAlreadyExistsException;
 import com.blueant_crm_erp.exception.common.ResourceNotFoundException;
 import com.blueant_crm_erp.servicerequest.enums.VerificationStatus;
@@ -37,6 +38,21 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.blueant_crm_erp.client.entity.ClientFamily;
+import com.blueant_crm_erp.client.entity.ClientFamilyHeadHistory;
+import com.blueant_crm_erp.client.entity.ClientFamilyMember;
+import com.blueant_crm_erp.client.enums.FamilyMembershipStatus;
+import com.blueant_crm_erp.client.enums.FamilyRelationship;
+import com.blueant_crm_erp.client.enums.FamilyStatus;
+import com.blueant_crm_erp.client.repository.ClientFamilyHeadHistoryRepository;
+import com.blueant_crm_erp.client.repository.ClientFamilyMemberRepository;
+import com.blueant_crm_erp.client.repository.ClientFamilyRepository;
+import com.blueant_crm_erp.client.service.ActiveInvestmentEligibilityService;
+import com.blueant_crm_erp.client.service.FamilyCodeGeneratorService;
+import com.blueant_crm_erp.exception.client.FamilyNotFoundException;
+import com.blueant_crm_erp.exception.client.IneligibleFamilyHeadException;
+import org.springframework.util.StringUtils;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -49,6 +65,12 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
     private final ClientNomineeRepository clientNomineeRepository;
     private final ClientDocumentRepository clientDocumentRepository;
     private final ClientAssignmentHistoryRepository clientAssignmentHistoryRepository;
+    private final StorageService storageService;
+    private final ClientFamilyRepository clientFamilyRepository;
+    private final ClientFamilyMemberRepository clientFamilyMemberRepository;
+    private final ClientFamilyHeadHistoryRepository clientFamilyHeadHistoryRepository;
+    private final FamilyCodeGeneratorService familyCodeGeneratorService;
+    private final ActiveInvestmentEligibilityService activeInvestmentEligibilityService;
 
     @Override
     @Transactional
@@ -175,6 +197,11 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
         List<ClientDocument> savedDocs = new ArrayList<>();
         if (request.getDocuments() != null && !request.getDocuments().isEmpty()) {
             for (ClientDocumentRequest dr : request.getDocuments()) {
+                String docRef = dr.getDocumentReference() != null ? dr.getDocumentReference().trim() : null;
+                if (org.springframework.util.StringUtils.hasText(docRef)) {
+                    docRef = storageService.promoteToPermanent(docRef);
+                }
+
                 ClientDocument doc = ClientDocument.builder()
                         .client(savedClient)
                         .documentType(dr.getDocumentType())
@@ -182,7 +209,7 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                         .received(Boolean.TRUE.equals(dr.getReceived()))
                         .receivedDate(dr.getReceivedDate())
                         .verificationStatus(dr.getVerificationStatus() != null ? dr.getVerificationStatus() : VerificationStatus.PENDING)
-                        .documentReference(dr.getDocumentReference() != null ? dr.getDocumentReference().trim() : null)
+                        .documentReference(docRef)
                         .remarks(dr.getRemarks() != null ? dr.getRemarks().trim() : null)
                         .build();
                 savedDocs.add(clientDocumentRepository.save(doc));
@@ -201,10 +228,108 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 .build();
         clientAssignmentHistoryRepository.save(history);
 
+        // 11. Handle Family Association (Optional)
+        ClientFamily associatedFamily = null;
+        if (StringUtils.hasText(request.getFamilyCode())) {
+            associatedFamily = clientFamilyRepository.findByFamilyCode(request.getFamilyCode().trim())
+                    .orElseThrow(() -> new FamilyNotFoundException("Family not found with code: " + request.getFamilyCode()));
+
+            FamilyRelationship rel = request.getRelationshipToHead() != null
+                    ? request.getRelationshipToHead()
+                    : FamilyRelationship.OTHER;
+
+            ClientFamilyMember member = ClientFamilyMember.builder()
+                    .family(associatedFamily)
+                    .client(savedClient)
+                    .relationshipToHead(rel)
+                    .membershipStatus(FamilyMembershipStatus.ACTIVE)
+                    .joinedAt(now)
+                    .joinedBy(currentUserIdentifier != null ? currentUserIdentifier : "SYSTEM")
+                    .build();
+            clientFamilyMemberRepository.save(member);
+
+            savedClient.setFamily(associatedFamily);
+            clientRepository.save(savedClient);
+
+            if (Boolean.TRUE.equals(request.getDesignateAsHead())) {
+                ActiveInvestmentEligibilityService.EligibilityResult eligibility =
+                        activeInvestmentEligibilityService.evaluateEligibility(savedClient);
+                if (!eligibility.eligible()) {
+                    throw new IneligibleFamilyHeadException(
+                            "Cannot designate client " + savedClient.getClientCode() + " as Family Head: " + eligibility.reason()
+                    );
+                }
+                Client prevHead = associatedFamily.getFamilyHead();
+                associatedFamily.setFamilyHead(savedClient);
+                clientFamilyRepository.save(associatedFamily);
+
+                ClientFamilyHeadHistory headHistory = ClientFamilyHeadHistory.builder()
+                        .family(associatedFamily)
+                        .previousHead(prevHead)
+                        .newHead(savedClient)
+                        .changedByUser(currentUserIdentifier != null ? currentUserIdentifier : "SYSTEM")
+                        .changedAt(now)
+                        .reason("Designated as head during client registration")
+                        .build();
+                clientFamilyHeadHistoryRepository.save(headHistory);
+            }
+        } else if (StringUtils.hasText(request.getNewFamilyName())) {
+            String generatedFamCode = familyCodeGeneratorService.generateNextFamilyCode();
+            ClientFamily newFam = ClientFamily.builder()
+                    .familyCode(generatedFamCode)
+                    .familyName(request.getNewFamilyName().trim())
+                    .status(FamilyStatus.ACTIVE)
+                    .build();
+
+            if (Boolean.TRUE.equals(request.getDesignateAsHead())) {
+                ActiveInvestmentEligibilityService.EligibilityResult eligibility =
+                        activeInvestmentEligibilityService.evaluateEligibility(savedClient);
+                if (!eligibility.eligible()) {
+                    throw new IneligibleFamilyHeadException(
+                            "Cannot designate client " + savedClient.getClientCode() + " as Family Head: " + eligibility.reason()
+                    );
+                }
+                newFam.setFamilyHead(savedClient);
+            }
+
+            associatedFamily = clientFamilyRepository.save(newFam);
+            savedClient.setFamily(associatedFamily);
+            clientRepository.save(savedClient);
+
+            FamilyRelationship rel = request.getRelationshipToHead() != null
+                    ? request.getRelationshipToHead()
+                    : FamilyRelationship.SELF;
+
+            ClientFamilyMember member = ClientFamilyMember.builder()
+                    .family(associatedFamily)
+                    .client(savedClient)
+                    .relationshipToHead(rel)
+                    .membershipStatus(FamilyMembershipStatus.ACTIVE)
+                    .joinedAt(now)
+                    .joinedBy(currentUserIdentifier != null ? currentUserIdentifier : "SYSTEM")
+                    .build();
+            clientFamilyMemberRepository.save(member);
+
+            if (Boolean.TRUE.equals(request.getDesignateAsHead())) {
+                ClientFamilyHeadHistory headHistory = ClientFamilyHeadHistory.builder()
+                        .family(associatedFamily)
+                        .previousHead(null)
+                        .newHead(savedClient)
+                        .changedByUser(currentUserIdentifier != null ? currentUserIdentifier : "SYSTEM")
+                        .changedAt(now)
+                        .reason("Designated as head during family creation on client registration")
+                        .build();
+                clientFamilyHeadHistoryRepository.save(headHistory);
+            }
+        }
+
         String docStatus = computeDocumentCompletionStatus(savedDocs);
 
         log.info("External client registered successfully. ClientCode: {}, ID: {}, AssignedTo: {}",
                 savedClient.getClientCode(), savedClient.getId(), salesPerson.getEmployeeCode());
+
+        boolean isHead = associatedFamily != null && associatedFamily.getFamilyHead() != null
+                && associatedFamily.getFamilyHead().getId().equals(savedClient.getId());
 
         return ClientRegistrationResponse.builder()
                 .id(savedClient.getId())
@@ -266,6 +391,11 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 .nominees(savedNominees.stream().map(this::mapNomineeResponse).collect(Collectors.toList()))
                 .documents(savedDocs.stream().map(this::mapDocumentResponse).collect(Collectors.toList()))
                 .documentCompletionStatus(docStatus)
+                // Section F: Family
+                .familyId(associatedFamily != null ? associatedFamily.getId() : null)
+                .familyCode(associatedFamily != null ? associatedFamily.getFamilyCode() : null)
+                .familyName(associatedFamily != null ? associatedFamily.getFamilyName() : null)
+                .isFamilyHead(isHead)
                 .build();
     }
 
@@ -350,6 +480,11 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 .documentCompletionStatus(docStatus)
                 // History
                 .assignmentHistories(histories.stream().map(this::mapAssignmentHistoryResponse).collect(Collectors.toList()))
+                // Section F: Family
+                .familyId(client.getFamily() != null ? client.getFamily().getId() : null)
+                .familyCode(client.getFamily() != null ? client.getFamily().getFamilyCode() : null)
+                .familyName(client.getFamily() != null ? client.getFamily().getFamilyName() : null)
+                .isFamilyHead(client.getFamily() != null && client.getFamily().getFamilyHead() != null && client.getFamily().getFamilyHead().getId().equals(client.getId()))
                 .build();
     }
 

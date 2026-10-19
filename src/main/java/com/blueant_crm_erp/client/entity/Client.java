@@ -201,4 +201,14 @@ public class Client extends BaseVersionEntity {
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
     private java.util.List<ClientAssignmentHistory> assignmentHistories = new java.util.ArrayList<>();
 
+    // --- Family Management ---
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "family_id", foreignKey = @ForeignKey(name = "fk_client_family"))
+    private ClientFamily family;
+
+    @lombok.Builder.Default
+    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<ClientFamilyMember> familyMemberships = new java.util.ArrayList<>();
+
 }

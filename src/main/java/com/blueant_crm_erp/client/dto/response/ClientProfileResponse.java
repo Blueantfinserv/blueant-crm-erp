@@ -87,4 +87,10 @@ public class ClientProfileResponse {
 
     // Ownership & Assignment Ledger
     private List<ClientAssignmentHistoryResponse> assignmentHistories;
+
+    // Section F: Family Management
+    private Long familyId;
+    private String familyCode;
+    private String familyName;
+    private Boolean isFamilyHead;
 }

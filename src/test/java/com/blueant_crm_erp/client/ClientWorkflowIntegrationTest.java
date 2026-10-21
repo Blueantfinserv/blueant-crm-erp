@@ -374,6 +374,7 @@ public class ClientWorkflowIntegrationTest {
     void test1_6_fullProfileRegistrationWithNomineesDocumentsAndHistory() throws Exception {
         String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
         LocalDate dob = LocalDate.of(1985, 5, 20);
+        LocalDate actualDob = LocalDate.of(1985, 3, 15);
         LocalDate appDate = LocalDate.now().minusDays(1);
         LocalDate reportDate = LocalDate.now();
         LocalDate paymentDate = LocalDate.now();
@@ -433,6 +434,7 @@ public class ClientWorkflowIntegrationTest {
                 // Section A
                 .panNumber("ABCDE1234F")
                 .dateOfBirth(dob)
+                .actualDateOfBirth(actualDob)
                 .motherName("Sunita Rathore")
                 .placeOfBirth("New Delhi")
                 .occupation("Doctor")
@@ -475,6 +477,8 @@ public class ClientWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.clientName").value("Dr. Vikram Profile"))
                 .andExpect(jsonPath("$.data.panNumber").value("ABCDE1234F"))
+                .andExpect(jsonPath("$.data.dateOfBirth").value(dob.toString()))
+                .andExpect(jsonPath("$.data.actualDateOfBirth").value(actualDob.toString()))
                 .andExpect(jsonPath("$.data.motherName").value("Sunita Rathore"))
                 .andExpect(jsonPath("$.data.city").value("New Delhi"))
                 .andExpect(jsonPath("$.data.clientSource").value("Doctor Referral"))
@@ -492,6 +496,7 @@ public class ClientWorkflowIntegrationTest {
         Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
         assertThat(client.getPanNumber()).isEqualTo("ABCDE1234F");
         assertThat(client.getDateOfBirth()).isEqualTo(dob);
+        assertThat(client.getActualDateOfBirth()).isEqualTo(actualDob);
         assertThat(client.getCity()).isEqualTo("New Delhi");
         assertThat(client.getInvestmentType()).isEqualTo("New SIP, Lumpsum");
         assertThat(client.getPaymentStatus()).isEqualTo(ClientPaymentStatus.YES);
@@ -627,14 +632,384 @@ public class ClientWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.clientName").value("Dr. Minimal Client"))
                 .andExpect(jsonPath("$.data.panNumber").doesNotExist())
+                .andExpect(jsonPath("$.data.dateOfBirth").doesNotExist())
+                .andExpect(jsonPath("$.data.actualDateOfBirth").doesNotExist())
                 .andExpect(jsonPath("$.data.documentCompletionStatus").value("NO_DOCUMENTS"));
 
         Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
         assertThat(client.getPanNumber()).isNull();
         assertThat(client.getDateOfBirth()).isNull();
+        assertThat(client.getActualDateOfBirth()).isNull();
         assertThat(client.getClientSource()).isNull();
         assertThat(client.getNominees()).isEmpty();
         assertThat(client.getDocuments()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("1.11 actualDateOfBirth and dateOfBirth are stored independently, coexist, and return via registration and profile API")
+    void test1_11_actualDateOfBirthIndependentStorageAndRetrieval() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate recordedDob = LocalDate.of(1980, 5, 10);
+        LocalDate actualDob = LocalDate.of(1980, 3, 25);
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Independent DOB Client")
+                .mobileNumber(mobile)
+                .speciality("Cardiology")
+                .location("Delhi Central")
+                .clinicAddress("Heart Institute")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .dateOfBirth(recordedDob)
+                .actualDateOfBirth(actualDob)
+                .build();
+
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        String responseStr = mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dateOfBirth").value(recordedDob.toString()))
+                .andExpect(jsonPath("$.data.actualDateOfBirth").value(actualDob.toString()))
+                .andReturn().getResponse().getContentAsString();
+
+        String clientCode = objectMapper.readTree(responseStr).path("data").path("clientCode").asText();
+
+        // Verify independent database persistence
+        Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
+        assertThat(client.getDateOfBirth()).isEqualTo(recordedDob);
+        assertThat(client.getActualDateOfBirth()).isEqualTo(actualDob);
+        assertThat(client.getDateOfBirth()).isNotEqualTo(client.getActualDateOfBirth());
+
+        // Verify retrieval via GET /v1/clients/{clientCode}/profile
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+        mockMvc.perform(get("/v1/clients/" + clientCode + "/profile")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dateOfBirth").value(recordedDob.toString()))
+                .andExpect(jsonPath("$.data.actualDateOfBirth").value(actualDob.toString()));
+    }
+
+    @Test
+    @DisplayName("1.12 actualDateOfBirth in the future is rejected with HTTP 400 Bad Request")
+    void test1_12_actualDateOfBirthFutureDateRejected() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate futureDate = LocalDate.now().plusDays(2);
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Future Actual DOB")
+                .mobileNumber(mobile)
+                .speciality("Orthopedics")
+                .location("Delhi South")
+                .clinicAddress("Bone Care")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .actualDateOfBirth(futureDate)
+                .build();
+
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation Failed"))
+                .andExpect(jsonPath("$.errors.actualDateOfBirth").value("Actual date of birth must be in the past."));
+    }
+
+    @Test
+    @DisplayName("1.13 Backward compatibility: Registration succeeds when actualDateOfBirth is omitted")
+    void test1_13_backwardCompatibilityOmitActualDateOfBirth() throws Exception {
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        LocalDate recordedDob = LocalDate.of(1990, 7, 15);
+
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Legacy Client No Actual DOB")
+                .mobileNumber(mobile)
+                .speciality("Pediatrics")
+                .location("Delhi East")
+                .clinicAddress("Child Care Clinic")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .dateOfBirth(recordedDob)
+                // actualDateOfBirth omitted / null
+                .build();
+
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        String responseStr = mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.dateOfBirth").value(recordedDob.toString()))
+                .andExpect(jsonPath("$.data.actualDateOfBirth").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        String clientCode = objectMapper.readTree(responseStr).path("data").path("clientCode").asText();
+
+        Client client = clientRepository.findByMobileNumber(mobile).orElseThrow();
+        assertThat(client.getDateOfBirth()).isEqualTo(recordedDob);
+        assertThat(client.getActualDateOfBirth()).isNull();
+
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+        mockMvc.perform(get("/v1/clients/" + clientCode + "/profile")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dateOfBirth").value(recordedDob.toString()))
+                .andExpect(jsonPath("$.data.actualDateOfBirth").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("1.14 Any TWO distinct supported document types satisfy the document requirement (PAN + Passport, Cheque + Signature, Aadhaar + Other)")
+    void test1_14_documentsAnyTwoDistinctSupportedTypesAccepted() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        // Combination 1: PAN_CARD + PASSPORT
+        String mobile1 = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req1 = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Pair One Client")
+                .mobileNumber(mobile1)
+                .speciality("Cardiology")
+                .location("Delhi")
+                .clinicAddress("Heart Institute")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .documents(List.of(
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.PAN_CARD).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.PASSPORT).received(true).receivedDate(LocalDate.now()).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("ALL_RECEIVED"));
+
+        // Combination 2: CHEQUE + SIGNATURE
+        String mobile2 = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req2 = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Pair Two Client")
+                .mobileNumber(mobile2)
+                .speciality("Neurology")
+                .location("Delhi")
+                .clinicAddress("Brain Hospital")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .documents(List.of(
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.CHEQUE).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.SIGNATURE).received(true).receivedDate(LocalDate.now()).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req2)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("ALL_RECEIVED"));
+
+        // Combination 3: AADHAAR_CARD + OTHER
+        String mobile3 = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req3 = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Pair Three Client")
+                .mobileNumber(mobile3)
+                .speciality("Pediatrics")
+                .location("Delhi")
+                .clinicAddress("Child Care")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .documents(List.of(
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.AADHAAR_CARD).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.OTHER).received(true).receivedDate(LocalDate.now()).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req3)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("ALL_RECEIVED"));
+    }
+
+    @Test
+    @DisplayName("1.15 Submitting only ONE document type in registration is rejected with HTTP 400 Bad Request")
+    void test1_15_documentsSingleTypeOnlyRejected() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Single Doc Client")
+                .mobileNumber(mobile)
+                .speciality("Dentistry")
+                .location("Delhi")
+                .clinicAddress("Dental Care")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .documents(List.of(
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.PAN_CARD).received(true).receivedDate(LocalDate.now()).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Any TWO distinct supported document types are mandatory")));
+    }
+
+    @Test
+    @DisplayName("1.16 Submitting TWO files of the SAME document type in registration is rejected with HTTP 400 Bad Request")
+    void test1_16_documentsTwoFilesOfSameTypeRejected() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Duplicate Doc Type Client")
+                .mobileNumber(mobile)
+                .speciality("Dentistry")
+                .location("Delhi")
+                .clinicAddress("Dental Care")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .documents(List.of(
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.PAN_CARD).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.PAN_CARD).received(true).receivedDate(LocalDate.now()).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Any TWO distinct supported document types are mandatory")));
+    }
+
+    @Test
+    @DisplayName("1.17 Incremental upload: PARTIAL status with 1 distinct type or duplicate type, ALL_RECEIVED when 2 distinct types uploaded")
+    void test1_17_documentsIncrementalUploadToDocumentComplete() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        // Step 1: Register client without documents -> NO_DOCUMENTS
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. Incremental Upload Client")
+                .mobileNumber(mobile)
+                .speciality("Dermatology")
+                .location("Delhi")
+                .clinicAddress("Skin Clinic")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .build();
+
+        String responseStr = mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("NO_DOCUMENTS"))
+                .andReturn().getResponse().getContentAsString();
+
+        String clientCode = objectMapper.readTree(responseStr).path("data").path("clientCode").asText();
+
+        // Step 2: Upload 1st document (PAN_CARD)
+        byte[] pdfBytes1 = "%PDF-1.4 pan content 1".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        MockMultipartFile file1 = new MockMultipartFile("file", "pan.pdf", "application/pdf", pdfBytes1);
+        mockMvc.perform(multipart("/v1/clients/" + clientCode + "/documents")
+                        .file(file1)
+                        .param("documentType", "PAN_CARD")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isCreated());
+
+        // Status must be PARTIAL because only 1 distinct type exists
+        mockMvc.perform(get("/v1/clients/" + clientCode + "/profile")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("PARTIAL"));
+
+        // Step 3: Upload 2nd document of SAME type (PAN_CARD)
+        byte[] pdfBytes2 = "%PDF-1.4 pan content 2".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        MockMultipartFile file2 = new MockMultipartFile("file", "pan_back.pdf", "application/pdf", pdfBytes2);
+        mockMvc.perform(multipart("/v1/clients/" + clientCode + "/documents")
+                        .file(file2)
+                        .param("documentType", "PAN_CARD")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isCreated());
+
+        // Status must STILL be PARTIAL because distinct types count is still 1
+        mockMvc.perform(get("/v1/clients/" + clientCode + "/profile")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("PARTIAL"));
+
+        // Step 4: Upload 3rd document of a DISTINCT supported type (PASSPORT)
+        byte[] pdfBytes3 = "%PDF-1.4 passport content".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        MockMultipartFile file3 = new MockMultipartFile("file", "passport.pdf", "application/pdf", pdfBytes3);
+        mockMvc.perform(multipart("/v1/clients/" + clientCode + "/documents")
+                        .file(file3)
+                        .param("documentType", "PASSPORT")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isCreated());
+
+        // Now distinct types = 2 (PAN_CARD, PASSPORT) -> Status must become ALL_RECEIVED
+        mockMvc.perform(get("/v1/clients/" + clientCode + "/profile")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("ALL_RECEIVED"));
+    }
+
+    @Test
+    @DisplayName("1.18 Registration with all SIX supported document types succeeds and is marked ALL_RECEIVED")
+    void test1_18_documentsAllSixSupportedTypesAccepted() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
+        CreateClientRegistrationRequest req = CreateClientRegistrationRequest.builder()
+                .clientName("Dr. All Six Docs Client")
+                .mobileNumber(mobile)
+                .speciality("Surgery")
+                .location("Delhi")
+                .clinicAddress("Surgical Center")
+                .salesPersonEmployeeCode(rmUser.getEmployeeCode())
+                .documents(List.of(
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.PAN_CARD).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.AADHAAR_CARD).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.PASSPORT).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.CHEQUE).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.SIGNATURE).received(true).receivedDate(LocalDate.now()).build(),
+                        ClientDocumentRequest.builder().documentType(ClientDocumentType.OTHER).received(true).receivedDate(LocalDate.now()).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/v1/clients/register")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.documentCompletionStatus").value("ALL_RECEIVED"));
+    }
+
+    @Test
+    @DisplayName("1.19 Uploading unsupported document type is rejected with HTTP 400 Bad Request")
+    void test1_19_documentsUnsupportedTypeRejected() throws Exception {
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-BADTYPE-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Bad Doc Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        byte[] pdfBytes = "%PDF-1.4 test".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", pdfBytes);
+
+        mockMvc.perform(multipart("/v1/clients/" + client.getClientCode() + "/documents")
+                        .file(file)
+                        .param("documentType", "INVALID_DOC_TYPE")
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isBadRequest());
     }
 
     // =========================================================================
@@ -1061,6 +1436,260 @@ public class ClientWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].verificationStatus").value("REJECTED"))
                 .andExpect(jsonPath("$.data[1].verificationStatus").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("4.5 PC verification supports multi-select business types, persists on meeting and verification, and does not duplicate meetings")
+    void test4_5_pcVerificationMultiSelectBusinessTypesSupported() throws Exception {
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        // Step 1: Schedule physical client meeting
+        String clientCode = "BA-CL-PCMULTI-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+        Client client = clientRepository.save(Client.builder()
+                .clientCode(clientCode)
+                .clientName("Dr. Multi Business Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        ClientMeeting meeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .client(client)
+                .meetingCode("BA-CLM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .meetingNumber(1)
+                .assignedEmployee(rmUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(11, 0))
+                .meetingStatus(MeetingStatus.COMPLETED)
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .businessGenerated("YES")
+                .build());
+
+        clientMeetingVerificationRepository.save(ClientMeetingVerification.builder()
+                .clientMeeting(meeting)
+                .attemptNumber(1)
+                .isCurrent(true)
+                .verificationStatus(VerificationStatus.PENDING)
+                .build());
+
+        long meetingCountBefore = clientMeetingRepository.count();
+
+        // Step 2: PC submits verification with multiple business types (SIP, INSURANCE)
+        ClientMeetingVerificationRequest verifyReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(11, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .businessTypes(List.of("SIP", "INSURANCE"))
+                .investmentAmount(new BigDecimal("250000"))
+                .remarks("Conducted successfully with multiple businesses")
+                .nextFollowupDate(LocalDate.now().plusMonths(1))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meeting.getMeetingCode() + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.businessGenerated").value("YES"))
+                .andExpect(jsonPath("$.data.businessTypes[0]").value("SIP"))
+                .andExpect(jsonPath("$.data.businessTypes[1]").value("INSURANCE"));
+
+        // Step 3: Verify meeting record is NOT duplicated
+        long meetingCountAfter = clientMeetingRepository.count();
+        assertThat(meetingCountAfter).isEqualTo(meetingCountBefore);
+
+        // Step 4: Verify entity persistence
+        ClientMeeting updatedMeeting = clientMeetingRepository.findByMeetingCode(meeting.getMeetingCode()).orElseThrow();
+        assertThat(updatedMeeting.getBusinessTypes()).isEqualTo("SIP, INSURANCE");
+
+        ClientMeetingVerification verification = clientMeetingVerificationRepository
+                .findByClientMeetingIdAndIsCurrentTrue(meeting.getId()).orElseThrow();
+        assertThat(verification.getVerificationStatus()).isEqualTo(VerificationStatus.VERIFIED);
+        assertThat(verification.getBusinessTypes()).isEqualTo("SIP, INSURANCE");
+
+        // Step 5: Verify meeting detail endpoint returns the multi-select business types array
+        mockMvc.perform(get("/v1/client-meetings/" + meeting.getMeetingCode())
+                        .with(user(rmPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.businessTypes[0]").value("SIP"))
+                .andExpect(jsonPath("$.data.businessTypes[1]").value("INSURANCE"));
+    }
+
+    @Test
+    @DisplayName("4.6 PC verification supports combinations across all seven types (LUMP_SUM, SHARE, LOAN, BROKER_CHANGE, SERVICE_REQUEST)")
+    void test4_6_pcVerificationSevenSupportedTypesAndCombinations() throws Exception {
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-7TYPES-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Seven Types Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        ClientMeeting meeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .client(client)
+                .meetingCode("BA-CLM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .meetingNumber(1)
+                .assignedEmployee(rmUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(14, 0))
+                .meetingStatus(MeetingStatus.COMPLETED)
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .businessGenerated("YES")
+                .build());
+
+        clientMeetingVerificationRepository.save(ClientMeetingVerification.builder()
+                .clientMeeting(meeting)
+                .attemptNumber(1)
+                .isCurrent(true)
+                .verificationStatus(VerificationStatus.PENDING)
+                .build());
+
+        // Combination: LUMP_SUM, SHARE, LOAN
+        ClientMeetingVerificationRequest verifyReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(14, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .businessTypes(List.of("LUMP_SUM", "SHARE", "LOAN"))
+                .investmentAmount(new BigDecimal("1000000"))
+                .remarks("Three distinct business types generated")
+                .nextFollowupDate(LocalDate.now().plusMonths(2))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meeting.getMeetingCode() + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.businessTypes.length()").value(3))
+                .andExpect(jsonPath("$.data.businessTypes[0]").value("LUMP_SUM"))
+                .andExpect(jsonPath("$.data.businessTypes[1]").value("SHARE"))
+                .andExpect(jsonPath("$.data.businessTypes[2]").value("LOAN"));
+    }
+
+    @Test
+    @DisplayName("4.7 PC verification rejects unsupported business types with HTTP 400 Bad Request")
+    void test4_7_pcVerificationUnsupportedBusinessTypeRejected() throws Exception {
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-BADTYPE-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. Bad Type Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        ClientMeeting meeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .client(client)
+                .meetingCode("BA-CLM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .meetingNumber(1)
+                .assignedEmployee(rmUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(14, 0))
+                .meetingStatus(MeetingStatus.COMPLETED)
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .businessGenerated("YES")
+                .build());
+
+        clientMeetingVerificationRepository.save(ClientMeetingVerification.builder()
+                .clientMeeting(meeting)
+                .attemptNumber(1)
+                .isCurrent(true)
+                .verificationStatus(VerificationStatus.PENDING)
+                .build());
+
+        ClientMeetingVerificationRequest badReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(14, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .businessTypes(List.of("SIP", "CRYPTO_INVESTMENT"))
+                .investmentAmount(new BigDecimal("50000"))
+                .remarks("Invalid type")
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meeting.getMeetingCode() + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(badReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Unsupported business/service type")));
+    }
+
+    @Test
+    @DisplayName("4.8 PC verification with Business Generated = NO requires no business types, clears them, and preserves single meeting")
+    void test4_8_pcVerificationBusinessGeneratedNoRequiresNoBusinessTypes() throws Exception {
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        Client client = clientRepository.save(Client.builder()
+                .clientCode("BA-CL-BGNO-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase())
+                .clientName("Dr. No Business Client")
+                .mobileNumber("9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L)))
+                .clientStatus(ClientStatus.ACTIVE)
+                .salesPerson(rmUser)
+                .build());
+
+        ClientMeeting meeting = clientMeetingRepository.save(ClientMeeting.builder()
+                .client(client)
+                .meetingCode("BA-CLM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .meetingNumber(1)
+                .assignedEmployee(rmUser)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(16, 0))
+                .meetingStatus(MeetingStatus.COMPLETED)
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .businessGenerated("NO")
+                .build());
+
+        clientMeetingVerificationRepository.save(ClientMeetingVerification.builder()
+                .clientMeeting(meeting)
+                .attemptNumber(1)
+                .isCurrent(true)
+                .verificationStatus(VerificationStatus.PENDING)
+                .build());
+
+        long countBefore = clientMeetingRepository.count();
+
+        ClientMeetingVerificationRequest noBgReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(16, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("NO")
+                .remarks("No business generated at this time")
+                .nextFollowupDate(LocalDate.now().plusMonths(1))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meeting.getMeetingCode() + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(noBgReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.businessGenerated").value("NO"))
+                .andExpect(jsonPath("$.data.businessTypes").isEmpty());
+
+        long countAfter = clientMeetingRepository.count();
+        assertThat(countAfter).isEqualTo(countBefore);
+
+        ClientMeeting updatedMeeting = clientMeetingRepository.findByMeetingCode(meeting.getMeetingCode()).orElseThrow();
+        assertThat(updatedMeeting.getBusinessGenerated()).isEqualTo("NO");
+        assertThat(updatedMeeting.getBusinessTypes()).isNull();
     }
 
     // =========================================================================

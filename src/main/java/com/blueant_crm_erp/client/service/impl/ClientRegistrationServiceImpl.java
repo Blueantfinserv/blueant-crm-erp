@@ -33,10 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import com.blueant_crm_erp.client.enums.ClientDocumentType;
 
 import com.blueant_crm_erp.client.entity.ClientFamily;
 import com.blueant_crm_erp.client.entity.ClientFamilyHeadHistory;
@@ -140,6 +140,7 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 // Section A: Personal & Family
                 .panNumber(panNumber)
                 .dateOfBirth(request.getDateOfBirth())
+                .actualDateOfBirth(request.getActualDateOfBirth())
                 .motherName(request.getMotherName() != null ? request.getMotherName().trim() : null)
                 .placeOfBirth(request.getPlaceOfBirth() != null ? request.getPlaceOfBirth().trim() : null)
                 .occupation(request.getOccupation() != null ? request.getOccupation().trim() : null)
@@ -360,6 +361,7 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 // Section A
                 .panNumber(savedClient.getPanNumber())
                 .dateOfBirth(savedClient.getDateOfBirth())
+                .actualDateOfBirth(savedClient.getActualDateOfBirth())
                 .motherName(savedClient.getMotherName())
                 .placeOfBirth(savedClient.getPlaceOfBirth())
                 .occupation(savedClient.getOccupation())
@@ -433,6 +435,7 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 // Section A
                 .panNumber(client.getPanNumber())
                 .dateOfBirth(client.getDateOfBirth())
+                .actualDateOfBirth(client.getActualDateOfBirth())
                 .motherName(client.getMotherName())
                 .placeOfBirth(client.getPlaceOfBirth())
                 .occupation(client.getOccupation())
@@ -492,6 +495,7 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
         if (documents == null || documents.isEmpty()) {
             return "NO_DOCUMENTS";
         }
+        Set<ClientDocumentType> distinctReceivedTypes = new HashSet<>();
         boolean allVerified = true;
         boolean allReceived = true;
         boolean anyReceived = false;
@@ -505,15 +509,20 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 allReceived = false;
             } else {
                 anyReceived = true;
+                if (d.getDocumentType() != null && ClientDocumentType.isSupported(d.getDocumentType())) {
+                    distinctReceivedTypes.add(d.getDocumentType().toCanonical());
+                }
             }
             if (d.getVerificationStatus() == VerificationStatus.REJECTED) {
                 anyRejected = true;
             }
         }
 
-        if (allVerified) return "ALL_VERIFIED";
+        boolean hasTwoDistinctTypes = distinctReceivedTypes.size() >= 2;
+
+        if (hasTwoDistinctTypes && allVerified) return "ALL_VERIFIED";
         if (anyRejected) return "REJECTED";
-        if (allReceived) return "ALL_RECEIVED";
+        if (hasTwoDistinctTypes && allReceived) return "ALL_RECEIVED";
         if (anyReceived) return "PARTIAL";
         return "PENDING";
     }

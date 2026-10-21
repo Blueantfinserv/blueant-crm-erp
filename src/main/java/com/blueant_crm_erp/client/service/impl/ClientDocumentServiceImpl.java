@@ -47,6 +47,10 @@ public class ClientDocumentServiceImpl implements ClientDocumentService {
                 documentType,
                 currentUserIdentifier);
 
+        if (documentType != null && !ClientDocumentType.isSupported(documentType)) {
+            throw new BadRequestException("Unsupported document type: '" + documentType + "'. Supported types: " + ClientDocumentType.SUPPORTED_TYPES);
+        }
+
         // 1. Strict security validation (size, extension, MIME, magic bytes signature)
         clientDocumentValidator.validateKycDocument(file);
 
@@ -84,6 +88,9 @@ public class ClientDocumentServiceImpl implements ClientDocumentService {
 
         if (documentType == null) {
             throw new BadRequestException("Document type is required.");
+        }
+        if (!ClientDocumentType.isSupported(documentType)) {
+            throw new BadRequestException("Unsupported document type: '" + documentType + "'. Supported types: " + ClientDocumentType.SUPPORTED_TYPES);
         }
 
         Client client = resolveClientOrThrow(clientCode);

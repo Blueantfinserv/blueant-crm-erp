@@ -520,6 +520,7 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .personName(meeting.getPersonName())
                 .position(meeting.getPosition())
                 .businessGenerated(meeting.getBusinessGenerated())
+                .businessTypes(parseBusinessTypes(meeting.getBusinessTypes()))
                 .remarks(meeting.getRemarks())
                 .nextPlanDate(meeting.getNextPlanDate())
                 .nextPlanTime(meeting.getNextPlanTime())
@@ -530,5 +531,15 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .verificationStatus(verificationStatus)
                 .createdAt(meeting.getCreatedAt())
                 .build();
+    }
+
+    private java.util.List<String> parseBusinessTypes(String str) {
+        if (str == null || str.isBlank()) {
+            return java.util.List.of();
+        }
+        return java.util.Arrays.stream(str.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
     }
 }

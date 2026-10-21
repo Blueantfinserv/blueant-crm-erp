@@ -85,6 +85,9 @@ public class ClientMeeting extends BaseVersionEntity {
     @Column(name = "business_generated", length = 10)
     private String businessGenerated;
 
+    @Column(name = "business_types", length = 500)
+    private String businessTypes;
+
     @Column(name = "remarks", length = 1000)
     private String remarks;
 

@@ -24,9 +24,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import com.blueant_crm_erp.client.enums.PcBusinessType;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -98,13 +101,41 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
 
             boolean bgYes = "YES".equalsIgnoreCase(meeting.getBusinessGenerated()) || "YES".equalsIgnoreCase(request.getBusinessGenerated());
             if (bgYes) {
+                List<String> distinctTypes = new ArrayList<>();
+                String joinedTypes;
+                if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
+                    distinctTypes = request.getBusinessTypes().stream()
+                            .map(PcBusinessType::normalize)
+                            .distinct()
+                            .collect(Collectors.toList());
+                    joinedTypes = String.join(", ", distinctTypes);
+                } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
+                    joinedTypes = request.getInvestmentType().trim();
+                    distinctTypes = Arrays.stream(joinedTypes.split(","))
+                            .map(String::trim)
+                            .map(PcBusinessType::normalize)
+                            .filter(s -> !s.isEmpty())
+                            .distinct()
+                            .collect(Collectors.toList());
+                } else {
+                    joinedTypes = null;
+                }
+
                 verification.setBusinessGenerated("YES");
-                verification.setInvestmentType(request.getInvestmentType());
+                verification.setBusinessTypes(joinedTypes);
+                verification.setInvestmentType(joinedTypes);
                 verification.setInvestmentAmount(request.getInvestmentAmount());
+
+                meeting.setBusinessGenerated("YES");
+                meeting.setBusinessTypes(joinedTypes);
             } else {
                 verification.setBusinessGenerated("NO");
+                verification.setBusinessTypes(null);
                 verification.setInvestmentType(null);
                 verification.setInvestmentAmount(null);
+
+                meeting.setBusinessGenerated("NO");
+                meeting.setBusinessTypes(null);
             }
         } else {
             LocalDate notConductedDate = request.getMeetingDate() != null ? request.getMeetingDate() : request.getNewMeetingDate();
@@ -205,11 +236,22 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
                 .position(v.getPosition())
                 .businessGenerated(v.getBusinessGenerated())
                 .investmentType(v.getInvestmentType())
+                .businessTypes(parseBusinessTypes(v.getBusinessTypes() != null ? v.getBusinessTypes() : v.getInvestmentType()))
                 .investmentAmount(v.getInvestmentAmount())
                 .remarks(v.getRemarks())
                 .nextFollowupDate(v.getNextFollowupDate())
                 .createdAt(v.getCreatedAt())
                 .createdBy(v.getCreatedBy())
                 .build();
+    }
+
+    private List<String> parseBusinessTypes(String str) {
+        if (str == null || str.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(str.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 }

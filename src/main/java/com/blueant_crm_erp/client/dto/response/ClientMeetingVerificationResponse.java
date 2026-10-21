@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -33,6 +34,7 @@ public class ClientMeetingVerificationResponse {
     private String position;
     private String businessGenerated;
     private String investmentType;
+    private List<String> businessTypes;
     private BigDecimal investmentAmount;
     private String remarks;
     private LocalDate nextFollowupDate;

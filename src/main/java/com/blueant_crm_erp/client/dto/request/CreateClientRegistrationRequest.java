@@ -61,6 +61,9 @@ public class CreateClientRegistrationRequest {
     @Past(message = "Date of birth must be in the past.")
     private LocalDate dateOfBirth;
 
+    @Past(message = "Actual date of birth must be in the past.")
+    private LocalDate actualDateOfBirth;
+
     @Size(max = 150, message = "Mother's name cannot exceed 150 characters.")
     private String motherName;
 

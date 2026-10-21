@@ -77,6 +77,9 @@ public class ClientMeetingVerification extends BaseVersionEntity {
     @Column(name = "investment_type", length = 100)
     private String investmentType;
 
+    @Column(name = "business_types", length = 500)
+    private String businessTypes;
+
     @Column(name = "investment_amount", precision = 15, scale = 2)
     private BigDecimal investmentAmount;
 

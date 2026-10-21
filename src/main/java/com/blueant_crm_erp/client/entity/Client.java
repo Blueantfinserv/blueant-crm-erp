@@ -106,6 +106,9 @@ public class Client extends BaseVersionEntity {
     @Column(name = "date_of_birth")
     private java.time.LocalDate dateOfBirth;
 
+    @Column(name = "actual_date_of_birth")
+    private java.time.LocalDate actualDateOfBirth;
+
     @Column(name = "mother_name", length = 150)
     private String motherName;
 

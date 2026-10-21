@@ -6,6 +6,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -32,6 +33,8 @@ public class ClientMeetingVerificationRequest {
     private String businessGenerated;
 
     private String investmentType;
+
+    private List<String> businessTypes;
 
     private BigDecimal investmentAmount;
 

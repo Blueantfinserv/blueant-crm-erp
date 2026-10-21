@@ -50,6 +50,7 @@ public class ClientRegistrationResponse {
     // Section A: Personal & Family Details
     private String panNumber;
     private LocalDate dateOfBirth;
+    private LocalDate actualDateOfBirth;
     private String motherName;
     private String placeOfBirth;
     private String occupation;

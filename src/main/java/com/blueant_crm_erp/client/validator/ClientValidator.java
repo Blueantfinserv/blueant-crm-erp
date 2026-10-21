@@ -12,9 +12,12 @@ import com.blueant_crm_erp.user.entity.User;
 import com.blueant_crm_erp.util.meeting.SalesRoleResolver;
 import org.springframework.stereotype.Component;
 
+import com.blueant_crm_erp.client.enums.ClientDocumentType;
+import com.blueant_crm_erp.client.enums.PcBusinessType;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Set;
+import java.util.*;
 
 @Component
 public class ClientValidator {
@@ -64,6 +67,10 @@ public class ClientValidator {
             throw new BadRequestException("Date of birth must be in the past.");
         }
 
+        if (request.getActualDateOfBirth() != null && !request.getActualDateOfBirth().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Actual date of birth must be in the past.");
+        }
+
         if (request.getFirstInvestmentAmount() != null && request.getFirstInvestmentAmount().compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("First investment amount must be non-negative.");
         }
@@ -98,14 +105,22 @@ public class ClientValidator {
             }
         }
 
-        if (request.getDocuments() != null) {
+        if (request.getDocuments() != null && !request.getDocuments().isEmpty()) {
+            Set<ClientDocumentType> distinctTypes = new HashSet<>();
             for (com.blueant_crm_erp.client.dto.request.ClientDocumentRequest doc : request.getDocuments()) {
                 if (doc.getDocumentType() == null) {
                     throw new BadRequestException("Document type is required.");
                 }
+                if (!ClientDocumentType.isSupported(doc.getDocumentType())) {
+                    throw new BadRequestException("Unsupported document type: '" + doc.getDocumentType() + "'. Supported types: " + ClientDocumentType.SUPPORTED_TYPES);
+                }
                 if (doc.getReceivedDate() != null && doc.getReceivedDate().isAfter(LocalDate.now())) {
                     throw new BadRequestException("Document received date cannot be in the future.");
                 }
+                distinctTypes.add(doc.getDocumentType().toCanonical());
+            }
+            if (distinctTypes.size() < 2) {
+                throw new BadRequestException("Any TWO distinct supported document types are mandatory for client registration document submission. Found distinct types: " + distinctTypes.size());
             }
         }
     }
@@ -316,13 +331,26 @@ public class ClientValidator {
                 "YES".equalsIgnoreCase(request.getBusinessGenerated());
 
         if (businessGenerated) {
-            if (request.getInvestmentType() == null || request.getInvestmentType().isBlank()) {
+            List<String> rawTypes = new ArrayList<>();
+            if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
+                rawTypes.addAll(request.getBusinessTypes());
+            } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
+                Arrays.stream(request.getInvestmentType().split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .forEach(rawTypes::add);
+            }
+
+            if (rawTypes.isEmpty()) {
                 throw new BadRequestException("Investment Type is required when Business Generated is YES.");
             }
-            String invType = request.getInvestmentType().trim();
-            if (!ALLOWED_INVESTMENT_TYPES.contains(invType)) {
-                throw new BadRequestException("Investment Type must be one of: " + ALLOWED_INVESTMENT_TYPES);
+
+            for (String rawType : rawTypes) {
+                if (rawType == null || rawType.isBlank() || !PcBusinessType.isValid(rawType)) {
+                    throw new BadRequestException("Unsupported business/service type: '" + rawType + "'. Supported types: " + PcBusinessType.SUPPORTED_TYPES);
+                }
             }
+
             if (request.getInvestmentAmount() == null || request.getInvestmentAmount().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BadRequestException("Investment Amount must be greater than zero when Business Generated is YES.");
             }

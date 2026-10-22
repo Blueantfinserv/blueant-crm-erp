@@ -108,10 +108,10 @@ public class JwtTokenProvider {
             parseToken(token);
             return true;
         } catch (JwtException ex) {
-            log.error("Invalid JWT Token", ex);
+            log.warn("Invalid JWT token: {}", ex.getClass().getSimpleName());
             return false;
         } catch (Exception ex) {
-            log.error("Unexpected error validating JWT token", ex);
+            log.warn("Unexpected error validating JWT token: {}", ex.getClass().getSimpleName());
             return false;
         }
     }

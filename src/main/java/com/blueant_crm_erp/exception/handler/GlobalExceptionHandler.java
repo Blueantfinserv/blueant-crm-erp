@@ -39,7 +39,8 @@ public class GlobalExceptionHandler {
             String errorMessage = error.getDefaultMessage();
             Object rejectedValue = ((FieldError) error).getRejectedValue();
             
-            log.error("Field: {}\nRejected Value: {}\nMessage: {}", fieldName, rejectedValue, errorMessage);
+            Object loggedValue = isSensitiveField(fieldName) ? "[PROTECTED]" : rejectedValue;
+            log.error("Field: {}\nRejected Value: {}\nMessage: {}", fieldName, loggedValue, errorMessage);
             
             errors.put(fieldName, errorMessage);
         });
@@ -49,6 +50,19 @@ public class GlobalExceptionHandler {
         response.put("errors", errors);
 
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    private boolean isSensitiveField(String fieldName) {
+        if (fieldName == null) {
+            return false;
+        }
+        String lower = fieldName.toLowerCase();
+        return lower.contains("password")
+                || lower.contains("token")
+                || lower.contains("secret")
+                || lower.contains("otp")
+                || lower.contains("credential")
+                || lower.contains("auth");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

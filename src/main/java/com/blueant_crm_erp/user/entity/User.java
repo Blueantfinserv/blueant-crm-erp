@@ -66,6 +66,7 @@ public class User extends BaseSoftDeleteEntity {
     @Column(name = "mobile_number", nullable = false, unique = true, length = 20)
     private String mobileNumber;
 
+    @ToString.Exclude
     @Column(nullable = false, length = 255)
     private String password;
 

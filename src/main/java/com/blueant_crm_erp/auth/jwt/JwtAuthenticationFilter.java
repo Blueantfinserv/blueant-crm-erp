@@ -79,18 +79,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         try {
-
-            String rawHeader = request.getHeader("Authorization");
-            log.info("Authorization Header = [{}]", rawHeader);
-
             String token = jwtTokenProvider.resolveToken(request);
-            log.info("Resolved Token = [{}]", token);
-
+            boolean tokenPresent = token != null;
             boolean isValid = false;
-            if (token != null) {
+
+            if (tokenPresent) {
                 isValid = jwtTokenProvider.validateToken(token);
             }
-            log.info("Token Valid = {}", isValid);
+
+            log.debug("JWT authentication: tokenPresent={}, valid={}", tokenPresent, isValid);
 
             if (isValid) {
 
@@ -123,7 +120,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         } catch (Exception ex) {
 
-            log.error("JWT Authentication failed", ex);
+            log.warn("JWT authentication failed: {}", ex.getClass().getSimpleName());
 
             SecurityContextHolder.clearContext();
         }

@@ -31,12 +31,6 @@ public class ClientMeetingUpdateRequest {
 
     private String aloneWith;
 
-    @Size(max = 100, message = "Person name cannot exceed 100 characters.")
-    private String personName;
-
-    @Size(max = 100, message = "Position cannot exceed 100 characters.")
-    private String position;
-
     private String businessGenerated;
 
     @Size(max = 1000, message = "Remarks cannot exceed 1000 characters.")

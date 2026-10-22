@@ -93,9 +93,15 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
             verification.setNewMeetingDate(request.getNewMeetingDate());
             verification.setMeetingTime(request.getMeetingTime());
             verification.setBlueantAppUsed(request.getBlueantAppUsed() != null ? request.getBlueantAppUsed().trim().toUpperCase() : null);
-            verification.setAloneWith(request.getAloneWith() != null ? request.getAloneWith().trim().toUpperCase() : null);
-            verification.setPersonName(request.getPersonName());
-            verification.setPosition(request.getPosition() != null ? request.getPosition().trim().toUpperCase() : null);
+            String aw = request.getAloneWith() != null ? request.getAloneWith().trim().toUpperCase() : null;
+            verification.setAloneWith(aw);
+            if ("SELF".equals(aw)) {
+                verification.setPersonName(null);
+                verification.setPosition(null);
+            } else {
+                verification.setPersonName(request.getPersonName() != null ? request.getPersonName().trim() : null);
+                verification.setPosition(request.getPosition() != null ? request.getPosition().trim().toUpperCase() : null);
+            }
             verification.setRemarks(request.getRemarks());
             verification.setNextFollowupDate(request.getNextFollowupDate());
 
@@ -157,6 +163,15 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
         // Update meeting state
         meeting.setVerifiedByPc(true);
         meeting.setMeetingStatus(isConducted ? MeetingStatus.COMPLETED : MeetingStatus.NOT_CONDUCTED);
+        if (isConducted) {
+            meeting.setAloneWith(verification.getAloneWith());
+            meeting.setPersonName(verification.getPersonName());
+            meeting.setPosition(verification.getPosition());
+        } else {
+            meeting.setAloneWith(null);
+            meeting.setPersonName(null);
+            meeting.setPosition(null);
+        }
         clientMeetingRepository.save(meeting);
 
         // Update client next follow-up and investment type if verified

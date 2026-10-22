@@ -355,9 +355,9 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
             meeting.setMeetingTime(request.getMeetingTime());
         }
         meeting.setClientMeetingStatus(request.getClientMeetingStatus());
-        meeting.setAloneWith(request.getAloneWith());
-        meeting.setPersonName(request.getPersonName());
-        meeting.setPosition(request.getPosition());
+        meeting.setAloneWith(request.getAloneWith() != null ? request.getAloneWith().trim().toUpperCase() : null);
+        meeting.setPersonName(null);
+        meeting.setPosition(null);
         meeting.setBusinessGenerated(request.getBusinessGenerated());
         meeting.setRemarks(request.getRemarks());
         meeting.setNextPlanDate(request.getNextPlanDate());
@@ -381,8 +381,8 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .meetingConducted(savedMeeting.getMeetingConducted())
                 .clientMeetingStatus(savedMeeting.getClientMeetingStatus())
                 .aloneWith(savedMeeting.getAloneWith())
-                .personName(savedMeeting.getPersonName())
-                .position(savedMeeting.getPosition())
+                .personName(null)
+                .position(null)
                 .businessGenerated(savedMeeting.getBusinessGenerated())
                 .remarks(savedMeeting.getRemarks())
                 .nextPlanDate(savedMeeting.getNextPlanDate())

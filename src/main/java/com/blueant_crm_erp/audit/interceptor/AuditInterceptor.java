@@ -83,7 +83,9 @@ public class AuditInterceptor extends EmptyInterceptor {
         java.util.Map<String, Object> map = new java.util.HashMap<>();
         for (int i = 0; i < propertyNames.length; i++) {
             Object val = state[i];
-            if (val instanceof BaseEntity) {
+            if (isSensitiveProperty(propertyNames[i])) {
+                map.put(propertyNames[i], "[PROTECTED]");
+            } else if (val instanceof BaseEntity) {
                 map.put(propertyNames[i], ((BaseEntity) val).getId());
             } else if (val instanceof java.util.Collection) {
                 map.put(propertyNames[i], "[Collection]");
@@ -92,5 +94,16 @@ public class AuditInterceptor extends EmptyInterceptor {
             }
         }
         return map;
+    }
+
+    private boolean isSensitiveProperty(String propertyName) {
+        if (propertyName == null) {
+            return false;
+        }
+        String lower = propertyName.toLowerCase();
+        return lower.contains("password")
+                || lower.contains("secret")
+                || lower.contains("token")
+                || lower.contains("otp");
     }
 }

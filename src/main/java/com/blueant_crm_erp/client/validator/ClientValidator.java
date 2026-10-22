@@ -174,20 +174,6 @@ public class ClientValidator {
             throw new BadRequestException("Alone with must be either 'SELF' or 'SOMEONE'.");
         }
 
-        if ("SOMEONE".equals(aw)) {
-            if (request.getPersonName() == null || request.getPersonName().isBlank()) {
-                throw new BadRequestException("Person name is required when aloneWith is SOMEONE.");
-            }
-            if (request.getPosition() == null || request.getPosition().isBlank()) {
-                throw new BadRequestException("Position is required when aloneWith is SOMEONE.");
-            }
-        } else {
-            if ((request.getPersonName() != null && !request.getPersonName().isBlank()) ||
-                (request.getPosition() != null && !request.getPosition().isBlank())) {
-                throw new BadRequestException("Person name and position must not be provided when aloneWith is SELF.");
-            }
-        }
-
         if (request.getBusinessGenerated() == null || request.getBusinessGenerated().isBlank()) {
             throw new BadRequestException("Business generated is required (YES or NO).");
         }
@@ -229,15 +215,19 @@ public class ClientValidator {
         validateGeoLocation(request.getLatitude(), request.getLongitude(), request.getAccuracy(), role, false);
     }
 
-    private void validateFollowUpDateLimit(LocalDate date, SalesRole role) {
-        if (date.isBefore(LocalDate.now())) {
+    public void validateFollowUpDateLimit(LocalDate date, SalesRole role) {
+        validateFollowUpDateLimit(date, role, LocalDate.now());
+    }
+
+    public void validateFollowUpDateLimit(LocalDate date, SalesRole role, LocalDate referenceDate) {
+        if (date.isBefore(referenceDate)) {
             throw new BadRequestException("Follow-up date cannot be in the past.");
         }
 
         if (role == SalesRole.RM || role == SalesRole.SC) {
-            LocalDate maxDate = LocalDate.now().plusMonths(1);
+            LocalDate maxDate = referenceDate.plusMonths(2);
             if (date.isAfter(maxDate)) {
-                throw new BadRequestException(role.name() + " follow-up date cannot exceed one calendar month (" + maxDate + ").");
+                throw new BadRequestException(role.name() + " follow-up date cannot exceed two calendar months (" + maxDate + ").");
             }
         }
     }
@@ -320,6 +310,11 @@ public class ClientValidator {
             String pos = request.getPosition().trim().toUpperCase();
             if (!ALLOWED_VERIFICATION_POSITIONS.contains(pos)) {
                 throw new BadRequestException("Position must be one of: " + ALLOWED_VERIFICATION_POSITIONS);
+            }
+        } else {
+            if ((request.getPersonName() != null && !request.getPersonName().isBlank()) ||
+                (request.getPosition() != null && !request.getPosition().isBlank())) {
+                throw new BadRequestException("Person name and position must not be provided when aloneWith is SELF.");
             }
         }
 

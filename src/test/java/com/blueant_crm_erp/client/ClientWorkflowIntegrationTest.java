@@ -1159,7 +1159,7 @@ public class ClientWorkflowIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Location coordinates")));
 
-        // Conducted with follow-up exceeding 1 calendar month -> Rejected
+        // Conducted with follow-up exceeding 2 calendar months -> Rejected
         ClientMeetingUpdateRequest exceedMonthReq = ClientMeetingUpdateRequest.builder()
                 .meetingConducted(MeetingConductStatus.CONDUCTED)
                 .meetingMode(MeetingMode.PHYSICAL)
@@ -1167,7 +1167,7 @@ public class ClientWorkflowIntegrationTest {
                 .aloneWith("SELF")
                 .businessGenerated("YES")
                 .remarks("Positive discussion")
-                .nextPlanDate(LocalDate.now().plusMonths(2)) // Exceeds 1 month!
+                .nextPlanDate(LocalDate.now().plusMonths(2).plusDays(1)) // Exceeds 2 months!
                 .latitude(new BigDecimal("28.6139"))
                 .longitude(new BigDecimal("77.2090"))
                 .accuracy(10.0)
@@ -1178,19 +1178,17 @@ public class ClientWorkflowIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(exceedMonthReq)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot exceed one calendar month")));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot exceed two calendar months")));
 
-        // Valid Conducted update with geo -> 200 OK
+        // Valid Conducted update with geo and exactly 2 calendar months follow-up -> 200 OK
         ClientMeetingUpdateRequest validReq = ClientMeetingUpdateRequest.builder()
                 .meetingConducted(MeetingConductStatus.CONDUCTED)
                 .meetingMode(MeetingMode.PHYSICAL)
                 .meetingDate(LocalDate.now())
                 .aloneWith("SOMEONE")
-                .personName("Dr. Colleague")
-                .position("RM")
                 .businessGenerated("YES")
                 .remarks("Meeting conducted successfully with co-worker")
-                .nextPlanDate(LocalDate.now().plusDays(15))
+                .nextPlanDate(LocalDate.now().plusMonths(2))
                 .latitude(new BigDecimal("28.6139"))
                 .longitude(new BigDecimal("77.2090"))
                 .accuracy(12.5)
@@ -2542,14 +2540,15 @@ public class ClientWorkflowIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Location coordinates")));
 
-        // 2. aloneWith SOMEONE without personName / position -> 400 Bad Request
-        ClientMeetingUpdateRequest missingPersonReq = ClientMeetingUpdateRequest.builder()
+        // 2. invalid aloneWith (not SELF or SOMEONE) -> 400 Bad Request
+        ClientMeetingUpdateRequest invalidAloneWithReq = ClientMeetingUpdateRequest.builder()
                 .meetingConducted(MeetingConductStatus.CONDUCTED)
                 .meetingMode(MeetingMode.PHYSICAL)
                 .meetingDate(LocalDate.now())
-                .aloneWith("SOMEONE")
+                .aloneWith("INVALID_CHOICE")
                 .businessGenerated("YES")
-                .remarks("Met someone without details")
+                .remarks("Invalid aloneWith choice")
+                .nextPlanDate(LocalDate.now().plusMonths(1))
                 .latitude(new BigDecimal("28.6139"))
                 .longitude(new BigDecimal("77.2090"))
                 .accuracy(10.0)
@@ -2558,9 +2557,52 @@ public class ClientWorkflowIntegrationTest {
         mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
                         .with(user(principal))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(missingPersonReq)))
+                        .content(objectMapper.writeValueAsString(invalidAloneWithReq)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Person name is required")));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Alone with must be either 'SELF' or 'SOMEONE'")));
+
+        // 3. follow-up exceeding 2 calendar months -> 400 Bad Request
+        ClientMeetingUpdateRequest exceedMonthsReq = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SOMEONE")
+                .businessGenerated("YES")
+                .remarks("Exceeding 2 months limit")
+                .nextPlanDate(LocalDate.now().plusMonths(2).plusDays(1))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(exceedMonthsReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot exceed two calendar months")));
+
+        // 4. aloneWith SOMEONE without personName / position -> 200 OK (RM/SC can submit SOMEONE without person details)
+        ClientMeetingUpdateRequest someoneNoPersonReq = ClientMeetingUpdateRequest.builder()
+                .meetingConducted(MeetingConductStatus.CONDUCTED)
+                .meetingMode(MeetingMode.PHYSICAL)
+                .meetingDate(LocalDate.now())
+                .aloneWith("SOMEONE")
+                .businessGenerated("YES")
+                .remarks("Met someone without person details (details moved to PC verification)")
+                .nextPlanDate(LocalDate.now().plusMonths(2))
+                .latitude(new BigDecimal("28.6139"))
+                .longitude(new BigDecimal("77.2090"))
+                .accuracy(10.0)
+                .build();
+
+        mockMvc.perform(post("/v1/clients/" + client.getClientCode() + "/meetings/update")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(someoneNoPersonReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.aloneWith").value("SOMEONE"))
+                .andExpect(jsonPath("$.data.verificationStatus").value("PENDING"));
     }
 
     @Test

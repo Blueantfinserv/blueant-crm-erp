@@ -238,6 +238,7 @@ public class ClientMeetingVerifiedIntegrationTest {
 
         // PC checks verified: meeting must now be present with VERIFIED status and isCurrent = true
         mockMvc.perform(get("/v1/client-meetings/verification/verified")
+                        .param("sort", "id,desc")
                         .with(user(pcPrincipal)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[?(@.meetingCode == '" + meetingCode + "')].verificationStatus").value("VERIFIED"))
@@ -342,6 +343,7 @@ public class ClientMeetingVerifiedIntegrationTest {
 
         // 5. In verified list: exactly one record for this meeting, with attemptNumber = 2 and isCurrent = true
         mockMvc.perform(get("/v1/client-meetings/verification/verified")
+                        .param("sort", "id,desc")
                         .with(user(pcPrincipal)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[?(@.meetingCode == '" + meetingCode + "')].attemptNumber").value(2))

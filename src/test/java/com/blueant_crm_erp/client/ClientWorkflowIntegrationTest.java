@@ -228,7 +228,7 @@ public class ClientWorkflowIntegrationTest {
                 .clinicAddress("Clinic 12, Medical Plaza")
                 .salesPersonEmployeeCode(rmUser.getEmployeeCode())
                 .assignmentDate(LocalDate.now())
-                .bestTimeToMeet("12:00 PM - 3:00 PM")
+                .bestTimeToMeet("1st half of the day")
                 .remarks("Referred from Apollo Hospital Excel sheet")
                 .build();
 
@@ -253,7 +253,7 @@ public class ClientWorkflowIntegrationTest {
         assertThat(client.getClientStatus()).isEqualTo(ClientStatus.ACTIVE);
         assertThat(client.getSalesPerson().getId()).isEqualTo(rmUser.getId());
         assertThat(client.getSpeciality()).isEqualTo("Neurology");
-        assertThat(client.getBestTimeToMeet()).isEqualTo("12:00 PM - 3:00 PM");
+        assertThat(client.getBestTimeToMeet()).isEqualTo("1st half of the day");
     }
 
     @Test
@@ -267,7 +267,7 @@ public class ClientWorkflowIntegrationTest {
                 .location("Noida Sector 62")
                 .clinicAddress("Fortis Clinic")
                 .salesPersonEmployeeCode(scUser.getEmployeeCode())
-                .bestTimeToMeet("3:00 PM - 6:00 PM")
+                .bestTimeToMeet("2nd half of the day")
                 .build();
 
         UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
@@ -429,7 +429,7 @@ public class ClientWorkflowIntegrationTest {
                 .clinicAddress("Clinic 12, Medical Plaza")
                 .salesPersonEmployeeCode(rmUser.getEmployeeCode())
                 .assignmentDate(LocalDate.now())
-                .bestTimeToMeet("12:00 PM - 3:00 PM")
+                .bestTimeToMeet("By Appointment")
                 .remarks("Complete onboarding profile")
                 // Section A
                 .panNumber("ABCDE1234F")

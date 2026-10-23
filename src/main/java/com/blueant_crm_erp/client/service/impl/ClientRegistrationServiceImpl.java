@@ -8,6 +8,7 @@ import com.blueant_crm_erp.client.entity.Client;
 import com.blueant_crm_erp.client.entity.ClientAssignmentHistory;
 import com.blueant_crm_erp.client.entity.ClientDocument;
 import com.blueant_crm_erp.client.entity.ClientNominee;
+import com.blueant_crm_erp.client.enums.ClientBestTimeToMeet;
 import com.blueant_crm_erp.client.enums.ClientStatus;
 import com.blueant_crm_erp.client.repository.ClientAssignmentHistoryRepository;
 import com.blueant_crm_erp.client.repository.ClientDocumentRepository;
@@ -130,7 +131,7 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
                 .clinicAddress(request.getClinicAddress().trim())
                 .remarks(request.getRemarks() != null ? request.getRemarks().trim() : null)
                 .assignmentDate(assignmentDate)
-                .bestTimeToMeet(request.getBestTimeToMeet() != null ? request.getBestTimeToMeet().trim() : null)
+                .bestTimeToMeet(request.getBestTimeToMeet() != null ? ClientBestTimeToMeet.normalizeToDisplayName(request.getBestTimeToMeet()) : null)
                 .salesPerson(salesPerson)
                 .createdBySalesPerson(salesPerson)
                 .assignedBy(assignedBy)

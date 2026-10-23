@@ -12,6 +12,7 @@ import com.blueant_crm_erp.user.entity.User;
 import com.blueant_crm_erp.util.meeting.SalesRoleResolver;
 import org.springframework.stereotype.Component;
 
+import com.blueant_crm_erp.client.enums.ClientBestTimeToMeet;
 import com.blueant_crm_erp.client.enums.ClientDocumentType;
 import com.blueant_crm_erp.client.enums.PcBusinessType;
 
@@ -21,13 +22,6 @@ import java.util.*;
 
 @Component
 public class ClientValidator {
-
-    private static final Set<String> ALLOWED_BEST_TIME_TO_MEET = Set.of(
-            "9:00 AM - 12:00 PM",
-            "12:00 PM - 3:00 PM",
-            "3:00 PM - 6:00 PM",
-            "6:00 PM - 9:00 PM"
-    );
 
     private static final Set<String> ALLOWED_VERIFICATION_POSITIONS = Set.of(
             "SM",
@@ -58,8 +52,8 @@ public class ClientValidator {
 
         if (request.getBestTimeToMeet() != null && !request.getBestTimeToMeet().isBlank()) {
             String trimmed = request.getBestTimeToMeet().trim();
-            if (!ALLOWED_BEST_TIME_TO_MEET.contains(trimmed)) {
-                throw new BadRequestException("Invalid bestTimeToMeet: '" + trimmed + "'. Allowed values: " + ALLOWED_BEST_TIME_TO_MEET);
+            if (!ClientBestTimeToMeet.isValid(trimmed)) {
+                throw new BadRequestException("Invalid bestTimeToMeet: '" + trimmed + "'. Allowed values: " + ClientBestTimeToMeet.SUPPORTED_DISPLAY_NAMES);
             }
         }
 

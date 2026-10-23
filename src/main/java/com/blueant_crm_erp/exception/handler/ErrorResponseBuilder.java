@@ -143,9 +143,11 @@ public class ErrorResponseBuilder {
      * - ELK Correlation Id
      */
     private String generateTraceId() {
-
+        String correlationId = org.slf4j.MDC.get("correlationId");
+        if (correlationId != null && !correlationId.isBlank()) {
+            return correlationId;
+        }
         return UUID.randomUUID().toString();
-
     }
 
 }

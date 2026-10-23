@@ -11,6 +11,8 @@ public interface ClientVerificationService {
 
     PageResponse<ClientMeetingVerificationResponse> getPendingVerifications(Pageable pageable);
 
+    PageResponse<ClientMeetingVerificationResponse> getVerifiedVerifications(Pageable pageable);
+
     List<ClientMeetingVerificationResponse> getVerificationHistory(String meetingCode);
 
     ClientMeetingVerificationResponse verifyMeeting(String meetingCode, ClientMeetingVerificationRequest request, String currentUserIdentifier);

@@ -36,6 +36,15 @@ public class ClientMeetingVerificationController {
         return ApiResponse.success("Pending client meeting verifications retrieved successfully", response);
     }
 
+    @Operation(summary = "Get verified client meeting verifications", description = "Returns client meetings verified by PC")
+    @GetMapping("/verified")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('MEETING_VERIFY') or hasAnyRole('PC_COORDINATOR', 'ADMIN', 'SUPER_ADMIN')")
+    public ApiResponse<PageResponse<ClientMeetingVerificationResponse>> getVerifiedVerifications(Pageable pageable) {
+        PageResponse<ClientMeetingVerificationResponse> response = clientVerificationService.getVerifiedVerifications(pageable);
+        return ApiResponse.success("Verified client meeting verifications retrieved successfully", response);
+    }
+
     @Operation(summary = "Get verification attempt history", description = "Returns all historical verification attempts for a client meeting")
     @GetMapping("/{meetingCode}/history")
     @ResponseStatus(HttpStatus.OK)

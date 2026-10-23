@@ -152,6 +152,45 @@ public class GlobalExceptionHandler {
         }
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException ex, HttpServletRequest request) {
+        log.warn("Resource or endpoint not found: {} {}", request.getMethod(), request.getRequestURI());
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.NOT_FOUND,
+                ErrorCode.RESOURCE_NOT_FOUND,
+                ErrorType.RESOURCE,
+                "Resource not found: " + request.getRequestURI(),
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.NoHandlerFoundException.class)
+    public ResponseEntity<ApiError> handleNoHandlerFound(org.springframework.web.servlet.NoHandlerFoundException ex, HttpServletRequest request) {
+        log.warn("No handler found for: {} {}", request.getMethod(), request.getRequestURI());
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.NOT_FOUND,
+                ErrorCode.RESOURCE_NOT_FOUND,
+                ErrorType.RESOURCE,
+                "Resource not found: " + request.getRequestURI(),
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(org.springframework.web.HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        log.warn("Method not supported: {} {}", request.getMethod(), request.getRequestURI());
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                ErrorCode.BAD_REQUEST,
+                ErrorType.VALIDATION,
+                "Request method '" + request.getMethod() + "' is not supported for this endpoint.",
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.METHOD_NOT_ALLOWED);
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiError> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex, HttpServletRequest request) {
         log.error("Max upload size exceeded for URI: {}", request.getRequestURI());

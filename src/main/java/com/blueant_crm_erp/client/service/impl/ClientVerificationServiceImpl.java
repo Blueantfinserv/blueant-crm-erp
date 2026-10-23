@@ -52,6 +52,15 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<ClientMeetingVerificationResponse> getVerifiedVerifications(Pageable pageable) {
+        Page<ClientMeetingVerification> page = clientMeetingVerificationRepository
+                .findByVerificationStatusAndIsCurrentTrue(VerificationStatus.VERIFIED, pageable);
+
+        return PageResponse.of(page.map(this::mapToResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ClientMeetingVerificationResponse> getVerificationHistory(String meetingCode) {
         ClientMeeting meeting = clientMeetingRepository.findByMeetingCode(meetingCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Client meeting not found: " + meetingCode));

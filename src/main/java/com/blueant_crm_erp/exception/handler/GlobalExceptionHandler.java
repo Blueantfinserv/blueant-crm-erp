@@ -13,6 +13,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -185,6 +189,58 @@ public class GlobalExceptionHandler {
                 request
         );
         return new ResponseEntity<>(apiError, HttpStatus.METHOD_NOT_ALLOWED);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        log.error("Max upload size exceeded for URI: {}", request.getRequestURI());
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.BAD_REQUEST,
+                ErrorCode.VALIDATION_FAILED,
+                ErrorType.VALIDATION,
+                "File size exceeds maximum allowed limit of 10MB.",
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiError> handleMissingServletRequestPart(MissingServletRequestPartException ex, HttpServletRequest request) {
+        log.error("Missing multipart request part '{}' for URI: {}", ex.getRequestPartName(), request.getRequestURI());
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.BAD_REQUEST,
+                ErrorCode.VALIDATION_FAILED,
+                ErrorType.VALIDATION,
+                "Required multipart request part '" + ex.getRequestPartName() + "' is missing.",
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingServletRequestParameter(MissingServletRequestParameterException ex, HttpServletRequest request) {
+        log.error("Missing request parameter '{}' for URI: {}", ex.getParameterName(), request.getRequestURI());
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.BAD_REQUEST,
+                ErrorCode.VALIDATION_FAILED,
+                ErrorType.VALIDATION,
+                "Required parameter '" + ex.getParameterName() + "' is missing.",
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiError> handleMultipartException(MultipartException ex, HttpServletRequest request) {
+        log.error("Multipart processing error for URI: {}", request.getRequestURI());
+        ApiError apiError = errorResponseBuilder.build(
+                HttpStatus.BAD_REQUEST,
+                ErrorCode.VALIDATION_FAILED,
+                ErrorType.VALIDATION,
+                "Failed to process multipart request. Ensure a valid multipart/form-data payload is provided.",
+                request
+        );
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)

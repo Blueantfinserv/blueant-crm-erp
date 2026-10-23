@@ -3,6 +3,7 @@ package com.blueant_crm_erp.exception.handler;
 import com.blueant_crm_erp.exception.base.ErrorCode;
 import com.blueant_crm_erp.exception.base.ErrorType;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
@@ -88,8 +89,14 @@ public final class ExceptionHandlerUtil {
 
     /**
      * Generates unique request trace id.
+     * Reuses the existing MDC correlationId if present so API error responses
+     * correlate directly with server logs.
      */
     public static String generateTraceId() {
+        String correlationId = MDC.get("correlationId");
+        if (correlationId != null && !correlationId.isBlank()) {
+            return correlationId;
+        }
         return UUID.randomUUID().toString();
     }
 

@@ -410,6 +410,7 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .attemptNumber(attemptNumber)
                 .isCurrent(true)
                 .verificationStatus(VerificationStatus.PENDING)
+                .businessGenerated(savedMeeting.getBusinessGenerated())
                 .remarks(null)
                 .build();
         ClientMeetingVerification savedVerif = clientMeetingVerificationRepository.save(newAttempt);
@@ -499,6 +500,16 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
         Client client = meeting.getClient();
         User employee = meeting.getAssignedEmployee();
 
+        List<com.blueant_crm_erp.client.dto.ClientBusinessItemDto> businessItems = clientMeetingVerificationRepository
+                .findByClientMeetingIdAndIsCurrentTrue(meeting.getId())
+                .map(v -> v.getBusinessItems().stream()
+                        .map(i -> com.blueant_crm_erp.client.dto.ClientBusinessItemDto.builder()
+                                .businessType(i.getBusinessType())
+                                .amount(i.getAmount())
+                                .build())
+                        .toList())
+                .orElse(List.of());
+
         return ClientMeetingResponse.builder()
                 .id(meeting.getId())
                 .meetingCode(meeting.getMeetingCode())
@@ -521,6 +532,7 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .position(meeting.getPosition())
                 .businessGenerated(meeting.getBusinessGenerated())
                 .businessTypes(parseBusinessTypes(meeting.getBusinessTypes()))
+                .businessItems(businessItems)
                 .remarks(meeting.getRemarks())
                 .nextPlanDate(meeting.getNextPlanDate())
                 .nextPlanTime(meeting.getNextPlanTime())

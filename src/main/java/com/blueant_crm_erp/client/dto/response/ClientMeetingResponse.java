@@ -41,6 +41,7 @@ public class ClientMeetingResponse {
     private String position;
     private String businessGenerated;
     private List<String> businessTypes;
+    private List<com.blueant_crm_erp.client.dto.ClientBusinessItemDto> businessItems;
     private String remarks;
 
     private LocalDate nextPlanDate;

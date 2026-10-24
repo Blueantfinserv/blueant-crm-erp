@@ -201,6 +201,7 @@ public class ClientMeetingVerifiedIntegrationTest {
 
         // PC checks pending: meeting must be present
         mockMvc.perform(get("/v1/client-meetings/verification/pending")
+                        .param("sort", "id,desc")
                         .with(user(pcPrincipal)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[?(@.meetingCode == '" + meetingCode + "')].verificationStatus").value("PENDING"));

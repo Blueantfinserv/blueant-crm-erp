@@ -19,8 +19,27 @@ public enum PcBusinessType {
     private static final Map<String, String> ALIASES = Map.of(
             "NEW SIP", "SIP",
             "LUMPSUM", "LUMP_SUM",
-            "NEW BROKER CHANGE", "BROKER_CHANGE"
+            "NEW BROKER CHANGE", "BROKER_CHANGE",
+            "BROKER CHANGE", "BROKER_CHANGE",
+            "SERVICE REQUEST", "SERVICE_REQUEST",
+            "SHARES", "SHARE"
     );
+
+    public boolean isMonetary() {
+        return this != SERVICE_REQUEST && this != BROKER_CHANGE;
+    }
+
+    public static boolean isMonetary(String type) {
+        String normalized = normalize(type);
+        if (normalized == null) {
+            return false;
+        }
+        try {
+            return PcBusinessType.valueOf(normalized).isMonetary();
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
 
     public static boolean isValid(String value) {
         if (value == null || value.isBlank()) {

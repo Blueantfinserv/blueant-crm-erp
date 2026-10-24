@@ -1,5 +1,6 @@
 package com.blueant_crm_erp.client.validator;
 
+import com.blueant_crm_erp.client.dto.ClientBusinessItemDto;
 import com.blueant_crm_erp.client.dto.request.ClientMeetingUpdateRequest;
 import com.blueant_crm_erp.client.dto.request.ClientMeetingVerificationRequest;
 import com.blueant_crm_erp.client.dto.request.CreateClientRegistrationRequest;
@@ -320,28 +321,62 @@ public class ClientValidator {
                 "YES".equalsIgnoreCase(request.getBusinessGenerated());
 
         if (businessGenerated) {
-            List<String> rawTypes = new ArrayList<>();
-            if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
-                rawTypes.addAll(request.getBusinessTypes());
-            } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
-                Arrays.stream(request.getInvestmentType().split(","))
-                        .map(String::trim)
-                        .filter(s -> !s.isEmpty())
-                        .forEach(rawTypes::add);
-            }
+            if (request.getBusinessItems() != null && !request.getBusinessItems().isEmpty()) {
+                Set<String> seenTypes = new HashSet<>();
+                for (ClientBusinessItemDto item : request.getBusinessItems()) {
+                    if (item.getBusinessType() == null || item.getBusinessType().isBlank()) {
+                        throw new BadRequestException("Business type is required for each business item.");
+                    }
+                    if (!PcBusinessType.isValid(item.getBusinessType())) {
+                        throw new BadRequestException("Unsupported business/service type: '" + item.getBusinessType() + "'. Supported types: " + PcBusinessType.SUPPORTED_TYPES);
+                    }
+                    String normalized = PcBusinessType.normalize(item.getBusinessType());
+                    if (!seenTypes.add(normalized)) {
+                        throw new BadRequestException("Duplicate business type is not allowed: " + item.getBusinessType());
+                    }
 
-            if (rawTypes.isEmpty()) {
-                throw new BadRequestException("Investment Type is required when Business Generated is YES.");
-            }
-
-            for (String rawType : rawTypes) {
-                if (rawType == null || rawType.isBlank() || !PcBusinessType.isValid(rawType)) {
-                    throw new BadRequestException("Unsupported business/service type: '" + rawType + "'. Supported types: " + PcBusinessType.SUPPORTED_TYPES);
+                    boolean isMonetary = PcBusinessType.isMonetary(normalized);
+                    if (isMonetary) {
+                        if (item.getAmount() == null || item.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                            throw new BadRequestException("Amount must be greater than zero for category: " + item.getBusinessType());
+                        }
+                    } else {
+                        if (item.getAmount() != null && item.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+                            throw new BadRequestException("Amount cannot be negative for category: " + item.getBusinessType());
+                        }
+                    }
                 }
-            }
+            } else {
+                List<String> rawTypes = new ArrayList<>();
+                if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
+                    rawTypes.addAll(request.getBusinessTypes());
+                } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
+                    Arrays.stream(request.getInvestmentType().split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .forEach(rawTypes::add);
+                }
 
-            if (request.getInvestmentAmount() == null || request.getInvestmentAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                throw new BadRequestException("Investment Amount must be greater than zero when Business Generated is YES.");
+                if (rawTypes.isEmpty()) {
+                    throw new BadRequestException("Investment Type is required when Business Generated is YES.");
+                }
+
+                for (String rawType : rawTypes) {
+                    if (rawType == null || rawType.isBlank() || !PcBusinessType.isValid(rawType)) {
+                        throw new BadRequestException("Unsupported business/service type: '" + rawType + "'. Supported types: " + PcBusinessType.SUPPORTED_TYPES);
+                    }
+                }
+
+                boolean hasMonetary = rawTypes.stream().anyMatch(PcBusinessType::isMonetary);
+                if (hasMonetary) {
+                    if (request.getInvestmentAmount() == null || request.getInvestmentAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new BadRequestException("Investment Amount must be greater than zero when Business Generated is YES.");
+                    }
+                } else {
+                    if (request.getInvestmentAmount() != null && request.getInvestmentAmount().compareTo(BigDecimal.ZERO) < 0) {
+                        throw new BadRequestException("Investment Amount cannot be negative.");
+                    }
+                }
             }
         }
     }

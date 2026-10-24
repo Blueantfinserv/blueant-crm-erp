@@ -1,10 +1,12 @@
 package com.blueant_crm_erp.client.service.impl;
 
+import com.blueant_crm_erp.client.dto.ClientBusinessItemDto;
 import com.blueant_crm_erp.client.dto.request.ClientMeetingVerificationRequest;
 import com.blueant_crm_erp.client.dto.response.ClientMeetingVerificationResponse;
 import com.blueant_crm_erp.client.entity.Client;
 import com.blueant_crm_erp.client.entity.ClientMeeting;
 import com.blueant_crm_erp.client.entity.ClientMeetingVerification;
+import com.blueant_crm_erp.client.entity.ClientMeetingVerificationBusinessItem;
 import com.blueant_crm_erp.client.repository.ClientMeetingRepository;
 import com.blueant_crm_erp.client.repository.ClientMeetingVerificationRepository;
 import com.blueant_crm_erp.client.repository.ClientRepository;
@@ -26,6 +28,7 @@ import org.springframework.util.StringUtils;
 
 import com.blueant_crm_erp.client.enums.PcBusinessType;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -116,34 +119,90 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
 
             boolean bgYes = "YES".equalsIgnoreCase(meeting.getBusinessGenerated()) || "YES".equalsIgnoreCase(request.getBusinessGenerated());
             if (bgYes) {
+                List<ClientMeetingVerificationBusinessItem> itemsToPersist = new ArrayList<>();
                 List<String> distinctTypes = new ArrayList<>();
-                String joinedTypes;
-                if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
-                    distinctTypes = request.getBusinessTypes().stream()
-                            .map(PcBusinessType::normalize)
-                            .distinct()
-                            .collect(Collectors.toList());
-                    joinedTypes = String.join(", ", distinctTypes);
-                } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
-                    joinedTypes = request.getInvestmentType().trim();
-                    distinctTypes = Arrays.stream(joinedTypes.split(","))
-                            .map(String::trim)
-                            .map(PcBusinessType::normalize)
-                            .filter(s -> !s.isEmpty())
-                            .distinct()
-                            .collect(Collectors.toList());
+                BigDecimal totalMonetaryAmount = BigDecimal.ZERO;
+
+                if (request.getBusinessItems() != null && !request.getBusinessItems().isEmpty()) {
+                    for (ClientBusinessItemDto itemDto : request.getBusinessItems()) {
+                        String normalized = PcBusinessType.normalize(itemDto.getBusinessType());
+                        distinctTypes.add(normalized);
+                        BigDecimal itemAmount = itemDto.getAmount();
+                        boolean isMonetary = PcBusinessType.isMonetary(normalized);
+                        if (isMonetary && itemAmount != null) {
+                            totalMonetaryAmount = totalMonetaryAmount.add(itemAmount);
+                        }
+                        itemsToPersist.add(ClientMeetingVerificationBusinessItem.builder()
+                                .verification(verification)
+                                .businessType(normalized)
+                                .amount(itemAmount)
+                                .createdAt(LocalDateTime.now())
+                                .createdBy(currentUserIdentifier)
+                                .build());
+                    }
                 } else {
-                    joinedTypes = null;
+                    List<String> rawTypes = new ArrayList<>();
+                    if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
+                        rawTypes.addAll(request.getBusinessTypes());
+                    } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
+                        Arrays.stream(request.getInvestmentType().split(","))
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .forEach(rawTypes::add);
+                    }
+
+                    distinctTypes = rawTypes.stream()
+                            .map(PcBusinessType::normalize)
+                            .distinct()
+                            .collect(Collectors.toList());
+
+                    BigDecimal legacyAmount = request.getInvestmentAmount();
+                    if (legacyAmount != null && legacyAmount.compareTo(BigDecimal.ZERO) > 0) {
+                        totalMonetaryAmount = legacyAmount;
+                    }
+
+                    long monetaryCount = distinctTypes.stream().filter(PcBusinessType::isMonetary).count();
+                    for (String normalized : distinctTypes) {
+                        boolean isMonetary = PcBusinessType.isMonetary(normalized);
+                        BigDecimal itemAmount = (isMonetary && monetaryCount == 1) ? legacyAmount : null;
+                        itemsToPersist.add(ClientMeetingVerificationBusinessItem.builder()
+                                .verification(verification)
+                                .businessType(normalized)
+                                .amount(itemAmount)
+                                .createdAt(LocalDateTime.now())
+                                .createdBy(currentUserIdentifier)
+                                .build());
+                    }
+                }
+
+                verification.getBusinessItems().clear();
+                verification.getBusinessItems().addAll(itemsToPersist);
+
+                String investmentTypeStr;
+                String businessTypesStr;
+                if (request.getBusinessItems() != null && !request.getBusinessItems().isEmpty()) {
+                    businessTypesStr = String.join(", ", distinctTypes);
+                    investmentTypeStr = businessTypesStr;
+                } else if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
+                    businessTypesStr = String.join(", ", distinctTypes);
+                    investmentTypeStr = businessTypesStr;
+                } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
+                    businessTypesStr = request.getInvestmentType().trim();
+                    investmentTypeStr = request.getInvestmentType().trim();
+                } else {
+                    businessTypesStr = String.join(", ", distinctTypes);
+                    investmentTypeStr = businessTypesStr;
                 }
 
                 verification.setBusinessGenerated("YES");
-                verification.setBusinessTypes(joinedTypes);
-                verification.setInvestmentType(joinedTypes);
-                verification.setInvestmentAmount(request.getInvestmentAmount());
+                verification.setBusinessTypes(businessTypesStr);
+                verification.setInvestmentType(investmentTypeStr);
+                verification.setInvestmentAmount(totalMonetaryAmount.compareTo(BigDecimal.ZERO) > 0 ? totalMonetaryAmount : null);
 
                 meeting.setBusinessGenerated("YES");
-                meeting.setBusinessTypes(joinedTypes);
+                meeting.setBusinessTypes(businessTypesStr);
             } else {
+                verification.getBusinessItems().clear();
                 verification.setBusinessGenerated("NO");
                 verification.setBusinessTypes(null);
                 verification.setInvestmentType(null);
@@ -154,6 +213,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
             }
         } else {
             LocalDate notConductedDate = request.getMeetingDate() != null ? request.getMeetingDate() : request.getNewMeetingDate();
+            verification.getBusinessItems().clear();
             verification.setNewMeetingDate(notConductedDate);
             verification.setMeetingTime(request.getMeetingTime());
             verification.setRemarks(request.getRemarks());
@@ -164,6 +224,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
             verification.setPosition(null);
             verification.setBusinessGenerated(null);
             verification.setInvestmentType(null);
+            verification.setBusinessTypes(null);
             verification.setInvestmentAmount(null);
         }
 
@@ -242,6 +303,27 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
 
     private ClientMeetingVerificationResponse mapToResponse(ClientMeetingVerification v) {
         ClientMeeting m = v.getClientMeeting();
+        String bg = v.getBusinessGenerated() != null ? v.getBusinessGenerated() : (m != null ? m.getBusinessGenerated() : null);
+
+        List<ClientBusinessItemDto> businessItems = new ArrayList<>();
+        if (v.getBusinessItems() != null && !v.getBusinessItems().isEmpty()) {
+            businessItems = v.getBusinessItems().stream()
+                    .map(item -> ClientBusinessItemDto.builder()
+                            .businessType(item.getBusinessType())
+                            .amount(item.getAmount())
+                            .build())
+                    .toList();
+        } else if (v.getBusinessTypes() != null || v.getInvestmentType() != null) {
+            List<String> types = parseBusinessTypes(v.getBusinessTypes() != null ? v.getBusinessTypes() : v.getInvestmentType());
+            long monetaryCount = types.stream().filter(PcBusinessType::isMonetary).count();
+            businessItems = types.stream()
+                    .map(t -> ClientBusinessItemDto.builder()
+                            .businessType(t)
+                            .amount(PcBusinessType.isMonetary(t) && monetaryCount == 1 ? v.getInvestmentAmount() : null)
+                            .build())
+                    .toList();
+        }
+
         return ClientMeetingVerificationResponse.builder()
                 .id(v.getId())
                 .clientMeetingId(m != null ? m.getId() : null)
@@ -258,9 +340,10 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
                 .aloneWith(v.getAloneWith())
                 .personName(v.getPersonName())
                 .position(v.getPosition())
-                .businessGenerated(v.getBusinessGenerated())
+                .businessGenerated(bg)
                 .investmentType(v.getInvestmentType())
                 .businessTypes(parseBusinessTypes(v.getBusinessTypes() != null ? v.getBusinessTypes() : v.getInvestmentType()))
+                .businessItems(businessItems)
                 .investmentAmount(v.getInvestmentAmount())
                 .remarks(v.getRemarks())
                 .nextFollowupDate(v.getNextFollowupDate())

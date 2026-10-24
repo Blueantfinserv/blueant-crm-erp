@@ -36,6 +36,8 @@ public class ClientMeetingVerificationRequest {
 
     private List<String> businessTypes;
 
+    private List<com.blueant_crm_erp.client.dto.ClientBusinessItemDto> businessItems;
+
     private BigDecimal investmentAmount;
 
     @Size(max = 1000, message = "Remarks cannot exceed 1000 characters.")

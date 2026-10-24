@@ -35,6 +35,7 @@ public class ClientMeetingVerificationResponse {
     private String businessGenerated;
     private String investmentType;
     private List<String> businessTypes;
+    private List<com.blueant_crm_erp.client.dto.ClientBusinessItemDto> businessItems;
     private BigDecimal investmentAmount;
     private String remarks;
     private LocalDate nextFollowupDate;

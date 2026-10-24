@@ -88,4 +88,8 @@ public class ClientMeetingVerification extends BaseVersionEntity {
 
     @Column(name = "next_followup_date")
     private LocalDate nextFollowupDate;
+
+    @lombok.Builder.Default
+    @OneToMany(mappedBy = "verification", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<ClientMeetingVerificationBusinessItem> businessItems = new java.util.ArrayList<>();
 }

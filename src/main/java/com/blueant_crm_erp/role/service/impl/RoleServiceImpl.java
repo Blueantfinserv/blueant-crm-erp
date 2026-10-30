@@ -10,11 +10,13 @@ import com.blueant_crm_erp.role.mapper.RoleMapper;
 import com.blueant_crm_erp.role.repository.RoleRepository;
 import com.blueant_crm_erp.role.service.RoleService;
 import com.blueant_crm_erp.role.validator.RoleValidator;
+import com.blueant_crm_erp.role.entity.Role;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -50,7 +52,11 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional(readOnly = true)
     public List<RoleSummaryResponse> getAllRoles() {
-        throw new UnsupportedOperationException("Implementation pending.");
+        List<Role> roles = roleRepository.findAllByDeletedFalseOrderByDisplayOrderAsc();
+        if (roles == null || roles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return roleMapper.toSummaryResponseList(roles);
     }
 
     @Override

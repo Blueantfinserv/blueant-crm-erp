@@ -11,6 +11,8 @@ import com.blueant_crm_erp.meeting.enums.MeetingConductStatus;
 import com.blueant_crm_erp.meeting.enums.SalesRole;
 import com.blueant_crm_erp.user.entity.User;
 import com.blueant_crm_erp.util.meeting.SalesRoleResolver;
+import com.blueant_crm_erp.util.validation.MobileValidator;
+import com.blueant_crm_erp.util.validation.PinCodeValidator;
 import org.springframework.stereotype.Component;
 
 import com.blueant_crm_erp.client.enums.ClientBestTimeToMeet;
@@ -39,7 +41,113 @@ public class ClientValidator {
     );
 
     public void validateUpdateRequest(UpdateClientRequest request) {
-        // Business logic validation for updates
+        if (request == null) {
+            return;
+        }
+
+        // 1. Mandatory Field Protection: Prevent blank strings from wiping non-nullable columns
+        if (request.getClientName() != null) {
+            if (request.getClientName().isBlank()) {
+                throw new BadRequestException("Client name cannot be blank.");
+            }
+            request.setClientName(request.getClientName().trim());
+        }
+        if (request.getMobileNumber() != null) {
+            if (request.getMobileNumber().isBlank()) {
+                throw new BadRequestException("Mobile number cannot be blank.");
+            }
+            String normalizedMobile = MobileValidator.normalize(request.getMobileNumber());
+            if (!MobileValidator.isValid(normalizedMobile) || !MobileValidator.hasValidLength(normalizedMobile)) {
+                throw new BadRequestException("Invalid mobile number. Must be a 10-digit Indian mobile number.");
+            }
+            request.setMobileNumber(normalizedMobile);
+        }
+
+        // 2. Accidental Blank Erase Protection: Normalize whitespace-only optional strings to null
+        // This ensures MapStruct's IGNORE strategy skips them, preserving existing DB values
+        request.setSpeciality(sanitizeBlank(request.getSpeciality()));
+        request.setLocation(sanitizeBlank(request.getLocation()));
+        request.setClinicAddress(sanitizeBlank(request.getClinicAddress()));
+        request.setAlternateMobileNumber(sanitizeBlank(request.getAlternateMobileNumber()));
+        request.setOccupation(sanitizeBlank(request.getOccupation()));
+        request.setMotherName(sanitizeBlank(request.getMotherName()));
+        request.setPlaceOfBirth(sanitizeBlank(request.getPlaceOfBirth()));
+        request.setResidentialAddress(sanitizeBlank(request.getResidentialAddress()));
+        request.setCorrespondenceAddress(sanitizeBlank(request.getCorrespondenceAddress()));
+        request.setOfficeAddress(sanitizeBlank(request.getOfficeAddress()));
+        request.setCity(sanitizeBlank(request.getCity()));
+        request.setState(sanitizeBlank(request.getState()));
+        request.setPinCode(sanitizeBlank(request.getPinCode()));
+        request.setClientSource(sanitizeBlank(request.getClientSource()));
+        request.setSourceDescription(sanitizeBlank(request.getSourceDescription()));
+        request.setInvestwellId(sanitizeBlank(request.getInvestwellId()));
+        request.setRemarks(sanitizeBlank(request.getRemarks()));
+        request.setEmail(sanitizeBlank(request.getEmail()));
+        request.setPanNumber(sanitizeBlank(request.getPanNumber()));
+        request.setAmc(sanitizeBlank(request.getAmc()));
+        request.setScheme(sanitizeBlank(request.getScheme()));
+        request.setInvestmentType(sanitizeBlank(request.getInvestmentType()));
+
+        // 3. Date Integrity Validations
+        if (request.getDateOfBirth() != null && !request.getDateOfBirth().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Date of birth must be in the past.");
+        }
+        if (request.getActualDateOfBirth() != null && !request.getActualDateOfBirth().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Actual date of birth must be in the past.");
+        }
+        if (request.getAssignmentDate() != null && request.getAssignmentDate().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Assignment date cannot be in the past. It must be today or a future date.");
+        }
+
+        // 4. Enumeration & Form Display Name Validation for bestTimeToMeet
+        if (request.getBestTimeToMeet() != null && !request.getBestTimeToMeet().isBlank()) {
+            String trimmed = request.getBestTimeToMeet().trim();
+            if (!ClientBestTimeToMeet.isValid(trimmed)) {
+                throw new BadRequestException("Invalid bestTimeToMeet: '" + trimmed + "'. Allowed values: " + ClientBestTimeToMeet.SUPPORTED_DISPLAY_NAMES);
+            }
+            request.setBestTimeToMeet(ClientBestTimeToMeet.normalizeToDisplayName(trimmed));
+        } else {
+            request.setBestTimeToMeet(null);
+        }
+
+        // 5. Alternate Mobile & PIN Validations
+        if (request.getAlternateMobileNumber() != null) {
+            String normAlt = MobileValidator.normalize(request.getAlternateMobileNumber());
+            if (!MobileValidator.isValid(normAlt) || !MobileValidator.hasValidLength(normAlt)) {
+                throw new BadRequestException("Invalid alternate mobile number. Must be a 10-digit Indian mobile number.");
+            }
+            if (request.getMobileNumber() != null && normAlt.equals(request.getMobileNumber())) {
+                throw new BadRequestException("Alternate mobile number cannot be identical to primary mobile number.");
+            }
+            request.setAlternateMobileNumber(normAlt);
+        }
+        if (request.getPinCode() != null) {
+            if (!PinCodeValidator.isValid(request.getPinCode())) {
+                throw new BadRequestException("Invalid PIN code. Expected 6-digit postal code.");
+            }
+            request.setPinCode(PinCodeValidator.normalize(request.getPinCode()));
+        }
+
+        // 6. PAN format validation if provided
+        if (request.getPanNumber() != null) {
+            String panUpper = request.getPanNumber().trim().toUpperCase(Locale.ENGLISH);
+            if (!panUpper.matches("^[A-Z]{5}[0-9]{4}[A-Z]{1}$")) {
+                throw new BadRequestException("Invalid PAN format. Expected format: ABCDE1234F.");
+            }
+            request.setPanNumber(panUpper);
+        }
+
+        // 7. Non-negative numeric amounts
+        if (request.getExpectedMaxSIP() != null && request.getExpectedMaxSIP().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Expected max SIP must be non-negative.");
+        }
+        if (request.getFirstInvestmentAmount() != null && request.getFirstInvestmentAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("First investment amount must be non-negative.");
+        }
+    }
+
+    private String sanitizeBlank(String val) {
+        return (val != null && !val.isBlank()) ? val.trim() : null;
     }
 
     public void validateRegistration(CreateClientRegistrationRequest request) {

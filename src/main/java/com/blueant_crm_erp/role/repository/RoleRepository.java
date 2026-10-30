@@ -52,4 +52,9 @@ public interface RoleRepository extends JpaRepository<Role, Long>,
      * Find Default Roles.
      */
     List<Role> findAllByDefaultRoleTrue();
+
+    /**
+     * Find All Non-Deleted Roles Ordered by Display Order.
+     */
+    List<Role> findAllByDeletedFalseOrderByDisplayOrderAsc();
 }

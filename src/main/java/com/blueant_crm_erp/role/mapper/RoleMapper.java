@@ -7,6 +7,7 @@ import com.blueant_crm_erp.role.dto.response.RoleSummaryResponse;
 import com.blueant_crm_erp.role.entity.Role;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
@@ -61,6 +62,8 @@ public interface RoleMapper {
      * @param role role entity
      * @return role response
      */
+    @Mapping(target = "roleName", source = "name")
+    @Mapping(target = "roleCode", source = "code")
     RoleResponse toResponse(Role role);
 
     /**
@@ -69,6 +72,8 @@ public interface RoleMapper {
      * @param role role entity
      * @return summary response
      */
+    @Mapping(target = "roleName", source = "name")
+    @Mapping(target = "roleCode", source = "code")
     RoleSummaryResponse toSummaryResponse(Role role);
 
     /**

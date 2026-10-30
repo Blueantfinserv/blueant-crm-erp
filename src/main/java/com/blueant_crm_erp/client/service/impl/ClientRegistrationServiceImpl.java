@@ -103,6 +103,12 @@ public class ClientRegistrationServiceImpl implements ClientRegistrationService 
         // 5. Generate concurrency-safe Client Code
         String clientCode = clientCodeGeneratorService.generateNextClientCode();
 
+        // 5b. Concurrency safety: Re-verify mobile number once sequence lock is acquired
+        if (clientRepository.existsByMobileNumber(normalizedMobile)) {
+            log.warn("Client registration rejected: Mobile number {} already exists after sequence lock.", normalizedMobile);
+            throw new ClientAlreadyExistsException("Client already exists with mobile number: " + normalizedMobile);
+        }
+
         LocalDate assignmentDate = request.getAssignmentDate() != null ? request.getAssignmentDate() : LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
 

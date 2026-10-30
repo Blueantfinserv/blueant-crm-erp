@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -35,4 +36,29 @@ public class ClientResponse {
     private String createdBySalesPersonCode;
     private String createdBySalesPersonName;
     private LocalDate nextFollowupDate;
+
+    // --- Extended Profile Fields ---
+    private String speciality;
+    private String location;
+    private String clinicAddress;
+    private String alternateMobileNumber;
+    private LocalDate dateOfBirth;
+    private LocalDate actualDateOfBirth;
+    private String occupation;
+    private String motherName;
+    private String placeOfBirth;
+    private String residentialAddress;
+    private String correspondenceAddress;
+    private String officeAddress;
+    private String city;
+    private String state;
+    private String pinCode;
+    private String clientSource;
+    private String sourceDescription;
+    private BigDecimal expectedMaxSIP;
+    private BigDecimal firstInvestmentAmount;
+    private String investwellId;
+    private String bestTimeToMeet;
+    private LocalDate assignmentDate;
+    private String remarks;
 }

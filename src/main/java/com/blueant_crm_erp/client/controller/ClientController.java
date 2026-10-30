@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -59,6 +60,7 @@ public class ClientController {
     @Operation(summary = "Update Client")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('client:read') or hasRole('SALES') or hasRole('SUPER_ADMIN')")
+    @Transactional
     public ResponseEntity<ClientResponse> updateClient(@PathVariable Long id, @Valid @RequestBody UpdateClientRequest request) {
         clientValidator.validateUpdateRequest(request);
         

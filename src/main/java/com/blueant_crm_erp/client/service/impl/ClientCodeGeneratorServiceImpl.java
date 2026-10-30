@@ -22,7 +22,7 @@ public class ClientCodeGeneratorServiceImpl implements ClientCodeGeneratorServic
     public static final String SEQUENCE_NAME = "CLIENT_CODE";
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRED)
     public String generateNextClientCode() {
         LeadCodeSequence sequence = sequenceRepository.findBySequenceNameWithLock(SEQUENCE_NAME)
                 .orElseGet(() -> {
@@ -48,5 +48,31 @@ public class ClientCodeGeneratorServiceImpl implements ClientCodeGeneratorServic
 
         log.debug("Generated concurrency-safe client code: {}", code);
         return code;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public long allocateContiguousClientCodeBlock(int count) {
+        if (count <= 0) {
+            throw new IllegalArgumentException("Count must be greater than zero.");
+        }
+
+        LeadCodeSequence sequence = sequenceRepository.findBySequenceNameWithLock(SEQUENCE_NAME)
+                .orElseGet(() -> {
+                    LeadCodeSequence newSeq = LeadCodeSequence.builder()
+                            .sequenceName(SEQUENCE_NAME)
+                            .currentValue(0L)
+                            .build();
+                    log.info("Initialized sequence {} with initial value: 0", SEQUENCE_NAME);
+                    return sequenceRepository.save(newSeq);
+                });
+
+        long startVal = sequence.getCurrentValue() + 1;
+        sequence.setCurrentValue(sequence.getCurrentValue() + count);
+        sequenceRepository.save(sequence);
+
+        log.debug("Allocated contiguous client code block: startVal={}, count={}, endVal={}",
+                startVal, count, startVal + count - 1);
+        return startVal;
     }
 }

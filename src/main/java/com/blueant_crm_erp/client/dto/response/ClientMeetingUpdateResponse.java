@@ -27,6 +27,19 @@ public class ClientMeetingUpdateResponse {
     private String position;
     private String businessGenerated;
     private String remarks;
+
+    // Additional Optional Questions for Client Meeting Update Form
+    private String residentialAddress;
+    private String officeAddress;
+    private String currentCity;
+    private String preferredContactTime;
+    private String occupationBusinessType;
+    private String companyOrganizationName;
+    private String communicationPreference;
+    private String preferredInvestmentService;
+    private String clientRequirements;
+    private String otherInfoNotes;
+
     private LocalDate nextPlanDate;
     private LocalTime nextPlanTime;
     private BigDecimal latitude;

@@ -360,6 +360,16 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
         meeting.setPosition(null);
         meeting.setBusinessGenerated(request.getBusinessGenerated());
         meeting.setRemarks(request.getRemarks());
+        meeting.setResidentialAddress(request.getResidentialAddress());
+        meeting.setOfficeAddress(request.getOfficeAddress());
+        meeting.setCurrentCity(request.getCurrentCity());
+        meeting.setPreferredContactTime(request.getPreferredContactTime());
+        meeting.setOccupationBusinessType(request.getOccupationBusinessType());
+        meeting.setCompanyOrganizationName(request.getCompanyOrganizationName());
+        meeting.setCommunicationPreference(request.getCommunicationPreference());
+        meeting.setPreferredInvestmentService(request.getPreferredInvestmentService());
+        meeting.setClientRequirements(request.getClientRequirements());
+        meeting.setOtherInfoNotes(request.getOtherInfoNotes());
         meeting.setNextPlanDate(request.getNextPlanDate());
         meeting.setNextPlanTime(request.getNextPlanTime());
         meeting.setLatitude(request.getLatitude());
@@ -385,6 +395,16 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .position(null)
                 .businessGenerated(savedMeeting.getBusinessGenerated())
                 .remarks(savedMeeting.getRemarks())
+                .residentialAddress(savedMeeting.getResidentialAddress())
+                .officeAddress(savedMeeting.getOfficeAddress())
+                .currentCity(savedMeeting.getCurrentCity())
+                .preferredContactTime(savedMeeting.getPreferredContactTime())
+                .occupationBusinessType(savedMeeting.getOccupationBusinessType())
+                .companyOrganizationName(savedMeeting.getCompanyOrganizationName())
+                .communicationPreference(savedMeeting.getCommunicationPreference())
+                .preferredInvestmentService(savedMeeting.getPreferredInvestmentService())
+                .clientRequirements(savedMeeting.getClientRequirements())
+                .otherInfoNotes(savedMeeting.getOtherInfoNotes())
                 .nextPlanDate(savedMeeting.getNextPlanDate())
                 .nextPlanTime(savedMeeting.getNextPlanTime())
                 .latitude(savedMeeting.getLatitude())
@@ -442,6 +462,16 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                         .position(u.getPosition())
                         .businessGenerated(u.getBusinessGenerated())
                         .remarks(u.getRemarks())
+                        .residentialAddress(u.getResidentialAddress())
+                        .officeAddress(u.getOfficeAddress())
+                        .currentCity(u.getCurrentCity())
+                        .preferredContactTime(u.getPreferredContactTime())
+                        .occupationBusinessType(u.getOccupationBusinessType())
+                        .companyOrganizationName(u.getCompanyOrganizationName())
+                        .communicationPreference(u.getCommunicationPreference())
+                        .preferredInvestmentService(u.getPreferredInvestmentService())
+                        .clientRequirements(u.getClientRequirements())
+                        .otherInfoNotes(u.getOtherInfoNotes())
                         .nextPlanDate(u.getNextPlanDate())
                         .nextPlanTime(u.getNextPlanTime())
                         .latitude(u.getLatitude())
@@ -534,6 +564,16 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .businessTypes(parseBusinessTypes(meeting.getBusinessTypes()))
                 .businessItems(businessItems)
                 .remarks(meeting.getRemarks())
+                .residentialAddress(meeting.getResidentialAddress())
+                .officeAddress(meeting.getOfficeAddress())
+                .currentCity(meeting.getCurrentCity())
+                .preferredContactTime(meeting.getPreferredContactTime())
+                .occupationBusinessType(meeting.getOccupationBusinessType())
+                .companyOrganizationName(meeting.getCompanyOrganizationName())
+                .communicationPreference(meeting.getCommunicationPreference())
+                .preferredInvestmentService(meeting.getPreferredInvestmentService())
+                .clientRequirements(meeting.getClientRequirements())
+                .otherInfoNotes(meeting.getOtherInfoNotes())
                 .nextPlanDate(meeting.getNextPlanDate())
                 .nextPlanTime(meeting.getNextPlanTime())
                 .latitude(meeting.getLatitude())

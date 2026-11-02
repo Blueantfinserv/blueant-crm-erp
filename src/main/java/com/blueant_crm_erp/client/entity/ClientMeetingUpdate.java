@@ -66,6 +66,37 @@ public class ClientMeetingUpdate extends BaseAuditEntity {
     @Column(name = "remarks", length = 1000)
     private String remarks;
 
+    // Additional Optional Questions for Client Meeting Update Form
+    @Column(name = "residential_address", length = 500)
+    private String residentialAddress;
+
+    @Column(name = "office_address", length = 500)
+    private String officeAddress;
+
+    @Column(name = "current_city", length = 100)
+    private String currentCity;
+
+    @Column(name = "preferred_contact_time", length = 100)
+    private String preferredContactTime;
+
+    @Column(name = "occupation_business_type", length = 100)
+    private String occupationBusinessType;
+
+    @Column(name = "company_organization_name", length = 150)
+    private String companyOrganizationName;
+
+    @Column(name = "communication_preference", length = 50)
+    private String communicationPreference;
+
+    @Column(name = "preferred_investment_service", length = 150)
+    private String preferredInvestmentService;
+
+    @Column(name = "client_requirements", length = 1000)
+    private String clientRequirements;
+
+    @Column(name = "other_info_notes", length = 1000)
+    private String otherInfoNotes;
+
     @Column(name = "next_plan_date")
     private LocalDate nextPlanDate;
 

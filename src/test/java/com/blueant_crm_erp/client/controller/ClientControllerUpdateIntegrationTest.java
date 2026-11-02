@@ -82,9 +82,12 @@ class ClientControllerUpdateIntegrationTest {
     @Autowired
     private UserDetailsService customUserDetailsService;
 
+    private User adminUser;
     private User crmUser;
     private User rmUser;
+    private UserDetails adminPrincipal;
     private UserDetails crmPrincipal;
+    private UserDetails rmPrincipal;
     private Team defaultTeam;
 
     @BeforeEach
@@ -97,10 +100,13 @@ class ClientControllerUpdateIntegrationTest {
 
         defaultTeam = teamRepository.findAll().stream().findFirst().orElse(null);
 
-        crmUser = createTestUser("CRM_UP_USER", BootstrapConstants.ROLE_CRM_ONBOARDING, BootstrapConstants.DESIG_CRM_ONBOARDING, crmDept, "PHYSICAL_LEAD_ASSIGN", "client:read");
+        adminUser = createTestUser("ADMIN_UP_USER", BootstrapConstants.ROLE_ADMIN, "ADMIN_DESIG", crmDept);
+        crmUser = createTestUser("CRM_UP_USER", BootstrapConstants.ROLE_CRM_ONBOARDING, BootstrapConstants.DESIG_CRM_ONBOARDING, crmDept, "PHYSICAL_LEAD_ASSIGN");
         rmUser = createTestUser("RM_UP_USER", BootstrapConstants.ROLE_RELATIONSHIP_MANAGER, BootstrapConstants.DESIG_RM, salesDept, "MEETING_UPDATE", "MEETING_READ");
 
+        adminPrincipal = customUserDetailsService.loadUserByUsername(adminUser.getEmployeeCode());
         crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+        rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
     }
 
     private User createTestUser(String prefix, String roleCode, String desigCode, Department dept, String... permissions) {
@@ -164,7 +170,7 @@ class ClientControllerUpdateIntegrationTest {
     }
 
     @Test
-    @DisplayName("1. Update client successfully with all 23 extended profile fields")
+    @DisplayName("1. Update client successfully by ADMIN with all 23 extended profile fields")
     void testUpdateClientWithAll23NewProfileFields() throws Exception {
         String mobile = randomMobile();
         String altMobile = randomMobile();
@@ -203,7 +209,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -275,7 +281,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -313,7 +319,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -342,7 +348,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestFutureDob)))
                 .andExpect(status().isBadRequest());
@@ -352,7 +358,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestFutureActualDob)))
                 .andExpect(status().isBadRequest());
@@ -369,7 +375,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestNegativeSip)))
                 .andExpect(status().isBadRequest());
@@ -379,7 +385,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestNegativeInvestment)))
                 .andExpect(status().isBadRequest());
@@ -396,7 +402,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -413,7 +419,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request2ndHalf)))
                 .andExpect(status().isOk())
@@ -427,7 +433,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestWeekend)))
                 .andExpect(status().isOk())
@@ -448,7 +454,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidPan)))
                 .andExpect(status().isBadRequest());
@@ -458,7 +464,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidPin)))
                 .andExpect(status().isBadRequest());
@@ -469,7 +475,7 @@ class ClientControllerUpdateIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/v1/clients/" + client.getId())
-                        .with(user(crmPrincipal))
+                        .with(user(adminPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isOk())
@@ -480,5 +486,54 @@ class ClientControllerUpdateIntegrationTest {
         assertThat(reloaded.getPanNumber()).isEqualTo("ABCDE1234F");
         assertThat(reloaded.getPinCode()).isEqualTo("110001");
     }
-}
 
+    @Test
+    @DisplayName("9. Explicit Negative Test: CRM_ONBOARDING cannot modify client via PUT /v1/clients/{id} and DB remains unchanged")
+    void testUpdateClient_CrmOnboardingForbidden() throws Exception {
+        String mobile = randomMobile();
+        Client client = createBaseClient("Dr. Unmodifiable by CRM", mobile);
+        client.setSpeciality("Oncology");
+        client = clientRepository.save(client);
+
+        UpdateClientRequest unauthorizedRequest = UpdateClientRequest.builder()
+                .clientName("Hacked Name Attempt")
+                .speciality("Unauthorized Speciality")
+                .build();
+
+        mockMvc.perform(put("/v1/clients/" + client.getId())
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(unauthorizedRequest)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        Client reloaded = clientRepository.findById(client.getId()).orElseThrow();
+        assertThat(reloaded.getClientName()).isEqualTo("Dr. Unmodifiable by CRM");
+        assertThat(reloaded.getSpeciality()).isEqualTo("Oncology");
+    }
+
+    @Test
+    @DisplayName("10. Explicit Negative Test: RELATIONSHIP_MANAGER cannot modify client via PUT /v1/clients/{id} and DB remains unchanged")
+    void testUpdateClient_RelationshipManagerForbidden() throws Exception {
+        String mobile = randomMobile();
+        Client client = createBaseClient("Dr. Unmodifiable by RM", mobile);
+        client.setLocation("Connaught Place");
+        client = clientRepository.save(client);
+
+        UpdateClientRequest unauthorizedRequest = UpdateClientRequest.builder()
+                .location("Malicious Location Change")
+                .build();
+
+        mockMvc.perform(put("/v1/clients/" + client.getId())
+                        .with(user(rmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(unauthorizedRequest)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        Client reloaded = clientRepository.findById(client.getId()).orElseThrow();
+        assertThat(reloaded.getLocation()).isEqualTo("Connaught Place");
+    }
+}

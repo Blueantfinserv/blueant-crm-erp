@@ -33,7 +33,7 @@ public class ClientController {
 
     @Operation(summary = "Get Client by ID")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('client:read') or hasRole('SALES') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('CRM_ONBOARDING', 'RELATIONSHIP_MANAGER', 'SALES_COORDINATOR', 'PC_COORDINATOR', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<ClientResponse> getClientById(@PathVariable Long id) {
         return clientRepository.findById(id)
                 .map(clientMapper::toResponse)
@@ -43,7 +43,7 @@ public class ClientController {
 
     @Operation(summary = "Search Clients")
     @GetMapping
-    @PreAuthorize("hasAuthority('client:read') or hasRole('SALES') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('CRM_ONBOARDING', 'RELATIONSHIP_MANAGER', 'SALES_COORDINATOR', 'PC_COORDINATOR', 'ADMIN', 'SUPER_ADMIN')")
     public ResponseEntity<Page<ClientResponse>> searchClients(
             @RequestParam(required = false) String clientCode,
             @RequestParam(required = false) ClientStatus status,
@@ -59,7 +59,7 @@ public class ClientController {
 
     @Operation(summary = "Update Client")
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('client:read') or hasRole('SALES') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Transactional
     public ResponseEntity<ClientResponse> updateClient(@PathVariable Long id, @Valid @RequestBody UpdateClientRequest request) {
         clientValidator.validateUpdateRequest(request);

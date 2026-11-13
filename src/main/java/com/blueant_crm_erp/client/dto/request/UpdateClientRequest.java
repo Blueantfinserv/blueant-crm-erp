@@ -1,6 +1,8 @@
 package com.blueant_crm_erp.client.dto.request;
 
+import com.blueant_crm_erp.client.enums.ClientPaymentStatus;
 import com.blueant_crm_erp.client.enums.ClientStatus;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
@@ -11,6 +13,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -112,4 +115,37 @@ public class UpdateClientRequest {
 
     @Size(max = 1000, message = "Remarks must not exceed 1000 characters")
     private String remarks;
+
+    // --- Remaining Profile Fields (Post-Import Editability) ---
+
+    @Size(max = 150, message = "Family head name must not exceed 150 characters")
+    private String familyHeadName;
+
+    @Size(max = 1000, message = "Family details must not exceed 1000 characters")
+    private String familyDetails;
+
+    private LocalDate applicationReceivedDate;
+
+    @Size(max = 50, message = "Application mode must not exceed 50 characters")
+    private String applicationMode;
+
+    private List<String> investmentTypes;
+
+    private LocalDate clientReportDate;
+
+    private ClientPaymentStatus paymentStatus;
+
+    @DecimalMin(value = "0.0", inclusive = true, message = "Payment amount must be non-negative")
+    private BigDecimal paymentAmount;
+
+    private LocalDate paymentDate;
+
+    @Size(max = 100, message = "Payment reference must not exceed 100 characters")
+    private String paymentReference;
+
+    @Valid
+    private List<ClientNomineeRequest> nominees;
+
+    @Size(max = 50, message = "Family code must not exceed 50 characters")
+    private String familyCode;
 }

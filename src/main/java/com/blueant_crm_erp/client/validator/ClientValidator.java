@@ -87,6 +87,11 @@ public class ClientValidator {
         request.setAmc(sanitizeBlank(request.getAmc()));
         request.setScheme(sanitizeBlank(request.getScheme()));
         request.setInvestmentType(sanitizeBlank(request.getInvestmentType()));
+        request.setFamilyHeadName(sanitizeBlank(request.getFamilyHeadName()));
+        request.setFamilyDetails(sanitizeBlank(request.getFamilyDetails()));
+        request.setApplicationMode(sanitizeBlank(request.getApplicationMode()));
+        request.setPaymentReference(sanitizeBlank(request.getPaymentReference()));
+        request.setFamilyCode(sanitizeBlank(request.getFamilyCode()));
 
         // 3. Date Integrity Validations
         if (request.getDateOfBirth() != null && !request.getDateOfBirth().isBefore(LocalDate.now())) {
@@ -143,6 +148,43 @@ public class ClientValidator {
         }
         if (request.getFirstInvestmentAmount() != null && request.getFirstInvestmentAmount().compareTo(BigDecimal.ZERO) < 0) {
             throw new BadRequestException("First investment amount must be non-negative.");
+        }
+        if (request.getPaymentAmount() != null && request.getPaymentAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Payment amount must be non-negative.");
+        }
+
+        // 8. Payment & Application Date Validations
+        if (request.getApplicationReceivedDate() != null && request.getApplicationReceivedDate().isAfter(LocalDate.now())) {
+            throw new BadRequestException("Application received date cannot be in the future.");
+        }
+        if (request.getClientReportDate() != null && request.getClientReportDate().isAfter(LocalDate.now())) {
+            throw new BadRequestException("Client report date cannot be in the future.");
+        }
+        if (request.getPaymentDate() != null && request.getPaymentDate().isAfter(LocalDate.now())) {
+            throw new BadRequestException("Payment date cannot be in the future.");
+        }
+
+        // 9. Nominee Validations
+        if (request.getNominees() != null && !request.getNominees().isEmpty()) {
+            for (com.blueant_crm_erp.client.dto.request.ClientNomineeRequest nr : request.getNominees()) {
+                if (nr.getNomineeName() == null || nr.getNomineeName().isBlank()) {
+                    throw new BadRequestException("Nominee name is required.");
+                }
+                if (nr.getRelationship() == null || nr.getRelationship().isBlank()) {
+                    throw new BadRequestException("Nominee relationship is required.");
+                }
+                if (nr.getDateOfBirth() != null && !nr.getDateOfBirth().isBefore(LocalDate.now())) {
+                    throw new BadRequestException("Nominee date of birth must be in the past.");
+                }
+                if (Boolean.TRUE.equals(nr.getIsMinor())) {
+                    if (nr.getGuardianName() == null || nr.getGuardianName().isBlank()) {
+                        throw new BadRequestException("Guardian name is required for minor nominee.");
+                    }
+                    if (nr.getGuardianRelationship() == null || nr.getGuardianRelationship().isBlank()) {
+                        throw new BadRequestException("Guardian relationship is required for minor nominee.");
+                    }
+                }
+            }
         }
     }
 

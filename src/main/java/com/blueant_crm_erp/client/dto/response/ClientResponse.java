@@ -1,5 +1,6 @@
 package com.blueant_crm_erp.client.dto.response;
 
+import com.blueant_crm_erp.client.enums.ClientPaymentStatus;
 import com.blueant_crm_erp.client.enums.ClientStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -61,4 +63,21 @@ public class ClientResponse {
     private String bestTimeToMeet;
     private LocalDate assignmentDate;
     private String remarks;
+
+    // --- Remaining Profile Fields (37 Questions Post-Import Editability) ---
+    private String familyHeadName;
+    private String familyDetails;
+    private LocalDate applicationReceivedDate;
+    private String applicationMode;
+    private List<String> investmentTypes;
+    private LocalDate clientReportDate;
+    private ClientPaymentStatus paymentStatus;
+    private BigDecimal paymentAmount;
+    private LocalDate paymentDate;
+    private String paymentReference;
+    private List<ClientNomineeResponse> nominees;
+    private Long familyId;
+    private String familyCode;
+    private String familyName;
+    private Boolean isFamilyHead;
 }

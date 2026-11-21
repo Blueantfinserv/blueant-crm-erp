@@ -3,6 +3,7 @@ package com.blueant_crm_erp.meeting.workflow;
 import com.blueant_crm_erp.lead.dto.request.CreateLeadRequest;
 import com.blueant_crm_erp.lead.dto.response.LeadResponse;
 import com.blueant_crm_erp.lead.service.LeadService;
+import com.blueant_crm_erp.meeting.constants.MeetingConstants;
 import com.blueant_crm_erp.meeting.dto.request.CreateMeetingRequest;
 import com.blueant_crm_erp.meeting.dto.request.MeetingWorkflowRequest;
 import com.blueant_crm_erp.meeting.dto.response.MeetingResponse;
@@ -440,6 +441,5 @@ public class MeetingWorkflowRedesignTest {
                 .content(objectMapper.writeValueAsString(successPayload)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(MeetingConstants.MEETING_ALREADY_COMPLETED));
-    }
     }
 }

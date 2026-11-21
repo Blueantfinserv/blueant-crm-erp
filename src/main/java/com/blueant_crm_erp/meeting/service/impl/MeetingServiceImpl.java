@@ -87,9 +87,6 @@ public class MeetingServiceImpl implements MeetingService {
         
         Optional<Meeting> lastMeeting = meetingRepository.findTopByLeadIdOrderByMeetingNumberDesc(lead.getId());
         int nextMeetingNumber = lastMeeting.map(m -> m.getMeetingNumber() + 1).orElse(MeetingConstants.FIRST_MEETING_NUMBER);
-        if (nextMeetingNumber > 10) {
-            throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");
-        }
         meeting.setMeetingNumber(nextMeetingNumber);
         meeting.setMeetingType(nextMeetingNumber == 1 ? com.blueant_crm_erp.meeting.enums.MeetingType.INTRO : com.blueant_crm_erp.meeting.enums.MeetingType.FOLLOW_UP);
 

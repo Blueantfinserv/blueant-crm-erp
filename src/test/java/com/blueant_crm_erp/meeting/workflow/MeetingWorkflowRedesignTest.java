@@ -323,10 +323,10 @@ public class MeetingWorkflowRedesignTest {
                 .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
     }
 
-    // TEST M: Sequential Meeting progression up to Meeting #9, and reject Meeting #10
+    // TEST M: Sequential Meeting progression beyond Meeting #10 (unrestricted meeting sequence)
     @Test
     @WithMockUser(username = "EMP000001", roles = {"SUPER_ADMIN"})
-    public void testM_SequentialMeetingProgressionUpToMeeting9AndRejectMeeting10() throws Exception {
+    public void testM_SequentialMeetingProgressionBeyondTenAllowed() throws Exception {
         LeadResponse lead = createTestLead();
         
         // 1. Create Intro Meeting (Sequence 1) via POST /v1/meetings
@@ -384,28 +384,62 @@ public class MeetingWorkflowRedesignTest {
         }
 
         // Now, currentMeeting is Meeting #9 (sequence 10).
-        // Attempting to complete Meeting #9 with a nextPlanDate (which would schedule Meeting #10 / sequence 11) must FAIL!
-        Map<String, Object> failPayload = new HashMap<>();
-        failPayload.put("leadStatus", "WORK_IN_PROGRESS");
-        failPayload.put("nextPlanDate", LocalDate.now().plusDays(11).toString());
-        failPayload.put("aloneWith", "SELF");
+        // Completing Meeting #9 with nextPlanDate must now SUCCEED and schedule Meeting #10 (sequence 11, "10th Meeting")!
+        Map<String, Object> payload11 = new HashMap<>();
+        payload11.put("leadStatus", "WORK_IN_PROGRESS");
+        payload11.put("nextPlanDate", LocalDate.now().plusDays(11).toString());
+        payload11.put("aloneWith", "SELF");
 
-        mockMvc.perform(post("/v1/meetings/" + currentMeeting.getMeetingCode() + "/workflow-update")
+        String res11Json = mockMvc.perform(post("/v1/meetings/" + currentMeeting.getMeetingCode() + "/workflow-update")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(failPayload)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+                .content(objectMapper.writeValueAsString(payload11)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
 
-        // However, completing Meeting #9 WITHOUT a nextPlanDate should succeed and close the workflow sequence!
+        MeetingResponse meeting11 = objectMapper.readValue(
+                objectMapper.readTree(res11Json).path("data").toString(), MeetingResponse.class);
+
+        assertEquals(11, meeting11.getMeetingNumber());
+        assertEquals("10th Meeting", meeting11.getMeetingTitle());
+        assertEquals("SCHEDULED", meeting11.getMeetingStatus().name());
+
+        // Completing Meeting #10 (sequence 11) with nextPlanDate must now SUCCEED and schedule Meeting #11 (sequence 12, "11th Meeting")!
+        Map<String, Object> payload12 = new HashMap<>();
+        payload12.put("leadStatus", "WORK_IN_PROGRESS");
+        payload12.put("nextPlanDate", LocalDate.now().plusDays(12).toString());
+        payload12.put("aloneWith", "SELF");
+
+        String res12Json = mockMvc.perform(post("/v1/meetings/" + meeting11.getMeetingCode() + "/workflow-update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload12)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        MeetingResponse meeting12 = objectMapper.readValue(
+                objectMapper.readTree(res12Json).path("data").toString(), MeetingResponse.class);
+
+        assertEquals(12, meeting12.getMeetingNumber());
+        assertEquals("11th Meeting", meeting12.getMeetingTitle());
+        assertEquals("SCHEDULED", meeting12.getMeetingStatus().name());
+
+        // Completing Meeting #11 (sequence 12) WITHOUT nextPlanDate should succeed and leave meeting status COMPLETED!
         Map<String, Object> successPayload = new HashMap<>();
         successPayload.put("leadStatus", "WORK_IN_PROGRESS");
         successPayload.put("aloneWith", "SELF");
 
-        mockMvc.perform(post("/v1/meetings/" + currentMeeting.getMeetingCode() + "/workflow-update")
+        mockMvc.perform(post("/v1/meetings/" + meeting12.getMeetingCode() + "/workflow-update")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(successPayload)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.meetingStatus").value("COMPLETED"));
+
+        // Verify that completed meeting cannot be updated again
+        mockMvc.perform(post("/v1/meetings/" + meeting12.getMeetingCode() + "/workflow-update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(successPayload)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(MeetingConstants.MEETING_ALREADY_COMPLETED));
+    }
     }
 }

@@ -270,10 +270,5 @@ public class MeetingWorkflowValidator {
         if (request.getMeetingConducted() == MeetingConductStatus.NOT_CONDUCTED) {
             return;
         }
-        if (request.getNextPlanDate() != null && request.getLeadStatus() == MeetingLeadStatus.WORK_IN_PROGRESS) {
-            if (meeting.getMeetingNumber() >= 10) {
-                throw new IllegalArgumentException("Maximum allowed meeting sequence reached. Cannot schedule Meeting #10.");
-            }
-        }
     }
 }

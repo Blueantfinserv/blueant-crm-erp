@@ -9,8 +9,10 @@ import com.blueant_crm_erp.client.dto.request.CreateFamilyRequest;
 import com.blueant_crm_erp.client.entity.Client;
 import com.blueant_crm_erp.client.entity.ClientFamily;
 import com.blueant_crm_erp.client.entity.ClientFamilyHeadHistory;
+import com.blueant_crm_erp.client.entity.ClientFamilyMember;
 import com.blueant_crm_erp.client.enums.ClientPaymentStatus;
 import com.blueant_crm_erp.client.enums.ClientStatus;
+import com.blueant_crm_erp.client.enums.FamilyMembershipStatus;
 import com.blueant_crm_erp.client.enums.FamilyRelationship;
 import com.blueant_crm_erp.client.enums.FamilyStatus;
 import com.blueant_crm_erp.client.repository.ClientFamilyHeadHistoryRepository;
@@ -109,6 +111,8 @@ public class ClientFamilyIntegrationTest {
 
     private User crmUser;
     private User rmUser;
+    private User pcUser;
+    private User adminUser;
     private Department salesDept;
     private Department crmDept;
     private Team defaultTeam;
@@ -125,6 +129,8 @@ public class ClientFamilyIntegrationTest {
 
         crmUser = createTestUser("CRM_FAM", BootstrapConstants.ROLE_CRM_ONBOARDING, BootstrapConstants.DESIG_CRM_ONBOARDING, crmDept, "PHYSICAL_LEAD_ASSIGN");
         rmUser = createTestUser("RM_FAM", BootstrapConstants.ROLE_RELATIONSHIP_MANAGER, BootstrapConstants.DESIG_RM, salesDept, "MEETING_UPDATE", "MEETING_READ");
+        pcUser = createTestUser("PC_FAM", BootstrapConstants.ROLE_PC_COORDINATOR, BootstrapConstants.DESIG_PC, crmDept, "PHYSICAL_LEAD_ASSIGN");
+        adminUser = createTestUser("ADMIN_FAM", BootstrapConstants.ROLE_ADMIN, BootstrapConstants.DESIG_BH, crmDept);
     }
 
     private User createTestUser(String prefix, String roleCode, String desigCode, Department dept, String... permissions) {
@@ -164,8 +170,8 @@ public class ClientFamilyIntegrationTest {
     }
 
     private Client createClient(String name, ClientPaymentStatus paymentStatus, BigDecimal paymentAmount, String investmentType, BigDecimal expectedMaxSip) {
-        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().hashCode() % 1000000000L));
-        String code = "BA-CL-2026-" + String.format("%06d", Math.abs(UUID.randomUUID().hashCode() % 900000 + 100000));
+        String mobile = "9" + String.format("%09d", Math.abs(UUID.randomUUID().getMostSignificantBits() % 1000000000L));
+        String code = "BA-CL-TEST-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         return clientRepository.save(Client.builder()
                 .clientCode(code)
                 .clientName(name)
@@ -242,7 +248,7 @@ public class ClientFamilyIntegrationTest {
     }
 
     @Test
-    @DisplayName("3. Create Family rejects ineligible head (only expectedMaxSIP, no payment)")
+    @DisplayName("3. Create Family rejects ineligible initial head (existing behavior preserved)")
     void testCreateFamilyWithIneligibleHead_rejected() throws Exception {
         UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
 
@@ -323,7 +329,43 @@ public class ClientFamilyIntegrationTest {
     }
 
     @Test
-    @DisplayName("5. Explicit Family Head change: Mother replaces Krishan, then Father with no investment is rejected")
+    @DisplayName("4b. Add member with designateAsHead=true rejects ineligible client (existing behavior preserved)")
+    void testAddMemberWithIneligibleHeadDesignation_rejected() throws Exception {
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        Client krishan = createClient("Krishan", ClientPaymentStatus.YES, new BigDecimal("10000.00"), "SIP", null);
+        Client brokeClient = createClient("Broke", ClientPaymentStatus.NO, null, null, null);
+
+        CreateFamilyRequest req1 = CreateFamilyRequest.builder()
+                .familyName("Family With Head")
+                .initialHeadClientId(krishan.getId())
+                .build();
+
+        MvcResult res1 = mockMvc.perform(post("/v1/client-families")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req1)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String famCode = objectMapper.readTree(res1.getResponse().getContentAsString()).path("data").path("familyCode").asText();
+
+        AddFamilyMemberRequest addReq = AddFamilyMemberRequest.builder()
+                .clientId(brokeClient.getId())
+                .relationshipToHead(FamilyRelationship.OTHER)
+                .designateAsHead(true)
+                .build();
+
+        mockMvc.perform(post("/v1/client-families/" + famCode + "/members")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(addReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Cannot designate client")));
+    }
+
+    @Test
+    @DisplayName("5. Explicit Family Head change: Existing active member without investment (Father) becomes Family Head")
     void testChangeFamilyHeadLifecycle() throws Exception {
         UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
 
@@ -379,35 +421,187 @@ public class ClientFamilyIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.familyHeadClientId").value(mother.getId()));
 
-        // 4. Attempt to change head to Father (ineligible, no active investment) -> MUST FAIL
+        // 4. Change head to Father (allowed now, investment/SIP restriction removed)
         ChangeFamilyHeadRequest changeToFatherReq = ChangeFamilyHeadRequest.builder()
                 .newHeadClientId(father.getId())
-                .reason("Father attempt")
+                .reason("Father designated as family head")
                 .build();
 
         mockMvc.perform(put("/v1/client-families/" + familyCode + "/head")
                         .with(user(principal))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(changeToFatherReq)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("does not meet active investment eligibility")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.familyHeadClientId").value(father.getId()));
 
-        // 5. Verify Mother is STILL the head, and history preserved
+        // 5. Verify Father is the new head, and history preserved
         ClientFamily family = clientFamilyRepository.findByFamilyCode(familyCode).orElseThrow();
-        assertThat(family.getFamilyHead().getId()).isEqualTo(mother.getId());
+        assertThat(family.getFamilyHead().getId()).isEqualTo(father.getId());
 
         List<ClientFamilyHeadHistory> history = clientFamilyHeadHistoryRepository.findByFamilyIdOrderByChangedAtDescIdDesc(family.getId());
-        assertThat(history).hasSize(2);
-        // Latest history entry: new head is Mother, previous head was Krishan
-        assertThat(history.get(0).getNewHead().getId()).isEqualTo(mother.getId());
-        assertThat(history.get(0).getPreviousHead().getId()).isEqualTo(krishan.getId());
-        // Previous history entry: initial Krishan
-        assertThat(history.get(1).getNewHead().getId()).isEqualTo(krishan.getId());
-        assertThat(history.get(1).getPreviousHead()).isNull();
+        assertThat(history).hasSize(3);
+        // Latest history entry: new head is Father, previous head was Mother
+        assertThat(history.get(0).getNewHead().getId()).isEqualTo(father.getId());
+        assertThat(history.get(0).getPreviousHead().getId()).isEqualTo(mother.getId());
+        // Previous history entry: new head was Mother, previous head was Krishan
+        assertThat(history.get(1).getNewHead().getId()).isEqualTo(mother.getId());
+        assertThat(history.get(1).getPreviousHead().getId()).isEqualTo(krishan.getId());
+        // Initial history entry: initial Krishan
+        assertThat(history.get(2).getNewHead().getId()).isEqualTo(krishan.getId());
+        assertThat(history.get(2).getPreviousHead()).isNull();
     }
 
     @Test
-    @DisplayName("6. Evaluate eligible heads endpoint correctly identifies eligible vs ineligible members")
+    @DisplayName("5b. Change Family Head rejects non-members and inactive members")
+    void testChangeFamilyHead_nonMemberAndInactiveMember_rejected() throws Exception {
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        Client head = createClient("Initial Head", ClientPaymentStatus.YES, new BigDecimal("10000.00"), "SIP", null);
+        Client member = createClient("Member", ClientPaymentStatus.NO, null, null, null);
+        Client outsider = createClient("Outsider", ClientPaymentStatus.YES, new BigDecimal("50000.00"), "MUTUAL_FUNDS", null);
+
+        CreateFamilyRequest createReq = CreateFamilyRequest.builder()
+                .familyName("Membership Validation Family")
+                .initialHeadClientId(head.getId())
+                .build();
+
+        MvcResult createRes = mockMvc.perform(post("/v1/client-families")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String familyCode = objectMapper.readTree(createRes.getResponse().getContentAsString()).path("data").path("familyCode").asText();
+
+        // Add member
+        mockMvc.perform(post("/v1/client-families/" + familyCode + "/members")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(AddFamilyMemberRequest.builder()
+                                .clientId(member.getId())
+                                .relationshipToHead(FamilyRelationship.CHILD)
+                                .build())))
+                .andExpect(status().isCreated());
+
+        // 1. Attempt to change head to outsider (non-member) -> 400 Bad Request
+        ChangeFamilyHeadRequest outsiderReq = ChangeFamilyHeadRequest.builder()
+                .newHeadClientId(outsider.getId())
+                .reason("Outsider attempt")
+                .build();
+
+        mockMvc.perform(put("/v1/client-families/" + familyCode + "/head")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(outsiderReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not an active member of family")));
+
+        // 2. Deactivate member and attempt to change head -> 400 Bad Request
+        ClientFamily family = clientFamilyRepository.findByFamilyCode(familyCode).orElseThrow();
+        ClientFamilyMember memEntity = clientFamilyMemberRepository.findByFamilyIdAndClientId(family.getId(), member.getId()).orElseThrow();
+        memEntity.setMembershipStatus(FamilyMembershipStatus.INACTIVE);
+        clientFamilyMemberRepository.save(memEntity);
+
+        ChangeFamilyHeadRequest inactiveReq = ChangeFamilyHeadRequest.builder()
+                .newHeadClientId(member.getId())
+                .reason("Inactive member attempt")
+                .build();
+
+        mockMvc.perform(put("/v1/client-families/" + familyCode + "/head")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(inactiveReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is not an active member of family")));
+
+        // 3. Deactivate family and attempt to change head -> 409 Conflict
+        family.setStatus(FamilyStatus.INACTIVE);
+        clientFamilyRepository.save(family);
+
+        ChangeFamilyHeadRequest changeOnInactiveFamReq = ChangeFamilyHeadRequest.builder()
+                .newHeadClientId(head.getId())
+                .reason("Change on inactive family attempt")
+                .build();
+
+        mockMvc.perform(put("/v1/client-families/" + familyCode + "/head")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(changeOnInactiveFamReq)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Cannot change head of inactive family")));
+    }
+
+    @Test
+    @DisplayName("5c. Change Family Head RBAC: PHYSICAL_LEAD_ASSIGN, CRM, and Admin succeed; RM is rejected")
+    void testChangeFamilyHead_rbacMatrix() throws Exception {
+        UserDetails crmPrincipal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+        UserDetails adminPrincipal = customUserDetailsService.loadUserByUsername(adminUser.getEmployeeCode());
+        UserDetails rmPrincipal = customUserDetailsService.loadUserByUsername(rmUser.getEmployeeCode());
+
+        Client krishan = createClient("Krishan", ClientPaymentStatus.YES, new BigDecimal("10000.00"), "SIP", null);
+        Client son = createClient("Son", ClientPaymentStatus.NO, null, null, null);
+
+        CreateFamilyRequest createReq = CreateFamilyRequest.builder()
+                .familyName("RBAC Test Family")
+                .initialHeadClientId(krishan.getId())
+                .build();
+
+        MvcResult createRes = mockMvc.perform(post("/v1/client-families")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String familyCode = objectMapper.readTree(createRes.getResponse().getContentAsString()).path("data").path("familyCode").asText();
+
+        mockMvc.perform(post("/v1/client-families/" + familyCode + "/members")
+                        .with(user(crmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(AddFamilyMemberRequest.builder()
+                                .clientId(son.getId())
+                                .relationshipToHead(FamilyRelationship.CHILD)
+                                .build())))
+                .andExpect(status().isCreated());
+
+        ChangeFamilyHeadRequest changeReq = ChangeFamilyHeadRequest.builder()
+                .newHeadClientId(son.getId())
+                .reason("RBAC test change")
+                .build();
+
+        // 1. RM has MEETING permissions but lacks PHYSICAL_LEAD_ASSIGN / CRM_ONBOARDING / ADMIN -> 403 Forbidden
+        mockMvc.perform(put("/v1/client-families/" + familyCode + "/head")
+                        .with(user(rmPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(changeReq)))
+                .andExpect(status().isForbidden());
+
+        // 2. PC Coordinator has PHYSICAL_LEAD_ASSIGN -> 200 OK
+        mockMvc.perform(put("/v1/client-families/" + familyCode + "/head")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(changeReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.familyHeadClientId").value(son.getId()));
+
+        // 3. Admin has ROLE_ADMIN -> 200 OK (change back to Krishan)
+        ChangeFamilyHeadRequest changeBackReq = ChangeFamilyHeadRequest.builder()
+                .newHeadClientId(krishan.getId())
+                .reason("Admin switch back")
+                .build();
+
+        mockMvc.perform(put("/v1/client-families/" + familyCode + "/head")
+                        .with(user(adminPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(changeBackReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.familyHeadClientId").value(krishan.getId()));
+    }
+
+    @Test
+    @DisplayName("6. Evaluate eligible heads endpoint returns eligible: true for all active members")
     void testEligibleHeadsEndpoint() throws Exception {
         UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
 
@@ -447,7 +641,9 @@ public class ClientFamilyIntegrationTest {
                 .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasSize(3)))
                 .andExpect(jsonPath("$.data[?(@.clientCode == '" + krishan.getClientCode() + "')].eligible").value(true))
                 .andExpect(jsonPath("$.data[?(@.clientCode == '" + mother.getClientCode() + "')].eligible").value(true))
-                .andExpect(jsonPath("$.data[?(@.clientCode == '" + father.getClientCode() + "')].eligible").value(false));
+                .andExpect(jsonPath("$.data[?(@.clientCode == '" + father.getClientCode() + "')].eligible").value(true))
+                .andExpect(jsonPath("$.data[?(@.clientCode == '" + father.getClientCode() + "')].eligibilityReason").value("Active family member eligible for Family Head designation"))
+                .andExpect(jsonPath("$.data[?(@.clientCode == '" + father.getClientCode() + "')].qualifyingDetails").value("Active family member"));
     }
 
     @Test
@@ -526,5 +722,31 @@ public class ClientFamilyIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("9. Existing getFamilies query behavior remains correct")
+    void testGetFamiliesQuery_success() throws Exception {
+        UserDetails principal = customUserDetailsService.loadUserByUsername(crmUser.getEmployeeCode());
+
+        // Create a family so we have at least one record
+        CreateFamilyRequest req = CreateFamilyRequest.builder()
+                .familyName("Listing Test Family")
+                .build();
+
+        mockMvc.perform(post("/v1/client-families")
+                        .with(user(principal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated());
+
+        // Perform GET /v1/client-families
+        mockMvc.perform(get("/v1/client-families")
+                        .with(user(principal))
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray());
     }
 }

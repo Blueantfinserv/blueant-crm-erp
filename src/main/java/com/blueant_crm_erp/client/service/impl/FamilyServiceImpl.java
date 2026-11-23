@@ -76,7 +76,7 @@ public class FamilyServiceImpl implements FamilyService {
                 );
             }
 
-            // Verify active investment eligibility
+            // Verify active investment eligibility (existing createFamily behavior preserved)
             ActiveInvestmentEligibilityService.EligibilityResult eligibility = activeInvestmentEligibilityService.evaluateEligibility(candidateHead);
             if (!eligibility.eligible()) {
                 throw new IneligibleFamilyHeadException(
@@ -129,7 +129,7 @@ public class FamilyServiceImpl implements FamilyService {
     public Page<FamilySummaryResponse> getFamilies(Pageable pageable, String search, FamilyStatus status) {
         Specification<ClientFamily> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("isDeleted"), false));
+            predicates.add(cb.isFalse(root.get("deleted")));
 
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
@@ -160,8 +160,14 @@ public class FamilyServiceImpl implements FamilyService {
     @Transactional
     public FamilyMemberResponse addMember(String familyCode, AddFamilyMemberRequest request, String authenticatedUsername) {
         String actor = StringUtils.hasText(authenticatedUsername) ? authenticatedUsername : "SYSTEM";
-        ClientFamily family = clientFamilyRepository.findByFamilyCode(familyCode)
+
+        // Concurrency-safe pessimistic write lock
+        ClientFamily family = clientFamilyRepository.findByFamilyCodeWithLock(familyCode.trim())
                 .orElseThrow(() -> new FamilyNotFoundException("Family not found with code: " + familyCode));
+
+        if (family.getStatus() != FamilyStatus.ACTIVE) {
+            throw new FamilyConflictException("Cannot add member to inactive family " + familyCode + " (status: " + family.getStatus() + ")");
+        }
 
         Client client = clientRepository.findById(request.getClientId())
                 .orElseThrow(() -> new ClientNotFoundException("Client not found with id: " + request.getClientId()));
@@ -209,7 +215,7 @@ public class FamilyServiceImpl implements FamilyService {
         client.setFamily(family);
         clientRepository.save(client);
 
-        // Optional head designation during member linking
+        // Optional head designation during member linking (existing eligibility validation preserved)
         if (Boolean.TRUE.equals(request.getDesignateAsHead())) {
             ActiveInvestmentEligibilityService.EligibilityResult eligibility = activeInvestmentEligibilityService.evaluateEligibility(client);
             if (!eligibility.eligible()) {
@@ -252,14 +258,20 @@ public class FamilyServiceImpl implements FamilyService {
             Client c = member.getClient();
             ActiveInvestmentEligibilityService.EligibilityResult result = activeInvestmentEligibilityService.evaluateEligibility(c);
             boolean isCurrentHead = Objects.equals(c.getId(), currentHeadId);
+            String eligibilityReason = result.eligible()
+                    ? result.reason()
+                    : "Active family member eligible for Family Head designation";
+            String qualifyingDetails = result.eligible()
+                    ? result.qualifyingDetails()
+                    : "Active family member";
             return EligibleFamilyHeadResponse.builder()
                     .clientId(c.getId())
                     .clientCode(c.getClientCode())
                     .clientName(c.getClientName())
                     .isCurrentHead(isCurrentHead)
-                    .eligible(result.eligible())
-                    .eligibilityReason(result.reason())
-                    .qualifyingDetails(result.qualifyingDetails())
+                    .eligible(true)
+                    .eligibilityReason(eligibilityReason)
+                    .qualifyingDetails(qualifyingDetails)
                     .build();
         }).toList();
     }
@@ -273,6 +285,10 @@ public class FamilyServiceImpl implements FamilyService {
         ClientFamily family = clientFamilyRepository.findByFamilyCodeWithLock(familyCode)
                 .orElseThrow(() -> new FamilyNotFoundException("Family not found with code: " + familyCode));
 
+        if (family.getStatus() != FamilyStatus.ACTIVE) {
+            throw new FamilyConflictException("Cannot change head of inactive family " + familyCode + " (status: " + family.getStatus() + ")");
+        }
+
         Client candidateHead = clientRepository.findById(request.getNewHeadClientId())
                 .orElseThrow(() -> new ClientNotFoundException("Client not found with id: " + request.getNewHeadClientId()));
 
@@ -285,14 +301,8 @@ public class FamilyServiceImpl implements FamilyService {
             );
         }
 
-        // Rule: The selected head must satisfy the authoritative active SIP/investment eligibility rule
-        ActiveInvestmentEligibilityService.EligibilityResult eligibility = activeInvestmentEligibilityService.evaluateEligibility(candidateHead);
-        if (!eligibility.eligible()) {
-            throw new IneligibleFamilyHeadException(
-                    "Selected client " + candidateHead.getClientCode() + " does not meet active investment eligibility: "
-                            + eligibility.reason()
-            );
-        }
+        // Active SIP / investment / PC verification status restrictions removed:
+        // Any active member of the family can become the Family Head
 
         Client previousHead = family.getFamilyHead();
 
@@ -300,13 +310,15 @@ public class FamilyServiceImpl implements FamilyService {
         family.setFamilyHead(candidateHead);
         clientFamilyRepository.save(family);
 
+        String changeReason = StringUtils.hasText(request.getReason()) ? request.getReason().trim() : "CRM family head update";
+
         ClientFamilyHeadHistory history = ClientFamilyHeadHistory.builder()
                 .family(family)
                 .previousHead(previousHead)
                 .newHead(candidateHead)
                 .changedByUser(actor)
                 .changedAt(LocalDateTime.now())
-                .reason(StringUtils.hasText(request.getReason()) ? request.getReason().trim() : "CRM family head update")
+                .reason(changeReason)
                 .build();
         clientFamilyHeadHistoryRepository.save(history);
 

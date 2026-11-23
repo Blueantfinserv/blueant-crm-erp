@@ -84,7 +84,7 @@ public class ClientFamilyController {
         return ApiResponse.success("Eligible family heads evaluated successfully", response);
     }
 
-    @Operation(summary = "Change family head", description = "Explicitly sets or changes the family head with mandatory active investment validation and concurrency lock")
+    @Operation(summary = "Change family head", description = "Explicitly sets or changes the family head with concurrency lock")
     @PutMapping("/{familyCode}/head")
     @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('CRM_ONBOARDING', 'ADMIN', 'SUPER_ADMIN')")
     public ApiResponse<FamilyDetailResponse> changeFamilyHead(

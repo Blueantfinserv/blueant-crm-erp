@@ -3,6 +3,7 @@ package com.blueant_crm_erp.client.controller;
 import com.blueant_crm_erp.client.dto.request.AddFamilyMemberRequest;
 import com.blueant_crm_erp.client.dto.request.ChangeFamilyHeadRequest;
 import com.blueant_crm_erp.client.dto.request.CreateFamilyRequest;
+import com.blueant_crm_erp.client.dto.request.RemoveFamilyMemberRequest;
 import com.blueant_crm_erp.client.dto.response.*;
 import com.blueant_crm_erp.client.enums.FamilyStatus;
 import com.blueant_crm_erp.client.service.FamilyService;
@@ -74,6 +75,26 @@ public class ClientFamilyController {
         String currentUser = principal != null ? principal.getName() : "system";
         FamilyMemberResponse response = familyService.addMember(familyCode, request, currentUser);
         return ApiResponse.success("Member added to family successfully", response);
+    }
+
+    @Operation(summary = "Remove member from family", description = "Removes an active client from a family without deleting the client record")
+    @DeleteMapping("/{familyCode}/members/{clientId}")
+    @PreAuthorize("hasAuthority('PHYSICAL_LEAD_ASSIGN') or hasAnyRole('CRM_ONBOARDING', 'ADMIN', 'SUPER_ADMIN')")
+    public ApiResponse<FamilyDetailResponse> removeMember(
+            @PathVariable String familyCode,
+            @PathVariable Long clientId,
+            @Valid @RequestBody(required = false) RemoveFamilyMemberRequest request,
+            @RequestParam(required = false) String reason,
+            Principal principal) {
+        String currentUser = principal != null ? principal.getName() : "system";
+        String resolvedReason = (request != null && org.springframework.util.StringUtils.hasText(request.getReason()))
+                ? request.getReason()
+                : reason;
+        RemoveFamilyMemberRequest effectiveRequest = RemoveFamilyMemberRequest.builder()
+                .reason(resolvedReason)
+                .build();
+        FamilyDetailResponse response = familyService.removeMember(familyCode, clientId, effectiveRequest, currentUser);
+        return ApiResponse.success("Member removed from family successfully", response);
     }
 
     @Operation(summary = "List eligible family heads", description = "Returns active family members with their active investment eligibility status")

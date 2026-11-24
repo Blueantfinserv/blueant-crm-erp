@@ -18,4 +18,6 @@ public interface ClientVerificationService {
     ClientMeetingVerificationResponse verifyMeeting(String meetingCode, ClientMeetingVerificationRequest request, String currentUserIdentifier);
 
     ClientMeetingVerificationResponse rejectMeeting(String meetingCode, String reason, String currentUserIdentifier);
+
+    List<String> getBusinessOptions();
 }

@@ -11,13 +11,16 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Business item representing an individual category and its dedicated amount.")
+@Schema(description = "Business item representing an individual category and its optional dedicated amount.")
 public class ClientBusinessItemDto {
 
     @NotBlank(message = "Business type is required.")
-    @Schema(description = "Applicable business category (e.g. SIP, LUMP_SUM, LOAN, SHARE/SHARES, INSURANCE, SERVICE_REQUEST, BROKER_CHANGE)")
+    @Schema(description = "Applicable business category (e.g. Bank Change / Update, SIP STP Start, Redeem, Lumpsum Switch / Change)")
     private String businessType;
 
-    @Schema(description = "Dedicated amount for monetary categories (null or 0 allowed for non-monetary categories)")
+    @Schema(description = "User-friendly display name of the business category")
+    private String displayName;
+
+    @Schema(description = "Optional dedicated amount for the business option (null or blank allowed; cannot be negative)")
     private BigDecimal amount;
 }

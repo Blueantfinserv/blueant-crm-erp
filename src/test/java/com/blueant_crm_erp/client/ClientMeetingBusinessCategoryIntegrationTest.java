@@ -318,15 +318,37 @@ public class ClientMeetingBusinessCategoryIntegrationTest {
     }
 
     @Test
-    @DisplayName("Scenario 5: Monetary category (e.g. SIP) with zero or null amount is rejected with HTTP 400 Bad Request")
-    void testMonetaryCategoryRequiresPositiveAmount() throws Exception {
+    @DisplayName("Scenario 5: Negative amount is rejected with HTTP 400 Bad Request, while zero and null amounts are accepted")
+    void testNegativeAmountIsRejectedWhileZeroAndNullAreAccepted() throws Exception {
         Client client = createTestClient(scUser);
         UserDetails scPrincipal = customUserDetailsService.loadUserByUsername(scUser.getEmployeeCode());
         UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
 
         String meetingCode = submitMeetingUpdate(client, scPrincipal, "YES");
 
-        ClientMeetingVerificationRequest verifyReq = ClientMeetingVerificationRequest.builder()
+        // 1. Negative amount must be rejected
+        ClientMeetingVerificationRequest invalidReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(14, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .businessItems(List.of(
+                        ClientBusinessItemDto.builder().businessType("SIP").amount(new BigDecimal("-100.00")).build()
+                ))
+                .remarks("Negative SIP amount")
+                .nextFollowupDate(LocalDate.now().plusMonths(1))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meetingCode + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Amount cannot be negative for category: SIP")));
+
+        // 2. Zero amount is accepted (not negative)
+        ClientMeetingVerificationRequest validReq = ClientMeetingVerificationRequest.builder()
                 .newMeetingDate(LocalDate.now())
                 .meetingTime(LocalTime.of(14, 0))
                 .blueantAppUsed("YES")
@@ -335,16 +357,16 @@ public class ClientMeetingBusinessCategoryIntegrationTest {
                 .businessItems(List.of(
                         ClientBusinessItemDto.builder().businessType("SIP").amount(BigDecimal.ZERO).build()
                 ))
-                .remarks("Invalid SIP amount")
+                .remarks("Zero SIP amount accepted")
                 .nextFollowupDate(LocalDate.now().plusMonths(1))
                 .build();
 
         mockMvc.perform(post("/v1/client-meetings/verification/" + meetingCode + "/verify")
                         .with(user(pcPrincipal))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(verifyReq)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("Amount must be greater than zero for category: SIP")));
+                        .content(objectMapper.writeValueAsString(validReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("VERIFIED"));
     }
 
     @Test
@@ -570,5 +592,167 @@ public class ClientMeetingBusinessCategoryIntegrationTest {
         ClientMeetingVerification verif = clientMeetingVerificationRepository.findByClientMeetingIdAndIsCurrentTrue(histMeeting.getId()).orElseThrow();
         List<ClientMeetingVerificationBusinessItem> items = clientMeetingVerificationBusinessItemRepository.findByVerificationId(verif.getId());
         assertThat(items).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Scenario 11: PC verifies all 23 new business options with optional amounts entered or blank")
+    void testPcVerifyAll23BusinessOptionsWithOptionalAmounts() throws Exception {
+        Client client = createTestClient(scUser);
+        UserDetails scPrincipal = customUserDetailsService.loadUserByUsername(scUser.getEmployeeCode());
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        String meetingCode = submitMeetingUpdate(client, scPrincipal, "YES");
+
+        List<ClientBusinessItemDto> all23Items = List.of(
+                ClientBusinessItemDto.builder().businessType("Bank Change / Update").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("CAN Create").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Change of Broker").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Change of Tax Status").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("KYC").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Mail ID Update").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Minor to Major").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Mobile Number Update").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Name Change").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Nominee Change / Update").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Lumpsum Switch / Change").amount(new BigDecimal("100000.00")).build(),
+                ClientBusinessItemDto.builder().businessType("Other Transaction").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Payzee Update").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Redeem").amount(new BigDecimal("25000.00")).build(),
+                ClientBusinessItemDto.builder().businessType("Reporting").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("SIP STP Start").amount(new BigDecimal("15000.00")).build(),
+                ClientBusinessItemDto.builder().businessType("SIP STP Stop").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Switch").amount(new BigDecimal("30000.00")).build(),
+                ClientBusinessItemDto.builder().businessType("SWP Start").amount(new BigDecimal("20000.00")).build(),
+                ClientBusinessItemDto.builder().businessType("SWP Stop").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Transmission").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Folio Club").amount(null).build(),
+                ClientBusinessItemDto.builder().businessType("Joint Holding (AOS)").amount(null).build()
+        );
+
+        ClientMeetingVerificationRequest verifyReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(15, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .businessItems(all23Items)
+                .remarks("Verification with all 23 new business options")
+                .nextFollowupDate(LocalDate.now().plusMonths(1))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meetingCode + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.businessItems", hasSize(23)))
+                .andExpect(jsonPath("$.data.businessItems[?(@.businessType == 'BANK_CHANGE_UPDATE')].displayName").value("Bank Change / Update"))
+                .andExpect(jsonPath("$.data.businessItems[?(@.businessType == 'JOINT_HOLDING_AOS')].displayName").value("Joint Holding (AOS)"))
+                .andExpect(jsonPath("$.data.businessItems[?(@.businessType == 'LUMPSUM_SWITCH_CHANGE')].amount").value(100000.00))
+                .andExpect(jsonPath("$.data.businessItems[?(@.businessType == 'REDEEM')].amount").value(25000.00))
+                .andExpect(jsonPath("$.data.businessItems[?(@.businessType == 'SIP_STP_START')].amount").value(15000.00))
+                .andExpect(jsonPath("$.data.businessItems[?(@.businessType == 'SWITCH')].amount").value(30000.00))
+                .andExpect(jsonPath("$.data.businessItems[?(@.businessType == 'SWP_START')].amount").value(20000.00))
+                // Total sum: 100000 + 25000 + 15000 + 30000 + 20000 = 190000.00
+                .andExpect(jsonPath("$.data.investmentAmount").value(190000.00));
+    }
+
+    @Test
+    @DisplayName("Scenario 12: PC verifies using enum constant codes (e.g. BANK_CHANGE_UPDATE)")
+    void testPcVerifyUsingEnumCodeNames() throws Exception {
+        Client client = createTestClient(scUser);
+        UserDetails scPrincipal = customUserDetailsService.loadUserByUsername(scUser.getEmployeeCode());
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        String meetingCode = submitMeetingUpdate(client, scPrincipal, "YES");
+
+        ClientMeetingVerificationRequest verifyReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(15, 30))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .businessItems(List.of(
+                        ClientBusinessItemDto.builder().businessType("BANK_CHANGE_UPDATE").amount(null).build(),
+                        ClientBusinessItemDto.builder().businessType("KYC").amount(null).build(),
+                        ClientBusinessItemDto.builder().businessType("SIP_STP_START").amount(new BigDecimal("5000.00")).build()
+                ))
+                .remarks("Verification with enum codes")
+                .nextFollowupDate(LocalDate.now().plusMonths(1))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meetingCode + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(verifyReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verificationStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.businessItems", hasSize(3)))
+                .andExpect(jsonPath("$.data.investmentAmount").value(5000.00));
+    }
+
+    @Test
+    @DisplayName("Scenario 13: Negative amount on any new category is rejected with HTTP 400 Bad Request")
+    void testNegativeAmountOnNewCategoryIsRejected() throws Exception {
+        Client client = createTestClient(scUser);
+        UserDetails scPrincipal = customUserDetailsService.loadUserByUsername(scUser.getEmployeeCode());
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        String meetingCode = submitMeetingUpdate(client, scPrincipal, "YES");
+
+        ClientMeetingVerificationRequest invalidReq = ClientMeetingVerificationRequest.builder()
+                .newMeetingDate(LocalDate.now())
+                .meetingTime(LocalTime.of(16, 0))
+                .blueantAppUsed("YES")
+                .aloneWith("SELF")
+                .businessGenerated("YES")
+                .businessItems(List.of(
+                        ClientBusinessItemDto.builder().businessType("Bank Change / Update").amount(new BigDecimal("-50.00")).build()
+                ))
+                .remarks("Negative amount test")
+                .nextFollowupDate(LocalDate.now().plusMonths(1))
+                .build();
+
+        mockMvc.perform(post("/v1/client-meetings/verification/" + meetingCode + "/verify")
+                        .with(user(pcPrincipal))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Amount cannot be negative for category: Bank Change / Update")));
+    }
+
+    @Test
+    @DisplayName("Scenario 14: GET /v1/client-meetings/verification/business-options returns the 23 options in order")
+    void testGetBusinessOptionsEndpointReturns23Options() throws Exception {
+        UserDetails pcPrincipal = customUserDetailsService.loadUserByUsername(pcUser.getEmployeeCode());
+
+        mockMvc.perform(get("/v1/client-meetings/verification/business-options")
+                        .with(user(pcPrincipal)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(23)))
+                .andExpect(jsonPath("$.data[0]").value("Bank Change / Update"))
+                .andExpect(jsonPath("$.data[1]").value("CAN Create"))
+                .andExpect(jsonPath("$.data[2]").value("Change of Broker"))
+                .andExpect(jsonPath("$.data[3]").value("Change of Tax Status"))
+                .andExpect(jsonPath("$.data[4]").value("KYC"))
+                .andExpect(jsonPath("$.data[5]").value("Mail ID Update"))
+                .andExpect(jsonPath("$.data[6]").value("Minor to Major"))
+                .andExpect(jsonPath("$.data[7]").value("Mobile Number Update"))
+                .andExpect(jsonPath("$.data[8]").value("Name Change"))
+                .andExpect(jsonPath("$.data[9]").value("Nominee Change / Update"))
+                .andExpect(jsonPath("$.data[10]").value("Lumpsum Switch / Change"))
+                .andExpect(jsonPath("$.data[11]").value("Other Transaction"))
+                .andExpect(jsonPath("$.data[12]").value("Payzee Update"))
+                .andExpect(jsonPath("$.data[13]").value("Redeem"))
+                .andExpect(jsonPath("$.data[14]").value("Reporting"))
+                .andExpect(jsonPath("$.data[15]").value("SIP STP Start"))
+                .andExpect(jsonPath("$.data[16]").value("SIP STP Stop"))
+                .andExpect(jsonPath("$.data[17]").value("Switch"))
+                .andExpect(jsonPath("$.data[18]").value("SWP Start"))
+                .andExpect(jsonPath("$.data[19]").value("SWP Stop"))
+                .andExpect(jsonPath("$.data[20]").value("Transmission"))
+                .andExpect(jsonPath("$.data[21]").value("Folio Club"))
+                .andExpect(jsonPath("$.data[22]").value("Joint Holding (AOS)"));
     }
 }

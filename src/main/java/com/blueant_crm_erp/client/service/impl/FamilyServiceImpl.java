@@ -3,6 +3,7 @@ package com.blueant_crm_erp.client.service.impl;
 import com.blueant_crm_erp.client.dto.request.AddFamilyMemberRequest;
 import com.blueant_crm_erp.client.dto.request.ChangeFamilyHeadRequest;
 import com.blueant_crm_erp.client.dto.request.CreateFamilyRequest;
+import com.blueant_crm_erp.client.dto.request.RemoveFamilyMemberRequest;
 import com.blueant_crm_erp.client.dto.response.*;
 import com.blueant_crm_erp.client.entity.Client;
 import com.blueant_crm_erp.client.entity.ClientFamily;
@@ -241,6 +242,72 @@ public class FamilyServiceImpl implements FamilyService {
 
         log.info("Added client {} to family {} by {}", client.getClientCode(), family.getFamilyCode(), actor);
         return mapToMemberResponse(savedMember, family.getFamilyHead() != null && family.getFamilyHead().getId().equals(client.getId()));
+    }
+
+    @Override
+    @Transactional
+    public FamilyDetailResponse removeMember(String familyCode, Long clientId, RemoveFamilyMemberRequest request, String authenticatedUsername) {
+        String actor = StringUtils.hasText(authenticatedUsername) ? authenticatedUsername : "SYSTEM";
+        String removalReason = (request != null && StringUtils.hasText(request.getReason())) ? request.getReason().trim() : null;
+
+        // 1. Concurrency-safe pessimistic write lock on family
+        ClientFamily family = clientFamilyRepository.findByFamilyCodeWithLock(familyCode.trim())
+                .orElseThrow(() -> new FamilyNotFoundException("Family not found with code: " + familyCode));
+
+        // 2. Validate family is ACTIVE
+        if (family.getStatus() != FamilyStatus.ACTIVE) {
+            throw new FamilyConflictException("Cannot remove member from inactive family " + familyCode + " (status: " + family.getStatus() + ")");
+        }
+
+        // 3. Validate client exists
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new ClientNotFoundException("Client not found with id: " + clientId));
+
+        // 4. Validate client is an ACTIVE member of this family
+        Optional<ClientFamilyMember> activeMemberOpt = clientFamilyMemberRepository
+                .findByFamilyIdAndClientIdAndMembershipStatus(family.getId(), client.getId(), FamilyMembershipStatus.ACTIVE);
+
+        if (activeMemberOpt.isEmpty()) {
+            // Check if member was already deactivated/removed from this family
+            Optional<ClientFamilyMember> existingMemberOpt = clientFamilyMemberRepository
+                    .findByFamilyIdAndClientId(family.getId(), client.getId());
+            if (existingMemberOpt.isPresent()) {
+                throw new FamilyConflictException("Client " + client.getClientCode() + " is already an inactive or removed member of family " + familyCode);
+            }
+            throw new FamilyConflictException("Client " + client.getClientCode() + " is not an active member of family " + familyCode);
+        }
+
+        // 5. Family Head Protection: Reject direct removal of current Family Head
+        if (family.getFamilyHead() != null && family.getFamilyHead().getId().equals(client.getId())) {
+            throw new FamilyConflictException(
+                    "Cannot remove client " + client.getClientCode() + " because they are currently the Family Head. Please designate another existing active family member as Family Head first."
+            );
+        }
+
+        // 6. Last Active Member Protection: Do not leave active family without any active members
+        List<ClientFamilyMember> activeMembers = clientFamilyMemberRepository
+                .findByFamilyIdAndMembershipStatus(family.getId(), FamilyMembershipStatus.ACTIVE);
+        if (activeMembers.size() <= 1) {
+            throw new FamilyConflictException(
+                    "Cannot remove client " + client.getClientCode() + " because they are the last active member of family " + familyCode + ". An active family cannot be left without active members."
+            );
+        }
+
+        // 7. Deactivate membership record (preserves historical relationship row and audit timestamps)
+        ClientFamilyMember member = activeMemberOpt.get();
+        member.setMembershipStatus(FamilyMembershipStatus.INACTIVE);
+        member.setLeftAt(LocalDateTime.now());
+        member.setLeftBy(actor);
+        clientFamilyMemberRepository.save(member);
+
+        // 8. Dissociate client from family while keeping client profile, history, investments, SIPs intact
+        client.setFamily(null);
+        clientRepository.save(client);
+
+        log.info("MEMBER_REMOVED: Successfully removed client {} (id={}) from family {} by {}. Reason: {}",
+                client.getClientCode(), client.getId(), family.getFamilyCode(), actor, removalReason != null ? removalReason : "N/A");
+
+        return mapToDetailResponse(family);
     }
 
     @Override

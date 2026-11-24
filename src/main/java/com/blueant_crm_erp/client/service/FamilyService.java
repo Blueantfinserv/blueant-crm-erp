@@ -3,6 +3,7 @@ package com.blueant_crm_erp.client.service;
 import com.blueant_crm_erp.client.dto.request.AddFamilyMemberRequest;
 import com.blueant_crm_erp.client.dto.request.ChangeFamilyHeadRequest;
 import com.blueant_crm_erp.client.dto.request.CreateFamilyRequest;
+import com.blueant_crm_erp.client.dto.request.RemoveFamilyMemberRequest;
 import com.blueant_crm_erp.client.dto.response.*;
 import com.blueant_crm_erp.client.enums.FamilyStatus;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,8 @@ public interface FamilyService {
     FamilyDetailResponse getFamilyByCode(String familyCode);
 
     FamilyMemberResponse addMember(String familyCode, AddFamilyMemberRequest request, String authenticatedUsername);
+
+    FamilyDetailResponse removeMember(String familyCode, Long clientId, RemoveFamilyMemberRequest request, String authenticatedUsername);
 
     List<EligibleFamilyHeadResponse> getEligibleHeads(String familyCode);
 

@@ -79,4 +79,13 @@ public class ClientMeetingVerificationController {
         ClientMeetingVerificationResponse response = clientVerificationService.rejectMeeting(meetingCode, reason, currentUser);
         return ApiResponse.success("Client meeting rejected successfully", response);
     }
+
+    @Operation(summary = "Get available PC verification business options", description = "Returns the 23 supported business options for PC verification")
+    @GetMapping("/business-options")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('MEETING_VERIFY') or hasAnyRole('PC_COORDINATOR', 'ADMIN', 'SUPER_ADMIN')")
+    public ApiResponse<List<String>> getBusinessOptions() {
+        List<String> options = clientVerificationService.getBusinessOptions();
+        return ApiResponse.success("Business options retrieved successfully", options);
+    }
 }

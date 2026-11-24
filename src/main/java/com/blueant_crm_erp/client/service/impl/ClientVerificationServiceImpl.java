@@ -128,8 +128,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
                         String normalized = PcBusinessType.normalize(itemDto.getBusinessType());
                         distinctTypes.add(normalized);
                         BigDecimal itemAmount = itemDto.getAmount();
-                        boolean isMonetary = PcBusinessType.isMonetary(normalized);
-                        if (isMonetary && itemAmount != null) {
+                        if (itemAmount != null && itemAmount.compareTo(BigDecimal.ZERO) > 0) {
                             totalMonetaryAmount = totalMonetaryAmount.add(itemAmount);
                         }
                         itemsToPersist.add(ClientMeetingVerificationBusinessItem.builder()
@@ -178,20 +177,24 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
                 verification.getBusinessItems().clear();
                 verification.getBusinessItems().addAll(itemsToPersist);
 
-                String investmentTypeStr;
                 String businessTypesStr;
                 if (request.getBusinessItems() != null && !request.getBusinessItems().isEmpty()) {
                     businessTypesStr = String.join(", ", distinctTypes);
-                    investmentTypeStr = businessTypesStr;
                 } else if (request.getBusinessTypes() != null && !request.getBusinessTypes().isEmpty()) {
                     businessTypesStr = String.join(", ", distinctTypes);
-                    investmentTypeStr = businessTypesStr;
                 } else if (request.getInvestmentType() != null && !request.getInvestmentType().isBlank()) {
                     businessTypesStr = request.getInvestmentType().trim();
-                    investmentTypeStr = request.getInvestmentType().trim();
                 } else {
                     businessTypesStr = String.join(", ", distinctTypes);
-                    investmentTypeStr = businessTypesStr;
+                }
+
+                if (businessTypesStr.length() > 500) {
+                    businessTypesStr = businessTypesStr.substring(0, 500);
+                }
+
+                String investmentTypeStr = businessTypesStr;
+                if (investmentTypeStr.length() > 100) {
+                    investmentTypeStr = investmentTypeStr.substring(0, 100);
                 }
 
                 verification.setBusinessGenerated("YES");
@@ -301,6 +304,11 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
         return mapToResponse(savedVerif);
     }
 
+    @Override
+    public List<String> getBusinessOptions() {
+        return PcBusinessType.DISPLAY_OPTIONS;
+    }
+
     private ClientMeetingVerificationResponse mapToResponse(ClientMeetingVerification v) {
         ClientMeeting m = v.getClientMeeting();
         String bg = v.getBusinessGenerated() != null ? v.getBusinessGenerated() : (m != null ? m.getBusinessGenerated() : null);
@@ -310,6 +318,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
             businessItems = v.getBusinessItems().stream()
                     .map(item -> ClientBusinessItemDto.builder()
                             .businessType(item.getBusinessType())
+                            .displayName(PcBusinessType.getDisplayName(item.getBusinessType()))
                             .amount(item.getAmount())
                             .build())
                     .toList();
@@ -319,6 +328,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
             businessItems = types.stream()
                     .map(t -> ClientBusinessItemDto.builder()
                             .businessType(t)
+                            .displayName(PcBusinessType.getDisplayName(t))
                             .amount(PcBusinessType.isMonetary(t) && monetaryCount == 1 ? v.getInvestmentAmount() : null)
                             .build())
                     .toList();

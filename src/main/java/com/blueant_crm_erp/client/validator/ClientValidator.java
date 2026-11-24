@@ -485,15 +485,8 @@ public class ClientValidator {
                         throw new BadRequestException("Duplicate business type is not allowed: " + item.getBusinessType());
                     }
 
-                    boolean isMonetary = PcBusinessType.isMonetary(normalized);
-                    if (isMonetary) {
-                        if (item.getAmount() == null || item.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                            throw new BadRequestException("Amount must be greater than zero for category: " + item.getBusinessType());
-                        }
-                    } else {
-                        if (item.getAmount() != null && item.getAmount().compareTo(BigDecimal.ZERO) < 0) {
-                            throw new BadRequestException("Amount cannot be negative for category: " + item.getBusinessType());
-                        }
+                    if (item.getAmount() != null && item.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+                        throw new BadRequestException("Amount cannot be negative for category: " + item.getBusinessType());
                     }
                 }
             } else {
@@ -517,15 +510,8 @@ public class ClientValidator {
                     }
                 }
 
-                boolean hasMonetary = rawTypes.stream().anyMatch(PcBusinessType::isMonetary);
-                if (hasMonetary) {
-                    if (request.getInvestmentAmount() == null || request.getInvestmentAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                        throw new BadRequestException("Investment Amount must be greater than zero when Business Generated is YES.");
-                    }
-                } else {
-                    if (request.getInvestmentAmount() != null && request.getInvestmentAmount().compareTo(BigDecimal.ZERO) < 0) {
-                        throw new BadRequestException("Investment Amount cannot be negative.");
-                    }
+                if (request.getInvestmentAmount() != null && request.getInvestmentAmount().compareTo(BigDecimal.ZERO) < 0) {
+                    throw new BadRequestException("Investment Amount cannot be negative.");
                 }
             }
         }

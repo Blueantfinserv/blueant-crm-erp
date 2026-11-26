@@ -42,4 +42,21 @@ public class ClientMeetingVerificationResponse {
 
     private LocalDateTime createdAt;
     private String createdBy;
+
+    // --- Additive Display & Audit Fields ---
+    private Long clientId;
+    private String clientCode;
+    private String clientName;
+    private String clientMobileNumber;
+    private Long assignedEmployeeId;
+    private String assignedEmployeeCode;
+    private String assignedEmployeeName;
+    private com.blueant_crm_erp.meeting.enums.SalesRole employeeRole;
+    private Integer meetingNumber;
+    private String meetingMode;
+    private LocalDate meetingDate;
+    private LocalTime meetingTimeOfDay;
+    private String meetingLocation;
+    private String meetingConducted;
+    private String clientMeetingStatus;
 }

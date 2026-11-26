@@ -13,6 +13,11 @@ public interface ClientVerificationService {
 
     PageResponse<ClientMeetingVerificationResponse> getVerifiedVerifications(Pageable pageable);
 
+    PageResponse<ClientMeetingVerificationResponse> searchVerifications(
+            com.blueant_crm_erp.client.dto.request.ClientMeetingVerificationSearchRequest request,
+            Pageable pageable,
+            String currentUserIdentifier);
+
     List<ClientMeetingVerificationResponse> getVerificationHistory(String meetingCode);
 
     ClientMeetingVerificationResponse verifyMeeting(String meetingCode, ClientMeetingVerificationRequest request, String currentUserIdentifier);

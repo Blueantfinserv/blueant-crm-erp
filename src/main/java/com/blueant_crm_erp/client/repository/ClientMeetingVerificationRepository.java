@@ -22,5 +22,15 @@ public interface ClientMeetingVerificationRepository extends JpaRepository<Clien
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"clientMeeting"})
     Page<ClientMeetingVerification> findByVerificationStatusAndIsCurrentTrue(VerificationStatus status, Pageable pageable);
 
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {
+            "clientMeeting",
+            "clientMeeting.client",
+            "clientMeeting.assignedEmployee",
+            "clientMeeting.assignedEmployee.role",
+            "clientMeeting.assignedEmployee.designation"
+    })
+    Page<ClientMeetingVerification> findAll(org.springframework.data.jpa.domain.Specification<ClientMeetingVerification> spec, Pageable pageable);
+
     int countByClientMeetingId(Long clientMeetingId);
 }

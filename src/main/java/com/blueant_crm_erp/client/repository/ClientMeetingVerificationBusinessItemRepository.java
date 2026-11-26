@@ -11,5 +11,7 @@ public interface ClientMeetingVerificationBusinessItemRepository extends JpaRepo
 
     List<ClientMeetingVerificationBusinessItem> findByVerificationId(Long verificationId);
 
+    List<ClientMeetingVerificationBusinessItem> findByVerificationIdIn(java.util.Collection<Long> verificationIds);
+
     void deleteByVerificationId(Long verificationId);
 }

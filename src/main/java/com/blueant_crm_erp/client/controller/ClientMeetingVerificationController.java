@@ -1,6 +1,7 @@
 package com.blueant_crm_erp.client.controller;
 
 import com.blueant_crm_erp.client.dto.request.ClientMeetingVerificationRequest;
+import com.blueant_crm_erp.client.dto.request.ClientMeetingVerificationSearchRequest;
 import com.blueant_crm_erp.client.dto.response.ClientMeetingVerificationResponse;
 import com.blueant_crm_erp.client.service.ClientVerificationService;
 import com.blueant_crm_erp.common.dto.response.ApiResponse;
@@ -43,6 +44,19 @@ public class ClientMeetingVerificationController {
     public ApiResponse<PageResponse<ClientMeetingVerificationResponse>> getVerifiedVerifications(Pageable pageable) {
         PageResponse<ClientMeetingVerificationResponse> response = clientVerificationService.getVerifiedVerifications(pageable);
         return ApiResponse.success("Verified client meeting verifications retrieved successfully", response);
+    }
+
+    @Operation(summary = "Search client meeting verifications", description = "Advanced search and filtering for client meeting verifications with role, date, client, and business filters")
+    @PostMapping("/search")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('MEETING_VERIFY') or hasAuthority('MEETING_READ') or hasAnyRole('PC_COORDINATOR', 'ADMIN', 'SUPER_ADMIN', 'RELATIONSHIP_MANAGER', 'SALES_COORDINATOR')")
+    public ApiResponse<PageResponse<ClientMeetingVerificationResponse>> searchVerifications(
+            @Valid @RequestBody(required = false) ClientMeetingVerificationSearchRequest request,
+            Pageable pageable,
+            Principal principal) {
+        String currentUser = principal != null ? principal.getName() : "system";
+        PageResponse<ClientMeetingVerificationResponse> response = clientVerificationService.searchVerifications(request, pageable, currentUser);
+        return ApiResponse.success("Client meeting verifications retrieved successfully", response);
     }
 
     @Operation(summary = "Get verification attempt history", description = "Returns all historical verification attempts for a client meeting")

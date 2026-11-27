@@ -432,6 +432,7 @@ public class ClientMeetingServiceImpl implements ClientMeetingService {
                 .verificationStatus(VerificationStatus.PENDING)
                 .businessGenerated(savedMeeting.getBusinessGenerated())
                 .remarks(null)
+                .nextFollowupDate(savedMeeting.getNextPlanDate())
                 .build();
         ClientMeetingVerification savedVerif = clientMeetingVerificationRepository.save(newAttempt);
 

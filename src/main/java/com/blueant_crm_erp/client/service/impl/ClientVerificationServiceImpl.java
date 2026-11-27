@@ -191,6 +191,11 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
 
         boolean isConducted = meeting.getMeetingConducted() == MeetingConductStatus.CONDUCTED;
 
+        // Authoritative resolution of follow-up date from meeting.nextPlanDate
+        LocalDate effectiveFollowupDate = meeting.getNextPlanDate() != null
+                ? meeting.getNextPlanDate()
+                : verification.getNextFollowupDate();
+
         verification.setVerificationStatus(VerificationStatus.VERIFIED);
         verification.setVerifiedBy(currentUserIdentifier);
         verification.setVerifiedAt(LocalDateTime.now());
@@ -210,7 +215,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
                 verification.setPosition(request.getPosition() != null ? request.getPosition().trim().toUpperCase() : null);
             }
             verification.setRemarks(request.getRemarks());
-            verification.setNextFollowupDate(request.getNextFollowupDate());
+            verification.setNextFollowupDate(effectiveFollowupDate);
 
             boolean bgYes = "YES".equalsIgnoreCase(meeting.getBusinessGenerated()) || "YES".equalsIgnoreCase(request.getBusinessGenerated());
             if (bgYes) {
@@ -315,7 +320,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
             verification.setNewMeetingDate(notConductedDate);
             verification.setMeetingTime(request.getMeetingTime());
             verification.setRemarks(request.getRemarks());
-            verification.setNextFollowupDate(request.getNextFollowupDate());
+            verification.setNextFollowupDate(effectiveFollowupDate);
             verification.setBlueantAppUsed(null);
             verification.setAloneWith(null);
             verification.setPersonName(null);
@@ -345,8 +350,8 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
         // Update client next follow-up and investment type if verified
         Client client = meeting.getClient();
         if (client != null) {
-            if (request.getNextFollowupDate() != null) {
-                client.setNextFollowupDate(request.getNextFollowupDate());
+            if (effectiveFollowupDate != null) {
+                client.setNextFollowupDate(effectiveFollowupDate);
             }
             if (StringUtils.hasText(savedVerif.getInvestmentType())) {
                 client.setInvestmentType(savedVerif.getInvestmentType());
@@ -386,6 +391,9 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
         verification.setRejectionReason(reason.trim());
         verification.setVerifiedBy(currentUserIdentifier);
         verification.setVerifiedAt(LocalDateTime.now());
+        if (verification.getNextFollowupDate() == null && meeting.getNextPlanDate() != null) {
+            verification.setNextFollowupDate(meeting.getNextPlanDate());
+        }
 
         ClientMeetingVerification savedVerif = clientMeetingVerificationRepository.save(verification);
 
@@ -450,6 +458,13 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
             }
         }
 
+        LocalDate effectiveFollowupDate;
+        if (Boolean.TRUE.equals(v.getIsCurrent()) && m != null) {
+            effectiveFollowupDate = m.getNextPlanDate();
+        } else {
+            effectiveFollowupDate = v.getNextFollowupDate() != null ? v.getNextFollowupDate() : (m != null ? m.getNextPlanDate() : null);
+        }
+
         return ClientMeetingVerificationResponse.builder()
                 .id(v.getId())
                 .clientMeetingId(m != null ? m.getId() : null)
@@ -472,7 +487,7 @@ public class ClientVerificationServiceImpl implements ClientVerificationService 
                 .businessItems(businessItems)
                 .investmentAmount(v.getInvestmentAmount())
                 .remarks(v.getRemarks())
-                .nextFollowupDate(v.getNextFollowupDate())
+                .nextFollowupDate(effectiveFollowupDate)
                 .createdAt(v.getCreatedAt())
                 .createdBy(v.getCreatedBy())
                 .clientId(client != null ? client.getId() : null)

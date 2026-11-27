@@ -38,6 +38,7 @@ public class ClientMeetingVerificationResponse {
     private List<com.blueant_crm_erp.client.dto.ClientBusinessItemDto> businessItems;
     private BigDecimal investmentAmount;
     private String remarks;
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate nextFollowupDate;
 
     private LocalDateTime createdAt;

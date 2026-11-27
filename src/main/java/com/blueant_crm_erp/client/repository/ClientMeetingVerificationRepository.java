@@ -16,10 +16,10 @@ public interface ClientMeetingVerificationRepository extends JpaRepository<Clien
 
     Optional<ClientMeetingVerification> findByClientMeetingIdAndIsCurrentTrue(Long clientMeetingId);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"clientMeeting"})
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"clientMeeting", "clientMeeting.client", "clientMeeting.assignedEmployee"})
     List<ClientMeetingVerification> findByClientMeetingIdOrderByAttemptNumberAsc(Long clientMeetingId);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"clientMeeting"})
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"clientMeeting", "clientMeeting.client", "clientMeeting.assignedEmployee"})
     Page<ClientMeetingVerification> findByVerificationStatusAndIsCurrentTrue(VerificationStatus status, Pageable pageable);
 
     @Override
